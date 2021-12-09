@@ -1,0 +1,30 @@
+#!/bin/sh
+
+#------ pjsub option --------#
+#PJM -L rscgrp=regular-flat 
+#PJM -L node=16
+#PJM --mpi proc=1024
+#PJM --omp thread=1
+#PJM -L elapse=00:05:00
+#PJM -g po8029
+#PJM -j
+#PJM -S
+#PJM -o "calliope.out.std"
+#PJM -m e
+#PJM --mail-list "yohey.44@gmail.com"
+
+#------ Pinning setting --------#
+source /usr/local/bin/hybrid_core_setting.sh 2
+# source /usr/local/bin/mpi_core_setting.sh
+#------- Program execution -------# 
+
+module purge
+module load intel/2020.2.254
+module load hdf5/1.12.0
+module load netcdf/4.7.4
+module load netcdf-fortran/4.5.3
+
+export LD_LIBRARY_PATH=/work/opt/local/apps/intel/2020.2.254/hdf5/1.12.0/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/work/opt/local/apps/intel/2020.2.254/netcdf/4.7.4/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/work/opt/local/apps/intel/2020.2.254/netcdf-fortran/4.5.3/lib:$LD_LIBRARY_PATH
+mpiexec.hydra -n ${PJM_MPI_PROC} ./calliope

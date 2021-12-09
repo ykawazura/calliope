@@ -1,0 +1,20 @@
+FC = mpifrtpx
+
+P3DFFT_HOME=/home/o07001/work/.local/p3dfft
+P3DFFT_INC=-I$(P3DFFT_HOME)/include/
+P3DFFT_LIB=-L$(P3DFFT_HOME)/lib/ -lp3dfft
+
+FFTW3_HOME=/work/opt/local/apps/intel/2019.5.281/fftw/3.3.8
+FFTW3_LIB=-L$(FFTW3_HOME)/lib/ -lfftw3
+
+NETCDF_HOME=$(NETCDF_FORTRAN_DIR)
+HDF5_PATH=$(HDF5_DIR)
+NETCDF_INC=-I$(NETCDF_HOME)/include/
+NETCDF_LIB=-L$(NETCDF_HOME)/lib -lnetcdf -lnetcdff -L/$(HDF5_PATH)/lib -lhdf5_hl -lhdf5 -lz
+
+F90FLAGS = -Cpp -Free
+# MPI_LIB = -lm -lmpi -lmpifort
+LIB_OPENMP = -fopenmp # used only when USE_OPENMP=yes in ../Makefile.in
+
+# CPPFLAGS += -DFCOMPILER=_FUJ_
+# FFLAGS = -Cpp -Free -Kfast

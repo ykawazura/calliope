@@ -1,0 +1,18 @@
+#!/bin/bash --login
+#PBS -q SQUID
+#PBS --group=G15242
+#PBS -l elapstim_req=00:05:00
+#PBS -b 2
+#PBS -T intmpi
+#PBS -v OMP_NUM_THREADS=1
+#PBS -m abe
+#PBS -M yohey.44@gmail.com
+
+# Change to the directory that the job was submitted from
+module load BaseCPU
+module load netcdf-c/4.7.4
+module load netcdf-fortran/4.5.3
+module load hdf5/1.10.5
+
+cd ${PBS_O_WORKDIR}
+mpirun ${NQSV_MPIOPTS} -n 152 ./calliope < calliope.in > calliope.out.std

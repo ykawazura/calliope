@@ -1,0 +1,108 @@
+!--------------------------------------------------!
+!             INPUTS for MHD COMP ISOTH            !
+!--------------------------------------------------!
+&mpi_settings
+  dim_decomp = 2
+/
+
+!==============================================================================
+&box_parameters
+  lx = 2.0 ! to be multiplied by 2pi
+  ly = 4.0 ! to be multiplied by 2pi
+  lz = 1.0 ! to be multiplied by 2pi
+
+  nlx = 1024
+  nly = 2048
+  nlz = 512
+/
+
+!==============================================================================
+&time_parameters
+  dt    = 1.0d-2
+  nstep = 10000 
+  cfl   = 0.9d0
+  reset_method = 'decrement'  !'multiply'  => multiply by a factor of 0.5
+                             !'decrement' => decrement the top integer of dt
+  increase_dt = F            !if .true., increase dt by a factor of 5.0
+                             ! when dt_cfl > 10.0*dt 
+/
+
+!==============================================================================
+&operation_parameters
+  nonlinear = T
+/
+
+!==============================================================================
+&dealias_parameters
+  dealias = '2/3' !: 2/3 or 3/2
+/
+
+!==============================================================================
+&physical_parameters
+  ! hyper dissipation ~ nu*k^(2*nuexp)
+  nu      = 1d+5  ! viscosity
+  nu_exp  = 4
+  ! hyper resistivity ~ eta*k^(2*etaexp)
+  eta     = 1d+5  ! resistivity
+  eta_exp = 4
+  ! hyper diffusion ~ lmd*k^(2*lmdexp)
+  lmd     = 1d+6  ! diffusion
+  lmd_exp = 4
+
+  beta0  = 7.9d+1
+
+  rho_min = 1.d-2 ! floor value
+
+  ! shear parameters
+  shear  = .true.
+  q      = 1.5d0
+/
+
+!==============================================================================
+&initial_condition
+  !init_type = 'zero'
+  !init_type = 'single_vortex'
+  !init_type = 'single_mode'
+  !init_type = 'OT2'
+  init_type = 'random'
+  !init_type = 'restart'
+/
+
+&initial_condition_params
+  kmin = 0.d0   0.d0   0.d0
+  kmax = 5.d0   5.d0   5.d0
+  b0   = 0.d0   0.d0   0.10d0     ! beta0*rho0/b0**2 will be the initial beta.
+  b1   = 1.d-2  1.d-2  1.d-2
+  u1   = 0.d+0  0.d+0  0.d+0
+  rho0 = 1.d+0                    ! beta0*rho0/b0**2 will be the initial beta.
+  rho1 = 0.d+0
+/
+
+!==============================================================================
+&force
+  driven = F
+  nk_stir = 0  !Number of independent driven Fourier modes
+/
+
+!==============================================================================
+&terminate
+  max_wall_time   = 11.5            ! The simulation will be terminated when the wall  
+                                    ! time exceeds this value (in the unit of hour).
+
+  terminate_file_name = 'terminate' ! The simulation will be terminated when the file 
+                                    ! named this value is created in the root directory
+                                    ! in the middle of simulaiton.
+/
+
+!==============================================================================
+&diagnostics_parameters
+  nwrite = 50  
+  nwrite_fld_section = 2000
+  nwrite_fld_3D = 20000
+  nwrite_SF2 = 0
+  nsave_restart = 5000 
+  restart_dir = './restart/'
+/
+
+
+

@@ -1,0 +1,22 @@
+FC = mpifrtpx
+
+# Choose one FFT engine, available options are:
+#   essl    - IBM Engineering and Scientific Subroutine Library
+#   fftw3   - FFTW version 3.x
+#   generic - A general FFT algorithm (no 3rd-party library needed)
+FFT = fftw3
+
+CPPFLAGS += -DFCOMPILER=_FUJ_
+
+FFLAGS = -Cpp -Free
+
+FFTW_INC=/center/fjlocal/s64fx/fftw-3.3.7/include
+FFTW_LIB=/center/fjlocal/s64fx/fftw-3.3.7/lib
+
+INCFFT=-I$(FFTW_INC)
+LIBFFT=-L$(FFTW_LIB) -lfftw3 -lfftw3f
+
+NETCDF_PATH=/center/fjlocal/s64fx/netcdf-4
+INCNETCDF=-I/usr/include -I$(NETCDF_PATH)/include 
+LIBNETCDF=-L$(NETCDF_PATH)/lib -lnetcdff -lnetcdf -L/center/fjlocal/s64fx/hdf5-1.10.1/lib -lhdf5_hl -lhdf5 -lz
+

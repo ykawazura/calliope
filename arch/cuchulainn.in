@@ -1,0 +1,16 @@
+FC = /usr/local/mpich2/bin/mpif90
+
+P3DFFT_HOME=/usr/local/p3dfft.2
+P3DFFT_INC=-I$(P3DFFT_HOME)/include/
+P3DFFT_LIB=-L$(P3DFFT_HOME)/lib/ -lp3dfft
+
+FFTW3_HOME=/usr/local/fftw3
+FFTW3_LIB=-L$(FFTW3_HOME)/lib/ -lfftw3
+
+NETCDF_HOME=/usr/local/netcdf
+NETCDF_INC=-I$(NETCDF_HOME)/include/
+NETCDF_LIB=-L$(NETCDF_HOME)/lib -lnetcdf -lnetcdff
+
+F90FLAGS = -DGNU -O3 -Wunused
+MPILIB = -lm -lmpi -lmpifort
+LIB_OPENMP = -fopenmp # used only when USE_OPENMP=yes in ../Makefile.in

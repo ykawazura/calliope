@@ -1,0 +1,17 @@
+FC = /usr/local/mpich_pgi/bin/mpif90
+
+# Choose one FFT engine, available options are:
+#   essl    - IBM Engineering and Scientific Subroutine Library
+#   fftw3   - FFTW version 3.x
+#   generic - A general FFT algorithm (no 3rd-party library needed)
+FFT = generic
+
+FFLAGS = -cpp -O3 -acc -Minfo=accel -ta=tesla,cc70,managed
+
+FFTW3_PATH=/usr/local/fftw3_pgi
+INCFFT=-I$(FFTW3_PATH)/include
+LIBFFT=-L$(FFTW3_PATH) -lfftw3 -lfftw3f
+
+NETCDF_PATH=/usr/local/netcdf_pgi
+INCNETCDF=-I/usr/include -I$(NETCDF_PATH)/include 
+LIBNETCDF=-L$(NETCDF_PATH)/lib -lnetcdf -lnetcdff  

@@ -1,0 +1,17 @@
+FC = h5pfc
+
+# Choose one FFT engine, available options are:
+#   essl    - IBM Engineering and Scientific Subroutine Library
+#   fftw3   - FFTW version 3.x
+#   generic - A general FFT algorithm (no 3rd-party library needed)
+FFT = fftw3
+
+FFLAGS = -cpp -O3 -funroll-loops -g -Warray-bounds -march=native
+
+FFTW3_PATH=$(FFTW_HOME)
+INCFFT=-I$(FFTW3_PATH)/include
+LIBFFT=-L$(FFTW3_PATH) -lfftw3 -lfftw3f
+
+NETCDF_PATH=$(NETCDFF_HOME)
+INCNETCDF=-I/usr/include -I$(NETCDF_PATH)/include 
+LIBNETCDF=-L$(NETCDF_PATH)/lib -lnetcdff  

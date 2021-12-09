@@ -1,0 +1,8 @@
+#!/bin/bash
+#COBALT -t 30
+#COBALT -n 128
+#COBALT -q default
+#COBALT --attrs mcdram=cache:numa=quad
+#COBALT -A AstroGK_turb
+
+aprun -n 8192 -N 64 -cc depth -d 1 -j 1 atlas

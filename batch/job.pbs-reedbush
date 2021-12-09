@@ -1,0 +1,21 @@
+#!/bin/sh
+#PBS -q h-tutorial
+#PBS -l select=1:mpiprocs=2:ompthreads=1 
+#PBS -W group_list=gt00
+#PBS -l walltime=01:00:00
+
+cd $PBS_O_WORKDIR
+
+. /etc/profile.d/modules.sh
+
+module purge
+module load pgi/19.10; 
+module load mvapich2/2.3.3/pgi
+
+export LD_LIBRARY_PATH=$HOME/.local/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/lustre/gt00/t00735/.local/fftw3/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=/lustre/gt00/t00735/.local/netcdf/lib:$LD_LIBRARY_PATH
+
+export PGI_ACC_TIME=1
+
+mpiexec -np=2 ./calliope < calliope.in > calliope.out.std

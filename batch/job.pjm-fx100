@@ -1,0 +1,15 @@
+#!/bin/sh
+#------ pjsub option --------# 
+#PJM -L "rscgrp=fx-small"
+#PJM -L "node=2x2x2:noncont"
+#PJM --mpi "proc=256"
+#PJM -L "elapse=24:00:00"
+#PJM -j
+#PJM -S
+#PJM -o "calliope.out.std"
+#PJM -m b
+#PJM -m e
+#PJM --mail-list yohey.44@gmail.com
+#------- Program execution -------# 
+
+mpiexec ./calliope

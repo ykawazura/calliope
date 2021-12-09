@@ -1,0 +1,18 @@
+#=======================================================================
+# Edit this file to change code options 
+#=======================================================================
+
+# Set architecture name; 'arch/$(arch).in' will be included.
+arch = danann_gfortran
+
+# MODEL : 
+# 	RMHD
+# 	MHD_INCOMP
+# 	MHD_COMP_ISOTH
+# 	MHD_COMP_ADIAB
+MODEL = MHD_INCOMP
+
+# use openmp
+USE_OPENMP = yes
+# debug
+DEBG = no

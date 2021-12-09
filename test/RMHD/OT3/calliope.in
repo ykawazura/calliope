@@ -1,0 +1,89 @@
+!--------------------------------------------------!
+!                  INPUTS for RMHD                 !
+!--------------------------------------------------!
+&mpi_settings
+  dim_decomp = 2
+/
+
+!==============================================================================
+&box_parameters
+  lx = 1.0 ! to be multiplied by 2pi
+  ly = 1.0 ! to be multiplied by 2pi
+  lz = 1.0 ! to be multiplied by 2pi
+
+  nlx = 64
+  nly = 64
+  nlz = 64
+/
+
+!==============================================================================
+&time_parameters
+  dt    = 1.0d-2
+  nstep = 5000 
+  cfl   = 0.9d0
+  reset_method = 'multiply'  !'multiply'  => multiply by a factor of 0.5
+                             !'decrement' => decrement the top integer of dt
+  increase_dt = F            !if .true., increase dt by a factor of 5.0
+                             ! when dt_cfl > 10.0*dt 
+/
+
+!==============================================================================
+&operation_parameters
+  nonlinear = T
+/
+
+!==============================================================================
+&dealias_parameters
+  dealias = '2/3' !: 2/3 or 3/2
+/
+
+!==============================================================================
+&physical_parameters
+  ! hyper dissipation ~ nu*kperp^(2*nuexp)
+  nupe_x      = 1d+3  ! perp viscosity   for phi
+  nupe_x_exp  = 4
+  etape_x     = 1d+3  ! perp resistivity for psi
+  etape_x_exp = 4
+
+  ! hyper dissipation ~ nu*kz^(2*nuexp)
+  nupe_z      = 1d+3  ! para viscosity   for phi
+  nupe_z_exp  = 4
+  etape_z     = 1d+3  ! para resistivity for psi
+  etape_z_exp = 4
+/
+
+!==============================================================================
+&initial_condition
+  !init_type = 'zero'
+  !init_type = 'test'
+  !init_type = 'single_mode'
+  !init_type = 'OT2'
+  init_type = 'OT3'
+  !init_type = 'random'
+  !init_type = 'restart'
+/
+
+!==============================================================================
+&force
+  driven = F
+  nk_stir = 0  !Number of independent driven Fourier modes
+/
+
+!==============================================================================
+&terminate
+  max_wall_time   = 12.             ! The simulation will be terminated when the wall  
+                                    ! time exceeds this value (in the unit of hour).
+
+  terminate_file_name = 'terminate' ! The simulation will be terminated when the file 
+                                    ! named this value is created in the root directory
+                                    ! in the middle of simulaiton.
+/
+
+!==============================================================================
+&diagnostics_parameters
+  nwrite = 100 
+  nwrite_fields = 90000 
+  nsave_restart = 5000 
+  restart_dir = './restart/'
+/
+

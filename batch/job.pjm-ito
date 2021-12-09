@@ -1,0 +1,35 @@
+#!/bin/sh
+#------ pjsub option --------# 
+#PJM -L "rscunit=ito-a"            
+#PJM -L "rscgrp=ito-m"
+#PJM -L "vnode=16"
+#PJM -L "vnode-core=36"
+#PJM -L elapse=24:00:00 
+#PJM -j
+#PJM -o "calliope.out.std"
+#PJM -m e
+#PJM --mail-list "yohey.44@gmail.com"
+
+
+module load intel
+module load openmpi/1.10.7
+module load netcdf
+module load hdf5/1.10.5_intel2020.1-process
+module load fftw
+# export LD_LIBRARY_PATH=/home/app/a/fftw-3.3.6-pl2//lib:$LD_LIBRARY_PATH
+# export LD_LIBRARY_PATH=/home/app/a/NetCDF-4.4.1.1/lib:$LD_LIBRARY_PATH
+# export LD_LIBRARY_PATH=/usr/local/intel2018_up1/compilers_and_libraries_2018.0.128/linux/compiler/lib/intel64/:$LD_LIBRARY_PATH
+
+
+NUM_NODES=${PJM_VNODES}
+NUM_CORES=36
+NUM_PROCS=576
+
+export I_MPI_PERHOST=$NUM_CORES
+export I_MPI_FABRICS=shm:ofi
+
+export I_MPI_HYDRA_BOOTSTRAP=rsh
+export I_MPI_HYDRA_BOOTSTRAP_EXEC=/bin/pjrsh
+export I_MPI_HYDRA_HOST_FILE=${PJM_O_NODEINF}
+
+mpiexec.hydra -n $NUM_PROCS ./calliope

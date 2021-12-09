@@ -1,0 +1,22 @@
+#!/bin/bash
+# set the number of nodes
+#SBATCH --nodes=1 
+
+# set the number of tasks (processes) per node.
+#SBATCH --ntasks-per-node=16
+
+# set max wallclock time
+#SBATCH --time=24:00:00
+
+# set name of job
+#SBATCH --job-name=calliope
+
+# mail alert at start, end and abortion of execution
+#SBATCH --mail-type=ALL
+
+# send mail to this address
+#SBATCH --mail-user=yohey.44@gmail.com
+
+. enable_arcus-b_mpi.sh
+
+mpirun $MPI_HOSTS ./calliope &> calliope.out.std

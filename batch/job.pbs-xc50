@@ -1,0 +1,12 @@
+#!/bin/bash --login
+#PBS -N calliope
+#PBS -l nodes=13
+#PBS -l walltime=24:00:00
+#PBS -q bulk-b
+#PBS -m abe
+#PBS -M yohey.44@gmail.com
+
+# Change to the directory that the job was submitted from
+cd ${PBS_O_WORKDIR}
+export OMP_NUM_THREADS=1
+aprun -n 520 -N 13 -d ${OMP_NUM_THREADS} -j 1 --cc depth ./calliope < calliope.in > calliope.out.std

@@ -1,0 +1,20 @@
+FC = mpifrtpx
+
+P3DFFT_HOME=/data/group1/z43491n/.local/p3dfft
+P3DFFT_INC=-I$(P3DFFT_HOME)/include/
+P3DFFT_LIB=-L$(P3DFFT_HOME)/lib/ -lp3dfft
+
+FFTW3_HOME=/home/center/opt/spack/aarch64/fj/4.2.1/fftw/3.3.8
+FFTW3_LIB=-L$(FFTW3_HOME)/lib/ -lfftw3
+
+NETCDFF_PATH=/home/center/opt/spack/aarch64/fj/4.1.0/netcdf-fortran/4.5.2/syl
+HDF5_PATH=/home/center/opt/spack/aarch64/fj/4.1.0/hdf5/1.10.6/3dn
+NETCDF_INC=-I/usr/include -I/$(NETCDF_DIR)/include -I$(NETCDFF_PATH)/include 
+NETCDF_LIB=-L/$(NETCDF_DIR)/lib -L$(NETCDFF_PATH)/lib -lnetcdff -lnetcdf -L/$(HDF5_PATH)/lib -lhdf5_hl -lhdf5 -lz
+
+F90FLAGS = -Cpp -Free -Kfast
+# MPI_LIB = -lm -lmpi -lmpifort
+LIB_OPENMP = -fopenmp # used only when USE_OPENMP=yes in ../Makefile.in
+
+# CPPFLAGS += -DFCOMPILER=_FUJ_
+# FFLAGS = -Cpp -Free -Kfast

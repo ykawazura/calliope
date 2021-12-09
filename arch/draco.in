@@ -1,0 +1,17 @@
+FC = mpifort
+
+# Choose one FFT engine, available options are:
+#   essl    - IBM Engineering and Scientific Subroutine Library
+#   fftw3   - FFTW version 3.x
+#   generic - A general FFT algorithm (no 3rd-party library needed)
+FFT = fftw3
+
+FFLAGS = -cpp -O3 -funroll-loops -g -march=native
+
+FFTW3_PATH=/usr/local/fftw-3.3.4-intel64-v16.0.1-openmpi-1.8.6/
+INCFFT=-I$(FFTW3_PATH)/include
+LIBFFT=-L$(FFTW3_PATH) -lfftw3 -lfftw3f
+
+NETCDF_PATH=$(HOME)/.local/netcdf/
+INCNETCDF=-I/usr/include -I$(NETCDF_PATH)/include 
+LIBNETCDF=-L$(NETCDF_PATH)/lib -lnetcdf -lnetcdff  

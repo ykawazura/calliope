@@ -1,0 +1,20 @@
+#!/bin/sh
+#------ pjsub option --------# 
+#PJM -L rscgrp=regular-o
+#PJM -L node=10
+#PJM -g gq55 
+#PJM --mpi proc=480
+#PJM --omp thread=1
+#PJM -L elapse=00:30:00 
+#PJM -j
+#PJM -o "calliope.out.std"
+#PJM -m e
+#PJM --mail-list "yohey.44@gmail.com"
+
+module load fj 
+module load fftw 
+module load netcdf
+module load netcdf-fortran
+module load hdf5
+
+mpirun ./calliope

@@ -1,0 +1,26 @@
+#!/bin/sh
+#PJM -L  "node=6144"
+#PJM -L  "rscgrp=large"
+#PJM -L  "elapse=01:00:00"
+#PJM --mpi "max-proc-per-node=24" 
+#PJM -s
+#PJM -j
+#PJM -m e
+#PJM --mail-list "yohey.44@gmail.com"
+#
+
+. /vol0004/apps/oss/spack/share/spack/setup-env.sh
+spack load netcdf-c@4.7.4%fj@4.6.1 
+spack load netcdf-fortran@4.5.3%fj@4.6.1
+spack load /kb65lmo
+spack load /iqe7btp
+
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/vol0004/apps/oss/spack-v0.16.2/opt/spack/linux-rhel8-a64fx/fj-4.6.1/hdf5-1.10.7-iqe7btpizzcuz2nvbpxxmoc5ean4ftca/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/vol0004/apps/oss/spack-v0.16.2/opt/spack/linux-rhel8-a64fx/fj-4.6.1/netcdf-c-4.7.4-h3jxiqc2hquhexqlmiohcu3bwemuahhe/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/vol0004/apps/oss/spack-v0.16.2/opt/spack/linux-rhel8-a64fx/fj-4.6.1/netcdf-fortran-4.5.3-bubmb4irgklabbtditixoiikqmr5brlz/lib
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/vol0004/apps/oss/spack-v0.16.2/opt/spack/linux-rhel8-a64fx/fj-4.6.1/fujitsu-fftw-master-ytok4j4l2qa355nopq524zx6ecktzjg2/lib
+
+export PARALLEL=2
+export OMP_NUM_THREADS=${PARALLEL}
+
+mpiexec -stdin calliope.in -std calliope.out.std -n 147456 ./calliope

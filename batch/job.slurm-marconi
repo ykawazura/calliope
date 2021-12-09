@@ -1,0 +1,15 @@
+#!/bin/bash
+#SBATCH --time=24:00:00
+#SBATCH --nodes=40
+#SBATCH --ntasks-per-node=48
+#SBATCH --mem=145GB
+#SBATCH --partition=skl_fua_prod
+#SBATCH --job-name=calliope
+#SBATCH --err=job.err 
+#SBATCH --out=job.out
+#SBATCH --account=FUA33_MULTEI
+#SBATCH --mail-type=ALL
+#SBATCH --mail-user=yohey.44@gmail.com
+
+module unload fftw/2.1.5--intelmpi--2018--binary; module load fftw/3.3.7--intelmpi--2018--binary
+srun --mpi=pmi2 ./calliope < calliope.in > calliope.out.std

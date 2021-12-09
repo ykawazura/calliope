@@ -1,0 +1,84 @@
+!--------------------------------------------------!
+!               INPUTS for MHD INCOMP              !
+!--------------------------------------------------!
+&mpi_settings
+  dim_decomp = 1
+/
+
+!==============================================================================
+&box_parameters
+  lx = 1.0 ! to be multiplied by 2pi
+  ly = 1.0 ! to be multiplied by 2pi
+  lz = 1.0 ! to be multiplied by 2pi
+
+  nlx = 64
+  nly = 64
+  nlz = 2
+/
+
+!==============================================================================
+&time_parameters
+  dt    = 2.0d-3
+  nstep = 3000 
+  cfl   = 0.9d0
+  reset_method = 'multiply'  !'multiply'  => multiply by a factor of 0.5
+                             !'decrement' => decrement the top integer of dt
+  increase_dt = F            !if .true., increase dt by a factor of 5.0
+                             ! when dt_cfl > 10.0*dt 
+/
+
+!==============================================================================
+&operation_parameters
+  nonlinear = T
+/
+
+!==============================================================================
+&dealias_parameters
+  dealias = '2/3' !: 2/3 or 3/2
+/
+
+!==============================================================================
+&physical_parameters
+  ! hyper dissipation ~ nu*k^(2*nuexp)
+  nu      = 1d+3  ! viscosity
+  nu_exp  = 4
+  ! hyper resistivity ~ eta*k^(2*etaexp)
+  eta     = 1d+3  ! resistivity
+  eta_exp = 4
+/
+
+!==============================================================================
+&initial_condition
+  !init_type = 'zero'
+  !init_type = 'single_mode'
+  init_type = 'OT2'
+  !init_type = 'random'
+  !init_type = 'restart'
+/
+
+!==============================================================================
+&force
+  driven = F
+  nk_stir = 0  !Number of independent driven Fourier modes
+/
+
+!==============================================================================
+&terminate
+  max_wall_time   = 12.             ! The simulation will be terminated when the wall  
+                                    ! time exceeds this value (in the unit of hour).
+
+  terminate_file_name = 'terminate' ! The simulation will be terminated when the file 
+                                    ! named this value is created in the root directory
+                                    ! in the middle of simulaiton.
+/
+
+!==============================================================================
+&diagnostics_parameters
+  nwrite = 80  
+  nwrite_fields = 90000 
+  nsave_restart = 5000 
+  restart_dir = './restart/'
+/
+
+
+
