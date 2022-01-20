@@ -36,6 +36,11 @@ SRC_RMHD = \
 			$(MODEL_DIR)/$(MODEL)_specific.F90 \
 			$(MODEL_DIR)/io.F90 $(MODEL_DIR)/diagnostics.F90 \
 			$(MODEL_DIR)/advance.F90 calliope.F90
+
+### List of files for 'RRMHD'
+SRC_RRMHD = $(SRC_RMHD)
+
+### List of files for 'MHD_INCOMP'
 SRC_MHD_INCOMP = \
 			time_stamp.F90 file.F90 \
 			$(MODEL_DIR)/params.F90 mp.F90 mpiio.F90 \
@@ -46,6 +51,8 @@ SRC_MHD_INCOMP = \
 			$(MODEL_DIR)/$(MODEL)_specific.F90 \
 			$(MODEL_DIR)/io.F90 $(MODEL_DIR)/diagnostics.F90 \
 			$(MODEL_DIR)/advance.F90 calliope.F90
+
+### List of files for 'MHD_COMP_ISOTH'
 SRC_MHD_COMP_ISOTH = \
 			time_stamp.F90 file.F90 \
 			$(MODEL_DIR)/params.F90 mp.F90 mpiio.F90 \
@@ -56,6 +63,8 @@ SRC_MHD_COMP_ISOTH = \
 			$(MODEL_DIR)/$(MODEL)_specific.F90 \
 			$(MODEL_DIR)/io.F90 $(MODEL_DIR)/diagnostics.F90 \
 			$(MODEL_DIR)/advance.F90 calliope.F90
+
+### List of files for 'MHD_COMP_ADIAB'
 SRC_MHD_COMP_ADIAB = \
 			time_stamp.F90 file.F90 \
 			$(MODEL_DIR)/params.F90 mp.F90 mpiio.F90 \

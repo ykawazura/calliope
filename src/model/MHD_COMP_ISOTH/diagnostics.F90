@@ -13,7 +13,7 @@ module diagnostics
   implicit none
 
   public :: init_diagnostics, finish_diagnostics
-  public :: loop_diagnostics, loop_diagnostics_fields_secion, loop_diagnostics_SF2
+  public :: loop_diagnostics, loop_diagnostics_fields_secion, loop_diagnostics_kpar, loop_diagnostics_SF2
 
   private
 contains
@@ -69,8 +69,6 @@ contains
     implicit none
     integer :: i, j, k
 
-    complex(r8), allocatable, dimension(:,:,:) :: lnrho, lnrho_old1
-    complex(r8), allocatable, dimension(:,:,:) :: u2half, u2half_old1
 
     real(r8)   , allocatable, dimension(:,:,:) :: wkin, wmag
     real(r8)   , allocatable, dimension(:,:,:) :: wkin_old1, wmag_old1
@@ -81,10 +79,14 @@ contains
     real(r8)   , allocatable, dimension(:,:,:) :: b2, bx2, by2, bz2
     real(r8)   , allocatable, dimension(:,:,:) :: p_u
     real(r8)   , allocatable, dimension(:,:,:) :: zp2, zm2
+    real(r8)   , allocatable, dimension(:,:,:) :: src_r
 
     complex(r8), allocatable, dimension(:,:,:) :: ux, uy, uz
     complex(r8), allocatable, dimension(:,:,:) :: ux_old1, uy_old1, uz_old1
+    complex(r8), allocatable, dimension(:,:,:) :: lnrho, lnrho_old1
+    complex(r8), allocatable, dimension(:,:,:) :: u2half, u2half_old1
     complex(r8), allocatable, dimension(:,:,:) :: f
+    complex(r8), allocatable, dimension(:,:,:) :: src_c
 
     real(r8)   , allocatable, dimension(:,:,:) :: rho_r, ux_r, uy_r, uz_r, bx_r, by_r, bz_r
 
@@ -115,37 +117,42 @@ contains
     endif
     if (proc0) call put_time_stamp(timer_diagnostics)
 
-    allocate(ux         (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); ux          = 0.d0
-    allocate(uy         (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); uy          = 0.d0
-    allocate(uz         (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); uz          = 0.d0
-    allocate(ux_old1    (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); ux_old1     = 0.d0
-    allocate(uy_old1    (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); uy_old1     = 0.d0
-    allocate(uz_old1    (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); uz_old1     = 0.d0
-    allocate(lnrho      (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); lnrho       = 0.d0
-    allocate(lnrho_old1 (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); lnrho_old1  = 0.d0
-    allocate(u2half     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); u2half      = 0.d0
-    allocate(u2half_old1(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); u2half_old1 = 0.d0
+    allocate(src_c(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0,0.d0))
+    allocate(ux         , source=src_c)
+    allocate(uy         , source=src_c)
+    allocate(uz         , source=src_c)
+    allocate(ux_old1    , source=src_c)
+    allocate(uy_old1    , source=src_c)
+    allocate(uz_old1    , source=src_c)
+    allocate(lnrho      , source=src_c)
+    allocate(lnrho_old1 , source=src_c)
+    allocate(u2half     , source=src_c)
+    allocate(u2half_old1, source=src_c)
+    allocate(f          , source=src_c)
+    deallocate(src_c)
 
-    allocate(wkin       (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); wkin        = 0.d0
-    allocate(wkin_old1  (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); wkin_old1   = 0.d0
-    allocate(wkin_dissip(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); wkin_dissip = 0.d0
-    allocate(wmag       (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); wmag        = 0.d0
-    allocate(wmag_old1  (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); wmag_old1   = 0.d0
-    allocate(wmag_dissip(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); wmag_dissip = 0.d0
-    allocate(wrho       (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); wrho        = 0.d0
-    allocate(wrho_old1  (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); wrho_old1   = 0.d0
-    allocate(wrho_dissip(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); wrho_dissip = 0.d0
-    allocate(u2         (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); u2          = 0.d0
-    allocate(ux2        (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); ux2         = 0.d0
-    allocate(uy2        (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); uy2         = 0.d0
-    allocate(uz2        (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); uz2         = 0.d0
-    allocate(b2         (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); b2          = 0.d0
-    allocate(bx2        (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); bx2         = 0.d0
-    allocate(by2        (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); by2         = 0.d0
-    allocate(bz2        (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); bz2         = 0.d0
-    allocate(p_u        (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); p_u         = 0.d0
-    allocate(zp2        (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); zp2         = 0.d0
-    allocate(zm2        (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); zm2         = 0.d0
+    allocate(src_r(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=0.d0)
+    allocate(wkin       , source=src_r)
+    allocate(wkin_old1  , source=src_r)
+    allocate(wkin_dissip, source=src_r)
+    allocate(wmag       , source=src_r)
+    allocate(wmag_old1  , source=src_r)
+    allocate(wmag_dissip, source=src_r)
+    allocate(wrho       , source=src_r)
+    allocate(wrho_old1  , source=src_r)
+    allocate(wrho_dissip, source=src_r)
+    allocate(u2         , source=src_r)
+    allocate(ux2        , source=src_r)
+    allocate(uy2        , source=src_r)
+    allocate(uz2        , source=src_r)
+    allocate(b2         , source=src_r)
+    allocate(bx2        , source=src_r)
+    allocate(by2        , source=src_r)
+    allocate(bz2        , source=src_r)
+    allocate(p_u        , source=src_r)
+    allocate(zp2        , source=src_r)
+    allocate(zm2        , source=src_r)
+    deallocate(src_r)
 
 
     allocate( u2_bin(1:nkpolar));  u2_bin = 0.d0
@@ -160,15 +167,15 @@ contains
     allocate(zp2_bin(1:nkpolar)); zp2_bin = 0.d0
     allocate(zm2_bin(1:nkpolar)); zm2_bin = 0.d0
 
-    allocate(f (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); f   = 0.d0
-
-    allocate(rho_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); rho_r = 0.d0
-    allocate( ux_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en));  ux_r = 0.d0
-    allocate( uy_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en));  uy_r = 0.d0
-    allocate( uz_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en));  uz_r = 0.d0
-    allocate( bx_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en));  bx_r = 0.d0
-    allocate( by_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en));  by_r = 0.d0
-    allocate( bz_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en));  bz_r = 0.d0
+    allocate(src_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
+    allocate(rho_r, source=src_r)
+    allocate( ux_r, source=src_r)
+    allocate( uy_r, source=src_r)
+    allocate( uz_r, source=src_r)
+    allocate( bx_r, source=src_r)
+    allocate( by_r, source=src_r)
+    allocate( bz_r, source=src_r)
+    deallocate(src_r)
 
     call rho_to_lnrho(rho     , lnrho     )
     call rho_to_lnrho(rho_old1, lnrho_old1)
@@ -473,6 +480,9 @@ contains
     real(r8)   , allocatable, dimension(:,:)   ::  u2_kxy,  u2_kyz,  u2_kxz
     real(r8)   , allocatable, dimension(:,:)   ::  b2_kxy,  b2_kyz,  b2_kxz
 
+    real(r8)   , allocatable, dimension(:,:)   :: src1, src2, src3
+    complex(r8), allocatable, dimension(:,:,:) :: src4
+
     integer :: i, j, k
 
     if(nremap > 0 .and. tsc <= 5.*dt) then
@@ -483,81 +493,86 @@ contains
     allocate(f (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); f   = 0.d0
     allocate(fr(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); fr  = 0.d0
 
-    allocate(ux (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); ux  = 0.d0
-    allocate(uy (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); uy  = 0.d0
-    allocate(uz (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); uz  = 0.d0
-    allocate(wx (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); wx  = 0.d0
-    allocate(wy (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); wy  = 0.d0
-    allocate(wz (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); wz  = 0.d0
-    allocate(jx (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); jx  = 0.d0
-    allocate(jy (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); jy  = 0.d0
-    allocate(jz (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); jz  = 0.d0
+    allocate(src1(nlx, nly), source=0.d0); allocate(src2(nly, nlz), source=0.d0); allocate(src3(nlx, nlz), source=0.d0)
+    allocate(rho_r_z0, source=src1)
+    allocate(rho_r_x0, source=src2)
+    allocate(rho_r_y0, source=src3)
 
-    allocate(rho_r_z0(nlx, nly)); rho_r_z0 = 0.d0
-    allocate(rho_r_x0(nly, nlz)); rho_r_x0 = 0.d0
-    allocate(rho_r_y0(nlx, nlz)); rho_r_y0 = 0.d0
+    allocate(mx_r_z0, source=src1)
+    allocate(mx_r_x0, source=src2)
+    allocate(mx_r_y0, source=src3)
+                                  
+    allocate(my_r_z0, source=src1)
+    allocate(my_r_x0, source=src2)
+    allocate(my_r_y0, source=src3)
+                                  
+    allocate(mz_r_z0, source=src1)
+    allocate(mz_r_x0, source=src2)
+    allocate(mz_r_y0, source=src3)
+                                  
+    allocate(wx_r_z0, source=src1)
+    allocate(wx_r_x0, source=src2)
+    allocate(wx_r_y0, source=src3)
+                                  
+    allocate(wy_r_z0, source=src1)
+    allocate(wy_r_x0, source=src2)
+    allocate(wy_r_y0, source=src3)
+                                  
+    allocate(wz_r_z0, source=src1)
+    allocate(wz_r_x0, source=src2)
+    allocate(wz_r_y0, source=src3)
+                                  
+    allocate(bx_r_z0, source=src1)
+    allocate(bx_r_x0, source=src2)
+    allocate(bx_r_y0, source=src3)
+                                  
+    allocate(by_r_z0, source=src1)
+    allocate(by_r_x0, source=src2)
+    allocate(by_r_y0, source=src3)
+                                  
+    allocate(bz_r_z0, source=src1)
+    allocate(bz_r_x0, source=src2)
+    allocate(bz_r_y0, source=src3)
+                                  
+    allocate(jx_r_z0, source=src1)
+    allocate(jx_r_x0, source=src2)
+    allocate(jx_r_y0, source=src3)
+                                  
+    allocate(jy_r_z0, source=src1)
+    allocate(jy_r_x0, source=src2)
+    allocate(jy_r_y0, source=src3)
+                                  
+    allocate(jz_r_z0, source=src1)
+    allocate(jz_r_x0, source=src2)
+    allocate(jz_r_y0, source=src3)
+    deallocate(src1, src2, src3)
 
-    allocate(mx_r_z0(nlx, nly)) ; mx_r_z0  = 0.d0
-    allocate(mx_r_x0(nly, nlz)) ; mx_r_x0  = 0.d0
-    allocate(mx_r_y0(nlx, nlz)) ; mx_r_y0  = 0.d0
-                                           
-    allocate(my_r_z0(nlx, nly)) ; my_r_z0  = 0.d0
-    allocate(my_r_x0(nly, nlz)) ; my_r_x0  = 0.d0
-    allocate(my_r_y0(nlx, nlz)) ; my_r_y0  = 0.d0
-                                           
-    allocate(mz_r_z0(nlx, nly)) ; mz_r_z0  = 0.d0
-    allocate(mz_r_x0(nly, nlz)) ; mz_r_x0  = 0.d0
-    allocate(mz_r_y0(nlx, nlz)) ; mz_r_y0  = 0.d0
-                                           
-    allocate(wx_r_z0(nlx, nly)) ; wx_r_z0  = 0.d0
-    allocate(wx_r_x0(nly, nlz)) ; wx_r_x0  = 0.d0
-    allocate(wx_r_y0(nlx, nlz)) ; wx_r_y0  = 0.d0
-                                           
-    allocate(wy_r_z0(nlx, nly)) ; wy_r_z0  = 0.d0
-    allocate(wy_r_x0(nly, nlz)) ; wy_r_x0  = 0.d0
-    allocate(wy_r_y0(nlx, nlz)) ; wy_r_y0  = 0.d0
-                                           
-    allocate(wz_r_z0(nlx, nly)) ; wz_r_z0  = 0.d0
-    allocate(wz_r_x0(nly, nlz)) ; wz_r_x0  = 0.d0
-    allocate(wz_r_y0(nlx, nlz)) ; wz_r_y0  = 0.d0
-                                           
-    allocate(bx_r_z0(nlx, nly)) ; bx_r_z0  = 0.d0
-    allocate(bx_r_x0(nly, nlz)) ; bx_r_x0  = 0.d0
-    allocate(bx_r_y0(nlx, nlz)) ; bx_r_y0  = 0.d0
-                                           
-    allocate(by_r_z0(nlx, nly)) ; by_r_z0  = 0.d0
-    allocate(by_r_x0(nly, nlz)) ; by_r_x0  = 0.d0
-    allocate(by_r_y0(nlx, nlz)) ; by_r_y0  = 0.d0
-                                           
-    allocate(bz_r_z0(nlx, nly)) ; bz_r_z0  = 0.d0
-    allocate(bz_r_x0(nly, nlz)) ; bz_r_x0  = 0.d0
-    allocate(bz_r_y0(nlx, nlz)) ; bz_r_y0  = 0.d0
-                                           
-    allocate(jx_r_z0(nlx, nly)) ; jx_r_z0  = 0.d0
-    allocate(jx_r_x0(nly, nlz)) ; jx_r_x0  = 0.d0
-    allocate(jx_r_y0(nlx, nlz)) ; jx_r_y0  = 0.d0
-                                           
-    allocate(jy_r_z0(nlx, nly)) ; jy_r_z0  = 0.d0
-    allocate(jy_r_x0(nly, nlz)) ; jy_r_x0  = 0.d0
-    allocate(jy_r_y0(nlx, nlz)) ; jy_r_y0  = 0.d0
-                                           
-    allocate(jz_r_z0(nlx, nly)) ; jz_r_z0  = 0.d0
-    allocate(jz_r_x0(nly, nlz)) ; jz_r_x0  = 0.d0
-    allocate(jz_r_y0(nlx, nlz)) ; jz_r_y0  = 0.d0
+    allocate(src4(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0,0.d0))
+    allocate(ux, source=src4)
+    allocate(uy, source=src4)
+    allocate(uz, source=src4)
+    allocate(wx, source=src4)
+    allocate(wy, source=src4)
+    allocate(wz, source=src4)
+    allocate(jx, source=src4)
+    allocate(jy, source=src4)
+    allocate(jz, source=src4)
+    deallocate(src4)
 
+    allocate(u2 (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=0.d0)
+    allocate(b2 (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=0.d0)
 
-    allocate(u2 (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); u2  = 0.d0
-    allocate(b2 (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); b2  = 0.d0
-
-    allocate(rho_kxy(nkx, nky)); rho_kxy = 0.d0
-    allocate(rho_kyz(nky, nkz)); rho_kyz = 0.d0
-    allocate(rho_kxz(nkx, nkz)); rho_kxz = 0.d0
-    allocate( u2_kxy(nkx, nky));  u2_kxy = 0.d0
-    allocate( u2_kyz(nky, nkz));  u2_kyz = 0.d0
-    allocate( u2_kxz(nkx, nkz));  u2_kxz = 0.d0
-    allocate( b2_kxy(nkx, nky));  b2_kxy = 0.d0
-    allocate( b2_kyz(nky, nkz));  b2_kyz = 0.d0
-    allocate( b2_kxz(nkx, nkz));  b2_kxz = 0.d0
+    allocate(src1(nkx, nky), source=0.d0); allocate(src2(nky, nkz), source=0.d0); allocate(src3(nkx, nkz), source=0.d0)
+    allocate(rho_kxy, source=src1)
+    allocate(rho_kyz, source=src2)
+    allocate(rho_kxz, source=src3)
+    allocate( u2_kxy, source=src1)
+    allocate( u2_kyz, source=src2)
+    allocate( u2_kxz, source=src3)
+    allocate( b2_kxy, source=src1)
+    allocate( b2_kyz, source=src2)
+    allocate( b2_kxz, source=src3)
+    deallocate(src1, src2, src3)
 
     !vvvvvvvvvvvvvvvvvv         2D cut of fields          vvvvvvvvvvvvvvvvvv!
     call m_to_u(rho, mx, my, mz, ux, uy, uz)
@@ -743,9 +758,9 @@ contains
     real   (r8), allocatable, dimension(:,:,:) :: rho_r, lnrho_r
     complex(r8), allocatable, dimension(:,:,:) :: rho_
 
-    allocate(rho_   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); rho_    = 0.d0
-    allocate(rho_r  (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); rho_r   = 0.d0
-    allocate(lnrho_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); lnrho_r = 0.d0
+    allocate(rho_   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
+    allocate(rho_r  (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
+    allocate(lnrho_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
 
     !$omp workshare
     rho_ = rho
@@ -782,14 +797,21 @@ contains
                             iky_st:iky_en), intent(out) :: u2half
     real   (r8), allocatable, dimension(:,:,:) :: ux_r, uy_r, uz_r, u2half_r
     complex(r8), allocatable, dimension(:,:,:) :: ux_ , uy_ , uz_
+    real   (r8), allocatable, dimension(:,:,:) :: src_r
+    complex(r8), allocatable, dimension(:,:,:) :: src_c
 
-    allocate(ux_     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); ux_      = 0.d0
-    allocate(uy_     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); uy_      = 0.d0
-    allocate(uz_     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); uz_      = 0.d0
-    allocate(ux_r    (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); ux_r     = 0.d0
-    allocate(uy_r    (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); uy_r     = 0.d0
-    allocate(uz_r    (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); uz_r     = 0.d0
-    allocate(u2half_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); u2half_r = 0.d0
+    allocate(src_c(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
+    allocate(ux_, source=src_c)
+    allocate(uy_, source=src_c)
+    allocate(uz_, source=src_c)
+    deallocate(src_c)
+    
+    allocate(src_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
+    allocate(ux_r    , source=src_r)
+    allocate(uy_r    , source=src_r)
+    allocate(uz_r    , source=src_r)
+    allocate(u2half_r, source=src_r)
+    deallocate(src_r)
 
     !$omp workshare
     ux_ = ux
@@ -823,7 +845,22 @@ contains
 !! @brief   Second order structure function
 !-----------------------------------------------!
   subroutine loop_diagnostics_SF2
+  ! under development...
   end subroutine loop_diagnostics_SF2
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    26 Jul 2019
+!! @brief   Return kpar(k) & delta b/b0
+!           k_\|(k) = \left(\frac{\langle|\mathbf{b}_{0,k} \cdot\nabla \delta\mathbf{b}_k|^2\rangle}
+!           {\langle b_{0,k}^2\rangle\langle \delta b_k^2\rangle}\right)^{1/2}  \\ 
+!           \mathbf{b}_{0,k}(\mathbf{x}) = \calF^{-1}\sum_{|\bm{k}|' \le k/2} \mathbf{b}_{\mathbf{k}'} \\  
+!           \delta\mathbf{b}_{k}(\mathbf{x}) = \calF^{-1}\sum_{k/2 \le |\bm{k}|' \le 2k} \mathbf{b}_{\mathbf{k}'}
+!-----------------------------------------------!
+  subroutine loop_diagnostics_kpar
+  ! under development...
+  end subroutine loop_diagnostics_kpar
 
 end module diagnostics
 

@@ -9,13 +9,13 @@ module io
   use MPI
   implicit none
 
-  public :: init_io, finish_io, loop_io, loop_io_fields_section, loop_io_SF2, &
-            loop_io_fields_3D, save_restart
+  public :: init_io, finish_io, loop_io, loop_io_fields_section, loop_io_kpar, &
+            loop_io_SF2, loop_io_fields_3D, save_restart
 
   private
 
   ! MPIIO
-  integer :: fh_ux, fh_uy, fh_uz, fh_bx, fh_by, fh_bz, fh_p
+  integer :: fh_ux, fh_uy, fh_uz, fh_bx, fh_by, fh_bz
   character(len=100) :: filename
   integer (kind=MPI_OFFSET_KIND) :: filesize_ux, disp_ux
   integer (kind=MPI_OFFSET_KIND) :: filesize_uy, disp_uy
@@ -86,6 +86,15 @@ module io
   integer, dimension (3) :: kxy_dim, kyz_dim, kxz_dim
 
   integer :: nout_fld_section
+
+  ! NETCDF for kpar output file
+  integer (kind_nf) :: ncid_kpar
+  ! coordinate
+  integer :: tt_kpar_id, kpbin_kpar_id
+  integer :: kpar_b_id, kpar_u_id, b1_ovr_b0_id
+  integer (kind_nf) :: tt_kpar_dim, kpbin_kpar_dim
+  integer, dimension (2) :: kpar_dim
+  integer :: nout_kpar
 
   ! NETCDF for 2nd order structure function output file
   integer (kind_nf) :: ncid_SF2
@@ -240,16 +249,16 @@ contains
       ! polar spectrum
       bin_dim (1) = kpbin_dim
       bin_dim (2) = tt_dim
-      status = nf90_def_var (ncid,  'u2_bin', NF90_DOUBLE, bin_dim,  u2_bin_id)
-      status = nf90_def_var (ncid, 'ux2_bin', NF90_DOUBLE, bin_dim, ux2_bin_id)
-      status = nf90_def_var (ncid, 'uy2_bin', NF90_DOUBLE, bin_dim, uy2_bin_id)
-      status = nf90_def_var (ncid, 'uz2_bin', NF90_DOUBLE, bin_dim, uz2_bin_id)
-      status = nf90_def_var (ncid,  'b2_bin', NF90_DOUBLE, bin_dim,  b2_bin_id)
-      status = nf90_def_var (ncid, 'bx2_bin', NF90_DOUBLE, bin_dim, bx2_bin_id)
-      status = nf90_def_var (ncid, 'by2_bin', NF90_DOUBLE, bin_dim, by2_bin_id)
-      status = nf90_def_var (ncid, 'bz2_bin', NF90_DOUBLE, bin_dim, bz2_bin_id)
-      status = nf90_def_var (ncid, 'zp2_bin', NF90_DOUBLE, bin_dim, zp2_bin_id)
-      status = nf90_def_var (ncid, 'zm2_bin', NF90_DOUBLE, bin_dim, zm2_bin_id)
+      status = nf90_def_var (ncid,  'u2_bin'  , NF90_DOUBLE, bin_dim,  u2_bin_id  )
+      status = nf90_def_var (ncid, 'ux2_bin'  , NF90_DOUBLE, bin_dim, ux2_bin_id  )
+      status = nf90_def_var (ncid, 'uy2_bin'  , NF90_DOUBLE, bin_dim, uy2_bin_id  )
+      status = nf90_def_var (ncid, 'uz2_bin'  , NF90_DOUBLE, bin_dim, uz2_bin_id  )
+      status = nf90_def_var (ncid,  'b2_bin'  , NF90_DOUBLE, bin_dim,  b2_bin_id  )
+      status = nf90_def_var (ncid, 'bx2_bin'  , NF90_DOUBLE, bin_dim, bx2_bin_id  )
+      status = nf90_def_var (ncid, 'by2_bin'  , NF90_DOUBLE, bin_dim, by2_bin_id  )
+      status = nf90_def_var (ncid, 'bz2_bin'  , NF90_DOUBLE, bin_dim, bz2_bin_id  )
+      status = nf90_def_var (ncid, 'zp2_bin'  , NF90_DOUBLE, bin_dim, zp2_bin_id  )
+      status = nf90_def_var (ncid, 'zm2_bin'  , NF90_DOUBLE, bin_dim, zm2_bin_id  )
       ! mean magnetic field
       mean_fld_dim (1) = vec_dim
       mean_fld_dim (2) = tt_dim
@@ -383,12 +392,42 @@ contains
       nout_fld_section = 1
 
       !--------------------------------------------------!
+      ! Output for kpar
+      !--------------------------------------------------!
+      filename = trim(runname)//'.out.kpar.nc' ! File name
+      status = nf90_create (filename, NF90_CLOBBER, ncid_kpar)
+
+      status = nf90_put_att (ncid_kpar, NF90_GLOBAL, 'title', 'calliope simulation data')
+      status = nf90_def_dim (ncid_kpar, 'char10', 10, char10_dim)
+      status = nf90_def_var (ncid_kpar, 'run_info', NF90_CHAR, char10_dim, run_id)
+      status = nf90_put_att (ncid_kpar, run_id, 'model', _MODEL_)
+
+      status = nf90_def_dim (ncid_kpar, 'tt', NF90_UNLIMITED, tt_kpar_dim)
+      status = nf90_def_dim (ncid_kpar, 'kpbin', size(kpbin), kpbin_kpar_dim)
+
+      status = nf90_def_var (ncid_kpar, 'tt'  , NF90_DOUBLE, tt_kpar_dim, tt_kpar_id)
+      status = nf90_def_var (ncid_kpar, 'kpbin', NF90_DOUBLE, kpbin_kpar_dim, kpbin_kpar_id)
+
+      kpar_dim (1) = kpbin_kpar_dim
+      kpar_dim (2) = tt_kpar_dim
+
+      status = nf90_def_var (ncid_kpar, 'kpar_b'   , NF90_DOUBLE, kpar_dim, kpar_b_id)
+      status = nf90_def_var (ncid_kpar, 'kpar_u'   , NF90_DOUBLE, kpar_dim, kpar_u_id)
+      status = nf90_def_var (ncid_kpar, 'b1_ovr_b0', NF90_DOUBLE, kpar_dim, b1_ovr_b0_id)
+
+      status = nf90_enddef (ncid_kpar)  ! out of definition mode
+
+      status = nf90_put_var (ncid_kpar, kpbin_kpar_id, kpbin)
+
+      nout_kpar = 1
+
+      !--------------------------------------------------!
       ! Output for 2D order structure function
       !--------------------------------------------------!
       filename = trim(runname)//'.out.SF2.nc' ! File name
       status = nf90_create (filename, NF90_CLOBBER, ncid_SF2)
 
-      status = nf90_put_att (ncid_SF2, NF90_GLOBAL, 'title', 'ATLAS Simulation Data')
+      status = nf90_put_att (ncid_SF2, NF90_GLOBAL, 'title', 'calliope simulation data')
       status = nf90_def_dim (ncid_SF2, 'char10', 10, char10_dim)
       status = nf90_def_var (ncid_SF2, 'run_info', NF90_CHAR, char10_dim, run_id)
       status = nf90_put_att (ncid_SF2, run_id, 'model', _MODEL_)
@@ -480,16 +519,16 @@ contains
 
       count2(1) = nkpolar
       count2(2) = 1
-      status = nf90_put_var (ncid,  u2_bin_id,  u2_bin, start=start2, count=count2)
-      status = nf90_put_var (ncid, ux2_bin_id, ux2_bin, start=start2, count=count2)
-      status = nf90_put_var (ncid, uy2_bin_id, uy2_bin, start=start2, count=count2)
-      status = nf90_put_var (ncid, uz2_bin_id, uz2_bin, start=start2, count=count2)
-      status = nf90_put_var (ncid,  b2_bin_id,  b2_bin, start=start2, count=count2)
-      status = nf90_put_var (ncid, bx2_bin_id, bx2_bin, start=start2, count=count2)
-      status = nf90_put_var (ncid, by2_bin_id, by2_bin, start=start2, count=count2)
-      status = nf90_put_var (ncid, bz2_bin_id, bz2_bin, start=start2, count=count2)
-      status = nf90_put_var (ncid, zp2_bin_id, zp2_bin, start=start2, count=count2)
-      status = nf90_put_var (ncid, zm2_bin_id, zm2_bin, start=start2, count=count2)
+      status = nf90_put_var (ncid,  u2_bin_id  ,  u2_bin  , start=start2, count=count2)
+      status = nf90_put_var (ncid, ux2_bin_id  , ux2_bin  , start=start2, count=count2)
+      status = nf90_put_var (ncid, uy2_bin_id  , uy2_bin  , start=start2, count=count2)
+      status = nf90_put_var (ncid, uz2_bin_id  , uz2_bin  , start=start2, count=count2)
+      status = nf90_put_var (ncid,  b2_bin_id  ,  b2_bin  , start=start2, count=count2)
+      status = nf90_put_var (ncid, bx2_bin_id  , bx2_bin  , start=start2, count=count2)
+      status = nf90_put_var (ncid, by2_bin_id  , by2_bin  , start=start2, count=count2)
+      status = nf90_put_var (ncid, bz2_bin_id  , bz2_bin  , start=start2, count=count2)
+      status = nf90_put_var (ncid, zp2_bin_id  , zp2_bin  , start=start2, count=count2)
+      status = nf90_put_var (ncid, zm2_bin_id  , zm2_bin  , start=start2, count=count2)
 
       status = nf90_sync (ncid)
 
@@ -662,6 +701,40 @@ contains
       nout_fld_section = nout_fld_section + 1
     endif
   end subroutine loop_io_fields_section
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    3 Jan 2022
+!! @brief   Append variables to NETCDF
+!           for kpar
+!-----------------------------------------------!
+  subroutine loop_io_kpar(nkpolar, kpar_b, kpar_u, b1_ovr_b0)
+    use time, only: tt
+    use mp, only: proc0
+    implicit none
+    integer , intent(in) :: nkpolar
+    real(r8), intent(in) :: kpar_b(1:nkpolar), kpar_u(1:nkpolar), b1_ovr_b0(1:nkpolar)
+
+    integer, dimension (2) :: start2, count2
+
+    ! output via NETCDF
+    if(proc0) then
+      status = nf90_put_var (ncid_kpar, tt_kpar_id, tt, start=(/nout_kpar/))
+      start2(1) = 1
+      start2(2) = nout_kpar
+
+      count2(1) = nkpolar
+      count2(2) = 1
+      status = nf90_put_var (ncid_kpar, kpar_b_id   , kpar_b   , start=start2, count=count2)
+      status = nf90_put_var (ncid_kpar, kpar_u_id   , kpar_u   , start=start2, count=count2)
+      status = nf90_put_var (ncid_kpar, b1_ovr_b0_id, b1_ovr_b0, start=start2, count=count2)
+
+      status = nf90_sync (ncid_kpar)
+
+      nout_kpar = nout_kpar + 1
+    endif
+  end subroutine loop_io_kpar
 
 
 !-----------------------------------------------!

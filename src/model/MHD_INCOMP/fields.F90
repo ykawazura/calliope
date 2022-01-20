@@ -34,21 +34,24 @@ contains
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use params, only: inputfile
     implicit none
+    complex(r8), allocatable, dimension(:,:,:) :: src
 
-    allocate(ux     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
-    allocate(uy     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
-    allocate(uz     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
-    allocate(bx     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
-    allocate(by     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
-    allocate(bz     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
-    allocate(p      (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
-    allocate(ux_old1(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
-    allocate(uy_old1(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
-    allocate(uz_old1(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
-    allocate(bx_old1(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
-    allocate(by_old1(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
-    allocate(bz_old1(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
-    allocate( p_old1(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
+    allocate(src(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
+    allocate(ux     , source=src)
+    allocate(uy     , source=src)
+    allocate(uz     , source=src)
+    allocate(bx     , source=src)
+    allocate(by     , source=src)
+    allocate(bz     , source=src)
+    allocate(p      , source=src)
+    allocate(ux_old1, source=src)
+    allocate(uy_old1, source=src)
+    allocate(uz_old1, source=src)
+    allocate(bx_old1, source=src)
+    allocate(by_old1, source=src)
+    allocate(bz_old1, source=src)
+    allocate( p_old1, source=src)
+    deallocate(src)
 
     call read_parameters(inputfile)
 
@@ -147,7 +150,7 @@ contains
     integer :: mode(3)
     real(r8) :: u1(3), b1(3)
     real(r8), allocatable, dimension(:,:,:) :: bz_r
-    real(r8) :: kpara, bz0
+    real(r8) :: kpar, bz0
     complex(r8) :: omega
     integer :: i, j, k
 
@@ -211,8 +214,8 @@ contains
       bz_r = bz0
       call p3dfft_ftran_r2c(bz_r, bz, 'fft'); bz = bz/nlx/nly/nlz 
 
-      kpara = kz(k)
-      omega = dsqrt(4.d0*(kpara*bz0)**2 + (2.d0 - q)**2) - (kpara*bz0)**2 - (2.d0 - q)
+      kpar  = kz(k)
+      omega = dsqrt(4.d0*(kpar*bz0)**2 + (2.d0 - q)**2) - (kpar*bz0)**2 - (2.d0 - q)
 
       if(real(omega) > 0.d0) then
         omega = zi*dsqrt(real(omega))
@@ -225,9 +228,9 @@ contains
       endif
 
       bx(i, k, j) = 1.d-1
-      by(i, k, j) = 2.d0*zi*omega/((kpara*bz0)**2 - omega**2)
-      ux(i, k, j) = -1.d0/kpara*omega*bx(i, k, j)
-      uy(i, k, j) = -1.d0/kpara*(omega*by(i, k, j) + zi*q*bx(i, k, j))
+      by(i, k, j) = 2.d0*zi*omega/((kpar*bz0)**2 - omega**2)
+      ux(i, k, j) = -1.d0/kpar*omega*bx(i, k, j)
+      uy(i, k, j) = -1.d0/kpar*(omega*by(i, k, j) + zi*q*bx(i, k, j))
 
     endif
 
@@ -288,6 +291,7 @@ contains
     implicit none
     real(r8), allocatable, dimension(:,:,:) :: ux_r, uy_r, uz_r
     real(r8), allocatable, dimension(:,:,:) :: bx_r, by_r, bz_r
+    real(r8), allocatable, dimension(:,:,:) :: src
     integer :: seedsize
     integer, allocatable :: seed(:)
     real(r8) :: rms, kmin(3), kmax(3)
@@ -318,12 +322,14 @@ contains
     close(unit)
     !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
 
-    allocate(ux_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); ux_r = 0.d0
-    allocate(uy_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); uy_r = 0.d0
-    allocate(uz_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); uz_r = 0.d0
-    allocate(bx_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); bx_r = 0.d0
-    allocate(by_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); by_r = 0.d0
-    allocate(bz_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); bz_r = 0.d0
+    allocate(src(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
+    allocate(ux_r, source=src)
+    allocate(uy_r, source=src)
+    allocate(uz_r, source=src)
+    allocate(bx_r, source=src)
+    allocate(by_r, source=src)
+    allocate(bz_r, source=src)
+    deallocate(src)
 
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
     !v             create random number             v
@@ -504,6 +510,7 @@ contains
     use params, only: zi, pi
     implicit none
     real(r8), allocatable, dimension(:,:,:) :: ux_r, uy_r, bx_r, by_r
+    real(r8), allocatable, dimension(:,:,:) :: src
     real(r8) :: x0, y0
     integer :: i, j, k
 
@@ -514,10 +521,12 @@ contains
     x0 = lx/(2.d0*pi)
     y0 = ly/(2.d0*pi)
 
-    allocate(ux_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); ux_r = 0.d0
-    allocate(uy_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); uy_r = 0.d0
-    allocate(bx_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); bx_r = 0.d0
-    allocate(by_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); by_r = 0.d0
+    allocate(src(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
+    allocate(ux_r, source=src)
+    allocate(uy_r, source=src)
+    allocate(bx_r, source=src)
+    allocate(by_r, source=src)
+    deallocate(src)
 
     do i = ilx_st, ilx_en
       do k = ilz_st, ilz_en
@@ -567,6 +576,7 @@ contains
     use params, only: zi, pi
     implicit none
     real(r8), allocatable, dimension(:,:,:) :: ux_r, uy_r, bx_r, by_r
+    real(r8), allocatable, dimension(:,:,:) :: src
     real(r8) :: x0, y0
     integer :: i, j, k
 
@@ -577,10 +587,12 @@ contains
     x0 = lx/(2.d0*pi)
     y0 = ly/(2.d0*pi)
 
-    allocate(ux_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); ux_r = 0.d0
-    allocate(uy_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); uy_r = 0.d0
-    allocate(bx_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); bx_r = 0.d0
-    allocate(by_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); by_r = 0.d0
+    allocate(src(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
+    allocate(ux_r, source=src)
+    allocate(uy_r, source=src)
+    allocate(bx_r, source=src)
+    allocate(by_r, source=src)
+    deallocate(src)
 
     do i = ilx_st, ilx_en
       do k = ilz_st, ilz_en

@@ -6,13 +6,14 @@
 arch = danann_gfortran
 
 # MODEL : 
-# 	RMHD
-# 	MHD_INCOMP
-# 	MHD_COMP_ISOTH
-# 	MHD_COMP_ADIAB
+# 	RMHD           ! reduced MHD
+# 	RRMHD          ! rotational reduced MHD
+# 	MHD_INCOMP     ! incompressible MHD
+# 	MHD_COMP_ISOTH ! isothermal compressible MHD
+# 	MHD_COMP_ADIAB ! adiabatic compressible MHD (under development)
 MODEL = MHD_INCOMP
 
-# use openmp
+# use openm_COMP_ISOTHp
 USE_OPENMP = yes
 # debug
 DEBG = no

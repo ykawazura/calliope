@@ -65,6 +65,7 @@ module mp
      module procedure sum_reduce_real
      module procedure sum_reduce_real_array
      module procedure sum_reduce_real_2array
+     module procedure sum_reduce_real_3array
 
      module procedure sum_reduce_complex
      module procedure sum_reduce_complex_array
@@ -464,6 +465,21 @@ contains
          (a, a, size(a), MPI_DOUBLE_PRECISION, MPI_SUM, dest, MPI_COMM_WORLD, ierror)
     endif
   end subroutine sum_reduce_real_2array
+
+  subroutine sum_reduce_real_3array (a, dest)
+    use p3dfft
+    implicit none
+    real(r8), dimension (:,:,:), intent (in out) :: a
+    integer, intent (in) :: dest
+    integer :: ierror
+    if(proc_id.eq.dest)then
+       call mpi_reduce &
+         (MPI_IN_PLACE, a, size(a), MPI_DOUBLE_PRECISION, MPI_SUM, dest, MPI_COMM_WORLD, ierror)
+    else
+       call mpi_reduce &
+         (a, a, size(a), MPI_DOUBLE_PRECISION, MPI_SUM, dest, MPI_COMM_WORLD, ierror)
+    endif
+  end subroutine sum_reduce_real_3array
 
   subroutine sum_reduce_complex (z, dest)
     implicit none

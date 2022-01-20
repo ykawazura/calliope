@@ -40,8 +40,8 @@ contains
 
     !Get random number seed length and allocate init_seed and fin_seed
     nseed = get_rnd_seed_length() 
-    allocate(init_seed(1:nseed)); init_seed = 0
-    allocate(fin_seed (1:nseed)); fin_seed  = 0
+    allocate(init_seed(1:nseed), source=0)
+    allocate(fin_seed (1:nseed), source=0)
 
     call read_parameters(inputfile)
 

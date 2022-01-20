@@ -49,7 +49,7 @@ contains
   subroutine solve
     use fields, only: phi, omg, psi
     use fields, only: phi_old1, omg_old1, psi_old1
-    use grid, only: kperp2, kperp2inv, kz2, kperp2_max, kz2_max
+    use grid, only: kprp2, kprp2inv, kz2, kprp2_max, kz2_max
     use grid, only: kx, ky, kz
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use time, only: dt, cfl, tt
@@ -93,15 +93,15 @@ contains
         do k = ikz_st, ikz_en
           do i = ikx_st, ikx_en
             call gear1(dt, omg_new(i, k, j), omg(i, k, j), &
-               nonlin(i, k, j, inonlin_omg) - zi*kz(k)*kperp2(i, k, j)*psi(i, k, j) + fomg(i, k, j), &
-               nupe_x*(kperp2(i, k, j)/kperp2_max)**nupe_x_exp + nupe_z*(kz2(k)/kz2_max)**nupe_z_exp &
+               nonlin(i, k, j, inonlin_omg) - zi*kz(k)*kprp2(i, k, j)*psi(i, k, j) + fomg(i, k, j), &
+               nupe_x*(kprp2(i, k, j)/kprp2_max)**nupe_x_exp + nupe_z*(kz2(k)/kz2_max)**nupe_z_exp &
             )
             call gear1(dt, psi_new(i, k, j), psi(i, k, j), &
                nonlin(i, k, j, inonlin_psi) + zi*kz(k)*phi(i, k, j) + fpsi(i, k, j), &
-               etape_x*(kperp2(i, k, j)/kperp2_max)**etape_x_exp + etape_z*(kz2(k)/kz2_max)**etape_z_exp &
+               etape_x*(kprp2(i, k, j)/kprp2_max)**etape_x_exp + etape_z*(kz2(k)/kz2_max)**etape_z_exp &
             )
 
-            phi_new(i, k, j) = omg_new(i, k, j)*(-kperp2inv(i, k, j))
+            phi_new(i, k, j) = omg_new(i, k, j)*(-kprp2inv(i, k, j))
           enddo
         enddo
       enddo
@@ -131,17 +131,17 @@ contains
         do k = ikz_st, ikz_en
           do i = ikx_st, ikx_en
             call gear2(dt, omg_new(i, k, j), omg(i, k, j), omg_old1(i, k, j), &
-               nonlin     (i, k, j, inonlin_omg) - zi*kz(k)*kperp2(i, k, j)*psi     (i, k, j) + fomg     (i, k, j), &
-               nonlin_old1(i, k, j, inonlin_omg) - zi*kz(k)*kperp2(i, k, j)*psi_old1(i, k, j) + fomg_old1(i, k, j), &
-               nupe_x*(kperp2(i, k, j)/kperp2_max)**nupe_x_exp + nupe_z*(kz2(k)/kz2_max)**nupe_z_exp &
+               nonlin     (i, k, j, inonlin_omg) - zi*kz(k)*kprp2(i, k, j)*psi     (i, k, j) + fomg     (i, k, j), &
+               nonlin_old1(i, k, j, inonlin_omg) - zi*kz(k)*kprp2(i, k, j)*psi_old1(i, k, j) + fomg_old1(i, k, j), &
+               nupe_x*(kprp2(i, k, j)/kprp2_max)**nupe_x_exp + nupe_z*(kz2(k)/kz2_max)**nupe_z_exp &
             )
             call gear2(dt, psi_new(i, k, j), psi(i, k, j), psi_old1(i, k, j), &
                nonlin     (i, k, j, inonlin_psi) + zi*kz(k)*phi     (i, k, j) + fpsi     (i, k, j), &
                nonlin_old1(i, k, j, inonlin_psi) + zi*kz(k)*phi_old1(i, k, j) + fpsi_old1(i, k, j), &
-               etape_x*(kperp2(i, k, j)/kperp2_max)**etape_x_exp + etape_z*(kz2(k)/kz2_max)**etape_z_exp &
+               etape_x*(kprp2(i, k, j)/kprp2_max)**etape_x_exp + etape_z*(kz2(k)/kz2_max)**etape_z_exp &
             )
 
-            phi_new(i, k, j) = omg_new(i, k, j)*(-kperp2inv(i, k, j))
+            phi_new(i, k, j) = omg_new(i, k, j)*(-kprp2inv(i, k, j))
           enddo
         enddo
       enddo
@@ -180,19 +180,19 @@ contains
         do k = ikz_st, ikz_en
           do i = ikx_st, ikx_en
             call gear3(dt, omg_new(i, k, j), omg(i, k, j), omg_old1(i, k, j), omg_old2(i, k, j), &
-               nonlin     (i, k, j, inonlin_omg) - zi*kz(k)*kperp2(i, k, j)*psi     (i, k, j) + fomg     (i, k, j), &
-               nonlin_old1(i, k, j, inonlin_omg) - zi*kz(k)*kperp2(i, k, j)*psi_old1(i, k, j) + fomg_old1(i, k, j), &
-               nonlin_old2(i, k, j, inonlin_omg) - zi*kz(k)*kperp2(i, k, j)*psi_old2(i, k, j) + fomg_old2(i, k, j), &
-               nupe_x*(kperp2(i, k, j)/kperp2_max)**nupe_x_exp + nupe_z*(kz2(k)/kz2_max)**nupe_z_exp &
+               nonlin     (i, k, j, inonlin_omg) - zi*kz(k)*kprp2(i, k, j)*psi     (i, k, j) + fomg     (i, k, j), &
+               nonlin_old1(i, k, j, inonlin_omg) - zi*kz(k)*kprp2(i, k, j)*psi_old1(i, k, j) + fomg_old1(i, k, j), &
+               nonlin_old2(i, k, j, inonlin_omg) - zi*kz(k)*kprp2(i, k, j)*psi_old2(i, k, j) + fomg_old2(i, k, j), &
+               nupe_x*(kprp2(i, k, j)/kprp2_max)**nupe_x_exp + nupe_z*(kz2(k)/kz2_max)**nupe_z_exp &
             )
             call gear3(dt, psi_new(i, k, j), psi(i, k, j), psi_old1(i, k, j), psi_old2(i, k, j), &
                nonlin     (i, k, j, inonlin_psi) + zi*kz(k)*phi     (i, k, j) + fpsi     (i, k, j), &
                nonlin_old1(i, k, j, inonlin_psi) + zi*kz(k)*phi_old1(i, k, j) + fpsi_old1(i, k, j), &
                nonlin_old2(i, k, j, inonlin_psi) + zi*kz(k)*phi_old2(i, k, j) + fpsi_old2(i, k, j), &
-               etape_x*(kperp2(i, k, j)/kperp2_max)**etape_x_exp + etape_z*(kz2(k)/kz2_max)**etape_z_exp &
+               etape_x*(kprp2(i, k, j)/kprp2_max)**etape_x_exp + etape_z*(kz2(k)/kz2_max)**etape_z_exp &
             )
 
-            phi_new(i, k, j) = omg_new(i, k, j)*(-kperp2inv(i, k, j))
+            phi_new(i, k, j) = omg_new(i, k, j)*(-kprp2inv(i, k, j))
           enddo
         enddo
       enddo
@@ -259,22 +259,25 @@ contains
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use file, only: open_output_file
     implicit none
+    complex(r8), allocatable, dimension(:,:,:) :: src
 
-    allocate(phi_new    (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))        ; phi_new    = 0.d0
-    allocate(phi_old2   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))        ; phi_old2   = 0.d0
+    allocate(src(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0,0.d0))
+    allocate(phi_new  , source=src)
+    allocate(phi_old2 , source=src)
 
-    allocate(omg_new    (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))        ; omg_new    = 0.d0
-    allocate(omg_old2   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))        ; omg_old2   = 0.d0
+    allocate(omg_new  , source=src)
+    allocate(omg_old2 , source=src)
 
-    allocate(psi_new    (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))        ; psi_new    = 0.d0
-    allocate(psi_old2   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))        ; psi_old2   = 0.d0
+    allocate(psi_new  , source=src)
+    allocate(psi_old2 , source=src)
+
+    allocate(fomg_old2, source=src)
+    allocate(fpsi_old2, source=src)
+    deallocate(src)
 
     allocate(nonlin     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nftran)); nonlin      = 0.d0
     allocate(nonlin_old1(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nftran)); nonlin_old1 = 0.d0
     allocate(nonlin_old2(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nftran)); nonlin_old2 = 0.d0
-
-    allocate(fomg_old2  (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))        ; fomg_old2   = 0.d0
-    allocate(fpsi_old2  (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))        ; fpsi_old2   = 0.d0
 
     call open_output_file (max_vel_unit, 'max_vel.dat')
 
@@ -293,7 +296,7 @@ contains
 !-----------------------------------------------!
   subroutine get_nonlinear_terms
     use fields, only: phi, psi
-    use grid, only: kperp2, nlx, nly, nlz, kx, ky
+    use grid, only: kprp2, nlx, nly, nlz, kx, ky
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use grid, only: nl_local_tot, nk_local_tot
@@ -311,24 +314,24 @@ contains
 
     if (proc0) call put_time_stamp(timer_nonlinear_terms)
 
-    allocate(wbk(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nbtran)); wbk = 0.d0
-    allocate(wb (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nbtran)); wb  = 0.d0
-    allocate(wf (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nftran)); wf  = 0.d0
+    allocate(wbk(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nbtran), source=(0.d0, 0.d0))
+    allocate(wb (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nbtran), source=0.d0)
+    allocate(wf (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nftran), source=0.d0)
 
     ! 1. Calculate grad in Fourier space
     !$omp parallel do private(i, k) schedule(static)
     do j = iky_st, iky_en
       do k = ikz_st, ikz_en
         do i = ikx_st, ikx_en
-          wbk(i,k,j,idphi_dx) = zi*kx(i)                   *phi(i, k, j)
-          wbk(i,k,j,idphi_dy) = zi*ky(j)                   *phi(i, k, j)
-          wbk(i,k,j,idomg_dx) = zi*kx(i)*(-kperp2(i, k, j))*phi(i, k, j)
-          wbk(i,k,j,idomg_dy) = zi*ky(j)*(-kperp2(i, k, j))*phi(i, k, j)
+          wbk(i,k,j,idphi_dx) = zi*kx(i)                  *phi(i, k, j)
+          wbk(i,k,j,idphi_dy) = zi*ky(j)                  *phi(i, k, j)
+          wbk(i,k,j,idomg_dx) = zi*kx(i)*(-kprp2(i, k, j))*phi(i, k, j)
+          wbk(i,k,j,idomg_dy) = zi*ky(j)*(-kprp2(i, k, j))*phi(i, k, j)
                                  
-          wbk(i,k,j,idpsi_dx) = zi*kx(i)                   *psi(i, k, j)
-          wbk(i,k,j,idpsi_dy) = zi*ky(j)                   *psi(i, k, j)
-          wbk(i,k,j,idjpa_dx) = zi*kx(i)*(-kperp2(i, k, j))*psi(i, k, j)
-          wbk(i,k,j,idjpa_dy) = zi*ky(j)*(-kperp2(i, k, j))*psi(i, k, j)
+          wbk(i,k,j,idpsi_dx) = zi*kx(i)                  *psi(i, k, j)
+          wbk(i,k,j,idpsi_dy) = zi*ky(j)                  *psi(i, k, j)
+          wbk(i,k,j,idjpa_dx) = zi*kx(i)*(-kprp2(i, k, j))*psi(i, k, j)
+          wbk(i,k,j,idjpa_dy) = zi*ky(j)*(-kprp2(i, k, j))*psi(i, k, j)
         enddo
       enddo
     enddo

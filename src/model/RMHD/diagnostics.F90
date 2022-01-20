@@ -13,7 +13,7 @@ module diagnostics
   implicit none
 
   public :: init_diagnostics, finish_diagnostics
-  public :: loop_diagnostics, loop_diagnostics_fields_secion, loop_diagnostics_SF2
+  public :: loop_diagnostics, loop_diagnostics_fields_secion, loop_diagnostics_kpar, loop_diagnostics_SF2
 
   private
 contains
@@ -42,7 +42,7 @@ contains
   subroutine loop_diagnostics
     use io, only: loop_io
     use mp, only: proc0
-    use grid, only: kperp2, kz2, kperp2_max, kz2_max
+    use grid, only: kprp2, kz2, kprp2_max, kz2_max
     use grid, only: nkz
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use fields, only: phi, psi
@@ -57,32 +57,35 @@ contains
     implicit none
     integer :: i, j, k
 
-    real(r8)   , allocatable, dimension(:,:,:) :: upe2, bpe2
-    real(r8)   , allocatable, dimension(:,:,:) :: upe2old1, bpe2old1
-    real(r8)   , allocatable, dimension(:,:,:) :: upe2dissip_x, upe2dissip_z
-    real(r8)   , allocatable, dimension(:,:,:) :: bpe2dissip_x, bpe2dissip_z
-    real(r8)   , allocatable, dimension(:,:,:) :: p_omg, p_psi
+    real(r8), allocatable, dimension(:,:,:) :: upe2, bpe2
+    real(r8), allocatable, dimension(:,:,:) :: upe2old1, bpe2old1
+    real(r8), allocatable, dimension(:,:,:) :: upe2dissip_x, upe2dissip_z
+    real(r8), allocatable, dimension(:,:,:) :: bpe2dissip_x, bpe2dissip_z
+    real(r8), allocatable, dimension(:,:,:) :: p_omg, p_psi
+    real(r8), allocatable, dimension(:,:,:) :: src
 
     real(r8) :: upe2_sum, bpe2_sum
     real(r8) :: upe2dot_sum, bpe2dot_sum
     real(r8) :: upe2dissip_sum, bpe2dissip_sum
     real(r8) :: p_omg_sum, p_psi_sum
 
-    real(r8), dimension(:, :), allocatable :: upe2_bin, bpe2_bin      ! [kperp, kz]
+    real(r8), dimension(:, :), allocatable :: upe2_bin, bpe2_bin      ! [kprp, kz]
     complex(r8) :: phi_mid, psi_mid, jpa_mid, fomg_mid, fpsi_mid
 
     if (proc0) call put_time_stamp(timer_diagnostics)
 
-    allocate(upe2        (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); upe2     = 0.d0
-    allocate(bpe2        (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); bpe2     = 0.d0
-    allocate(upe2old1    (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); upe2old1 = 0.d0
-    allocate(bpe2old1    (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); bpe2old1 = 0.d0
-    allocate(upe2dissip_x(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); upe2dissip_x = 0.d0
-    allocate(upe2dissip_z(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); upe2dissip_z = 0.d0
-    allocate(bpe2dissip_x(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); bpe2dissip_x = 0.d0
-    allocate(bpe2dissip_z(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); bpe2dissip_z = 0.d0
-    allocate(p_omg       (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); p_omg        = 0.d0
-    allocate(p_psi       (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); p_psi        = 0.d0
+    allocate(src(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=0.d0)
+    allocate(upe2        , source=src)
+    allocate(bpe2        , source=src)
+    allocate(upe2old1    , source=src)
+    allocate(bpe2old1    , source=src)
+    allocate(upe2dissip_x, source=src)
+    allocate(upe2dissip_z, source=src)
+    allocate(bpe2dissip_x, source=src)
+    allocate(bpe2dissip_z, source=src)
+    allocate(p_omg       , source=src)
+    allocate(p_psi       , source=src)
+    deallocate(src)
 
     allocate (upe2_bin(1:nkpolar, nkz)); upe2_bin = 0.d0
     allocate (bpe2_bin(1:nkpolar, nkz)); bpe2_bin = 0.d0
@@ -90,22 +93,22 @@ contains
     do j = iky_st, iky_en
       do k = ikz_st, ikz_en
         do i = ikx_st, ikx_en
-          upe2    (i, k, j) = 0.5d0*abs(phi(i, k, j))**2*kperp2(i, k, j)
-          bpe2    (i, k, j) = 0.5d0*abs(psi(i, k, j))**2*kperp2(i, k, j)
+          upe2    (i, k, j) = 0.5d0*abs(phi(i, k, j))**2*kprp2(i, k, j)
+          bpe2    (i, k, j) = 0.5d0*abs(psi(i, k, j))**2*kprp2(i, k, j)
 
-          upe2old1(i, k, j) = 0.5d0*abs(phi_old1(i, k, j))**2*kperp2(i, k, j)
-          bpe2old1(i, k, j) = 0.5d0*abs(psi_old1(i, k, j))**2*kperp2(i, k, j)
+          upe2old1(i, k, j) = 0.5d0*abs(phi_old1(i, k, j))**2*kprp2(i, k, j)
+          bpe2old1(i, k, j) = 0.5d0*abs(psi_old1(i, k, j))**2*kprp2(i, k, j)
 
           phi_mid  = 0.5d0*(phi (i, k, j) + phi_old1 (i, k, j))
           psi_mid  = 0.5d0*(psi (i, k, j) + psi_old1 (i, k, j))
-          jpa_mid  = -kperp2(i, k, j)*psi_mid
+          jpa_mid  = -kprp2(i, k, j)*psi_mid
           fomg_mid = 0.5d0*(fomg(i, k, j) + fomg_old1(i, k, j))
           fpsi_mid = 0.5d0*(fpsi(i, k, j) + fpsi_old1(i, k, j))
 
-          upe2dissip_x(i, k, j) =  nupe_x*(kperp2(i, k, j)/kperp2_max)** nupe_x_exp*abs(phi_mid)**2*kperp2(i, k, j)
-          upe2dissip_z(i, k, j) =  nupe_z*(kz2   (k)      /kz2_max   )** nupe_z_exp*abs(phi_mid)**2*kperp2(i, k, j)
-          bpe2dissip_x(i, k, j) = etape_x*(kperp2(i, k, j)/kperp2_max)**etape_x_exp*abs(psi_mid)**2*kperp2(i, k, j)
-          bpe2dissip_z(i, k, j) = etape_z*(kz2   (k)      /kz2_max   )**etape_z_exp*abs(psi_mid)**2*kperp2(i, k, j)
+          upe2dissip_x(i, k, j) =  nupe_x*(kprp2(i, k, j)/kprp2_max)** nupe_x_exp*abs(phi_mid)**2*kprp2(i, k, j)
+          upe2dissip_z(i, k, j) =  nupe_z*(kz2  (k)      /kz2_max  )** nupe_z_exp*abs(phi_mid)**2*kprp2(i, k, j)
+          bpe2dissip_x(i, k, j) = etape_x*(kprp2(i, k, j)/kprp2_max)**etape_x_exp*abs(psi_mid)**2*kprp2(i, k, j)
+          bpe2dissip_z(i, k, j) = etape_z*(kz2  (k)      /kz2_max  )**etape_z_exp*abs(psi_mid)**2*kprp2(i, k, j)
           p_omg      (i, k, j) = - 0.5d0*(fomg_mid*conjg(phi_mid) + conjg(fomg_mid)*phi_mid) 
           p_psi      (i, k, j) = - 0.5d0*(fpsi_mid*conjg(jpa_mid) + conjg(fpsi_mid)*jpa_mid) 
 
@@ -150,10 +153,10 @@ contains
     p_psi_sum      = sum(p_psi); call sum_reduce(p_psi_sum, 0)
     !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
 
-    !vvvvvvvvvvvvvvvvvv          bin over kperp           vvvvvvvvvvvvvvvvvv!
+    !vvvvvvvvvvvvvvvvvv          bin over kprp           vvvvvvvvvvvvvvvvvv!
     call get_polar_spectrum_2d(upe2, upe2_bin)
     call get_polar_spectrum_2d(bpe2, bpe2_bin)
-    !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
+    !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
   
     call loop_io( &
                   upe2_sum, bpe2_sum, &
@@ -192,7 +195,7 @@ contains
     use io, only: loop_io, loop_io_fields_section
     use mp, only: proc0
     use grid, only: nlx, nly, nlz
-    use grid, only: kx, ky, kperp2
+    use grid, only: kx, ky, kprp2
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     use fields, only: phi, psi
@@ -201,7 +204,6 @@ contains
     implicit none
     integer :: i, j, k
 
-    complex(r8), allocatable, dimension(:,:,:) :: omg, jpa, ux, uy, bx, by
     complex(r8), allocatable, dimension(:,:,:) :: f
     real(r8)   , allocatable, dimension(:,:,:) :: fr
     real(r8)   , allocatable, dimension(:,:)   :: phi_r_z0, phi_r_x0, phi_r_y0
@@ -212,58 +214,66 @@ contains
     real(r8)   , allocatable, dimension(:,:)   ::  uy_r_z0,  uy_r_x0,  uy_r_y0
     real(r8)   , allocatable, dimension(:,:)   ::  bx_r_z0,  bx_r_x0,  bx_r_y0
     real(r8)   , allocatable, dimension(:,:)   ::  by_r_z0,  by_r_x0,  by_r_y0
+    complex(r8), allocatable, dimension(:,:,:) :: omg, jpa, ux, uy, bx, by
+
+    real(r8)   , allocatable, dimension(:,:)   :: src1, src2, src3
+    complex(r8), allocatable, dimension(:,:,:) :: src4
 
     if (proc0) call put_time_stamp(timer_diagnostics)
 
-    allocate(omg(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); omg = 0.d0
-    allocate(jpa(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); jpa = 0.d0
-    allocate(ux (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); ux  = 0.d0
-    allocate(uy (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); uy  = 0.d0
-    allocate(bx (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); bx  = 0.d0
-    allocate(by (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); by  = 0.d0
     allocate(f  (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); f   = 0.d0
     allocate(fr (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); fr  = 0.d0
 
-    allocate(phi_r_z0(nlx, nly)); phi_r_z0 = 0.d0
-    allocate(phi_r_x0(nly, nlz)); phi_r_x0 = 0.d0
-    allocate(phi_r_y0(nlx, nlz)); phi_r_y0 = 0.d0
+    allocate(src1(nlx, nly), source=0.d0); allocate(src2(nly, nlz), source=0.d0); allocate(src3(nlx, nlz), source=0.d0)
+    allocate(phi_r_z0, source=src1)
+    allocate(phi_r_x0, source=src2)
+    allocate(phi_r_y0, source=src3)
 
-    allocate(psi_r_z0(nlx, nly)); psi_r_z0 = 0.d0
-    allocate(psi_r_x0(nly, nlz)); psi_r_x0 = 0.d0
-    allocate(psi_r_y0(nlx, nlz)); psi_r_y0 = 0.d0
+    allocate(psi_r_z0, source=src1)
+    allocate(psi_r_x0, source=src2)
+    allocate(psi_r_y0, source=src3)
 
-    allocate(omg_r_z0(nlx, nly)); omg_r_z0 = 0.d0
-    allocate(omg_r_x0(nly, nlz)); omg_r_x0 = 0.d0
-    allocate(omg_r_y0(nlx, nlz)); omg_r_y0 = 0.d0
+    allocate(omg_r_z0, source=src1)
+    allocate(omg_r_x0, source=src2)
+    allocate(omg_r_y0, source=src3)
 
-    allocate(jpa_r_z0(nlx, nly)); jpa_r_z0 = 0.d0
-    allocate(jpa_r_x0(nly, nlz)); jpa_r_x0 = 0.d0
-    allocate(jpa_r_y0(nlx, nlz)); jpa_r_y0 = 0.d0
+    allocate(jpa_r_z0, source=src1)
+    allocate(jpa_r_x0, source=src2)
+    allocate(jpa_r_y0, source=src3)
 
-    allocate( ux_r_z0(nlx, nly));  ux_r_z0 = 0.d0
-    allocate( ux_r_x0(nly, nlz));  ux_r_x0 = 0.d0
-    allocate( ux_r_y0(nlx, nlz));  ux_r_y0 = 0.d0
+    allocate( ux_r_z0, source=src1)
+    allocate( ux_r_x0, source=src2)
+    allocate( ux_r_y0, source=src3)
 
-    allocate( uy_r_z0(nlx, nly));  uy_r_z0 = 0.d0
-    allocate( uy_r_x0(nly, nlz));  uy_r_x0 = 0.d0
-    allocate( uy_r_y0(nlx, nlz));  uy_r_y0 = 0.d0
+    allocate( uy_r_z0, source=src1)
+    allocate( uy_r_x0, source=src2)
+    allocate( uy_r_y0, source=src3)
 
-    allocate( bx_r_z0(nlx, nly));  bx_r_z0 = 0.d0
-    allocate( bx_r_x0(nly, nlz));  bx_r_x0 = 0.d0
-    allocate( bx_r_y0(nlx, nlz));  bx_r_y0 = 0.d0
+    allocate( bx_r_z0, source=src1)
+    allocate( bx_r_x0, source=src2)
+    allocate( bx_r_y0, source=src3)
 
-    allocate( by_r_z0(nlx, nly));  by_r_z0 = 0.d0
-    allocate( by_r_x0(nly, nlz));  by_r_x0 = 0.d0
-    allocate( by_r_y0(nlx, nlz));  by_r_y0 = 0.d0
+    allocate( by_r_z0, source=src1)
+    allocate( by_r_x0, source=src2)
+    allocate( by_r_y0, source=src3)
+    deallocate(src1, src2, src3)
 
+    allocate(src4(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0,0.d0))
+    allocate(omg, source=src4)
+    allocate(jpa, source=src4)
+    allocate(ux , source=src4)
+    allocate(uy , source=src4)
+    allocate(bx , source=src4)
+    allocate(by , source=src4)
+    deallocate(src4)
 
     !vvvvvvvvvvvvvvvvvv         2D cut of fields          vvvvvvvvvvvvvvvvvv!
     !$omp parallel do private(i, k) schedule(static)
     do j = iky_st, iky_en
       do k = ikz_st, ikz_en
         do i = ikx_st, ikx_en
-          omg(i, k, j) = -kperp2(i, k, j)*phi(i, k, j)
-          jpa(i, k, j) = -kperp2(i, k, j)*psi(i, k, j)
+          omg(i, k, j) = -kprp2(i, k, j)*phi(i, k, j)
+          jpa(i, k, j) = -kprp2(i, k, j)*psi(i, k, j)
           ux (i, k, j) = -zi*ky(j)*phi(i, k, j)
           uy (i, k, j) =  zi*kx(i)*phi(i, k, j)
           bx (i, k, j) = -zi*ky(j)*psi(i, k, j)
@@ -344,7 +354,22 @@ contains
 !! @brief   Second order structure function
 !-----------------------------------------------!
   subroutine loop_diagnostics_SF2
+  ! under development...
   end subroutine loop_diagnostics_SF2
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    26 Jul 2019
+!! @brief   Return kpar(k) & delta b/b0
+!           k_\|(k) = \left(\frac{\langle|\mathbf{b}_{0,k} \cdot\nabla \delta\mathbf{b}_k|^2\rangle}
+!           {\langle b_{0,k}^2\rangle\langle \delta b_k^2\rangle}\right)^{1/2}  \\ 
+!           \mathbf{b}_{0,k}(\mathbf{x}) = \calF^{-1}\sum_{|\bm{k}|' \le k/2} \mathbf{b}_{\mathbf{k}'} \\  
+!           \delta\mathbf{b}_{k}(\mathbf{x}) = \calF^{-1}\sum_{k/2 \le |\bm{k}|' \le 2k} \mathbf{b}_{\mathbf{k}'}
+!-----------------------------------------------!
+  subroutine loop_diagnostics_kpar
+  ! under development...
+  end subroutine loop_diagnostics_kpar
 
 end module diagnostics
 

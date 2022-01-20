@@ -11,7 +11,7 @@ module params_common
   public  zi, pi
   public  runname, inputfile
   public  dealias
-  public  nwrite, nwrite_fld_section, nwrite_fld_3D, nwrite_SF2, SF2_nsample
+  public  nwrite, nwrite_fld_section, nwrite_fld_3D, nwrite_kpar, nwrite_SF2, SF2_nsample
   public  nsave_restart
   public  restart_dir
   public  series_output, n_series_modes, series_modes
@@ -29,7 +29,7 @@ module params_common
 
   character(len=100) :: dealias
 
-  integer            :: nwrite, nwrite_fld_section, nwrite_fld_3D, nwrite_SF2, SF2_nsample
+  integer            :: nwrite, nwrite_fld_section, nwrite_fld_3D, nwrite_kpar, nwrite_SF2, SF2_nsample
   integer            :: nsave_restart
   character(len=100) :: restart_dir
   integer            :: n_series_modes
@@ -77,8 +77,8 @@ contains
     integer  :: i, ierr
 
     namelist /dealias_parameters/ dealias
-    namelist /diagnostics_parameters/ nwrite, nwrite_fld_section, nwrite_fld_3D, nwrite_SF2, &
-                                      SF2_nsample, nsave_restart, restart_dir, output_modes
+    namelist /diagnostics_parameters/ nwrite, nwrite_fld_section, nwrite_fld_3D, nwrite_kpar, &
+                                      nwrite_SF2, SF2_nsample, nsave_restart, restart_dir, output_modes
 
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
     !v    used only when the corresponding value   v!
@@ -101,6 +101,7 @@ contains
     nwrite             = 0
     nwrite_fld_section = 0
     nwrite_fld_3D      = 0
+    nwrite_kpar        = 0
     nwrite_SF2         = 0
     SF2_nsample        = 100000
     nsave_restart      = 0
@@ -118,6 +119,7 @@ contains
     if (nwrite             == 0) nwrite             = huge(1)
     if (nwrite_fld_section == 0) nwrite_fld_section = huge(1)
     if (nwrite_fld_3D      == 0) nwrite_fld_3D      = huge(1)
+    if (nwrite_kpar        == 0) nwrite_kpar        = huge(1)
     if (nwrite_SF2         == 0) nwrite_SF2         = huge(1)
     if (nsave_restart      == 0) nsave_restart      = huge(1)
 

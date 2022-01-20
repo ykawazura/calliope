@@ -556,8 +556,8 @@ contains
       !$omp end parallel do
     endif
 
-    ! Div u & b cleaing
-    allocate(nbl2inv_div_b(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nbl2inv_div_b = 0.d0
+    ! Div b cleaing
+    allocate(nbl2inv_div_b(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
     !$omp parallel do private(i, k) schedule(static)
     do j = iky_st, iky_en
       do k = ikz_st, ikz_en
@@ -594,62 +594,65 @@ contains
     use shearing_box, only: shear_flg, tsc, k2t, k2t_inv
     use file, only: open_output_file
     implicit none
+    complex(r8), allocatable, dimension(:,:,:) :: src
     integer :: i, j, k
 
-    allocate(rho_new    (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); rho_new     = 0.d0
-    allocate(rho_old2   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); rho_old2    = 0.d0
+    allocate(src(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0,0.d0))
+    allocate(rho_new    , source=src)
+    allocate(rho_old2   , source=src)
 
-    allocate(mx_new     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); mx_new      = 0.d0
-    allocate(mx_old2    (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); mx_old2     = 0.d0
-                                                                                   
-    allocate(my_new     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); my_new      = 0.d0
-    allocate(my_old2    (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); my_old2     = 0.d0
-                                                                                   
-    allocate(mz_new     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); mz_new      = 0.d0
-    allocate(mz_old2    (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); mz_old2     = 0.d0
-                                                                                   
-    allocate(bx_new     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); bx_new      = 0.d0
-    allocate(bx_old2    (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); bx_old2     = 0.d0
-                                                                                   
-    allocate(by_new     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); by_new      = 0.d0
-    allocate(by_old2    (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); by_old2     = 0.d0
-                                                                                   
-    allocate(bz_new     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); bz_new      = 0.d0
-    allocate(bz_old2    (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); bz_old2     = 0.d0
-                                                                                   
-    allocate(nl_rho     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_rho      = 0.d0
-    allocate(nl_rho_old1(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_rho_old1 = 0.d0
-    allocate(nl_rho_old2(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_rho_old2 = 0.d0
-                                                                                   
-    allocate(nl_mx      (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_mx       = 0.d0
-    allocate(nl_mx_old1 (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_mx_old1  = 0.d0
-    allocate(nl_mx_old2 (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_mx_old2  = 0.d0
-                                                                                   
-    allocate(nl_my      (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_my       = 0.d0
-    allocate(nl_my_old1 (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_my_old1  = 0.d0
-    allocate(nl_my_old2 (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_my_old2  = 0.d0
-                                                                                   
-    allocate(nl_mz      (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_mz       = 0.d0
-    allocate(nl_mz_old1 (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_mz_old1  = 0.d0
-    allocate(nl_mz_old2 (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_mz_old2  = 0.d0
-                                                                                   
-    allocate(nl_bx      (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_bx       = 0.d0
-    allocate(nl_bx_old1 (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_bx_old1  = 0.d0
-    allocate(nl_bx_old2 (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_bx_old2  = 0.d0
-                                                                                   
-    allocate(nl_by      (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_by       = 0.d0
-    allocate(nl_by_old1 (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_by_old1  = 0.d0
-    allocate(nl_by_old2 (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_by_old2  = 0.d0
-                                                                                   
-    allocate(nl_bz      (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_bz       = 0.d0
-    allocate(nl_bz_old1 (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_bz_old1  = 0.d0
-    allocate(nl_bz_old2 (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_bz_old2  = 0.d0
+    allocate(mx_new     , source=src)
+    allocate(mx_old2    , source=src)
+                                                               
+    allocate(my_new     , source=src)
+    allocate(my_old2    , source=src)
+                                                               
+    allocate(mz_new     , source=src)
+    allocate(mz_old2    , source=src)
+                                                               
+    allocate(bx_new     , source=src)
+    allocate(bx_old2    , source=src)
+                                                               
+    allocate(by_new     , source=src)
+    allocate(by_old2    , source=src)
+                                                               
+    allocate(bz_new     , source=src)
+    allocate(bz_old2    , source=src)
+                                                               
+    allocate(nl_rho     , source=src)
+    allocate(nl_rho_old1, source=src)
+    allocate(nl_rho_old2, source=src)
+                                                               
+    allocate(nl_mx      , source=src)
+    allocate(nl_mx_old1 , source=src)
+    allocate(nl_mx_old2 , source=src)
+                                                               
+    allocate(nl_my      , source=src)
+    allocate(nl_my_old1 , source=src)
+    allocate(nl_my_old2 , source=src)
+                                                               
+    allocate(nl_mz      , source=src)
+    allocate(nl_mz_old1 , source=src)
+    allocate(nl_mz_old2 , source=src)
+                                                               
+    allocate(nl_bx      , source=src)
+    allocate(nl_bx_old1 , source=src)
+    allocate(nl_bx_old2 , source=src)
+                                                               
+    allocate(nl_by      , source=src)
+    allocate(nl_by_old1 , source=src)
+    allocate(nl_by_old2 , source=src)
+                                                               
+    allocate(nl_bz      , source=src)
+    allocate(nl_bz_old1 , source=src)
+    allocate(nl_bz_old2 , source=src)
 
-    allocate(flx        (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nftran)); flx = 0.d0
+    allocate(fmx_old2   , source=src)
+    allocate(fmy_old2   , source=src)
+    allocate(fmz_old2   , source=src)
+    deallocate(src)
 
-    allocate(fmx_old2   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); fmx_old2    = 0.d0
-    allocate(fmy_old2   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); fmy_old2    = 0.d0
-    allocate(fmz_old2   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); fmz_old2    = 0.d0
+    allocate(flx(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nftran)); flx = 0.d0
 
     allocate(kxt     (ikx_st:ikx_en, iky_st:iky_en))
     allocate(kxt_old1(ikx_st:ikx_en, iky_st:iky_en))
@@ -706,7 +709,8 @@ contains
     complex(r8), allocatable, dimension(:,:,:,:) :: wbk
     real   (r8), allocatable, dimension(:,:,:,:) :: wb , wf 
     real   (r8), allocatable, dimension(:,:,:)   :: ux_r, uy_r, uz_r
-    real   (r8), allocatable, dimension(:,:,:) :: cfx2_r, cfy2_r, cfz2_r ! Fast mode phase speed
+    real   (r8), allocatable, dimension(:,:,:)   :: cfx2_r, cfy2_r, cfz2_r ! Fast mode phase speed
+    real   (r8), allocatable, dimension(:,:,:)   :: src
     real   (r8) :: vax2_r, vay2_r, vaz2_r ! Alfven speed
 
     integer :: i, j, k
@@ -714,15 +718,18 @@ contains
 
     if (proc0) call put_time_stamp(timer_nonlinear_terms)
 
-    allocate(wbk   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nbtran)); wbk    = 0.d0
-    allocate(wb    (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nbtran)); wb     = 0.d0
-    allocate(wf    (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nftran)); wf     = 0.d0
-    allocate(ux_r  (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en))        ; ux_r   = 0.d0
-    allocate(uy_r  (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en))        ; uy_r   = 0.d0
-    allocate(uz_r  (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en))        ; uz_r   = 0.d0
-    allocate(cfx2_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en))        ; cfx2_r = 0.d0
-    allocate(cfy2_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en))        ; cfy2_r = 0.d0
-    allocate(cfz2_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en))        ; cfx2_r = 0.d0
+    allocate(wbk(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nbtran), source=(0.d0, 0.d0))
+    allocate(wb (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nbtran), source=0.d0)
+    allocate(wf (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nftran), source=0.d0)
+
+    allocate(src(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
+    allocate(ux_r  , source=src)
+    allocate(uy_r  , source=src)
+    allocate(uz_r  , source=src)
+    allocate(cfx2_r, source=src)
+    allocate(cfy2_r, source=src)
+    allocate(cfz2_r, source=src)
+    deallocate(src)
 
     ! 1. Calculate grad in Fourier space
     !$omp parallel do private(i, k) schedule(static)

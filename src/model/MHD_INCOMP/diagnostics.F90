@@ -13,7 +13,7 @@ module diagnostics
   implicit none
 
   public :: init_diagnostics, finish_diagnostics
-  public :: loop_diagnostics, loop_diagnostics_fields_secion, loop_diagnostics_SF2
+  public :: loop_diagnostics, loop_diagnostics_fields_secion, loop_diagnostics_kpar, loop_diagnostics_SF2
 
   private
 
@@ -69,12 +69,13 @@ contains
     implicit none
     integer :: i, j, k
 
-    real(r8)   , allocatable, dimension(:,:,:) :: u2, ux2, uy2, uz2
-    real(r8)   , allocatable, dimension(:,:,:) :: b2, bx2, by2, bz2
-    real(r8)   , allocatable, dimension(:,:,:) :: u2old1, b2old1
-    real(r8)   , allocatable, dimension(:,:,:) :: u2dissip, b2dissip
-    real(r8)   , allocatable, dimension(:,:,:) :: p_u
-    real(r8)   , allocatable, dimension(:,:,:) :: zp2, zm2
+    real(r8), allocatable, dimension(:,:,:) :: u2, ux2, uy2, uz2
+    real(r8), allocatable, dimension(:,:,:) :: b2, bx2, by2, bz2
+    real(r8), allocatable, dimension(:,:,:) :: u2old1, b2old1
+    real(r8), allocatable, dimension(:,:,:) :: u2dissip, b2dissip
+    real(r8), allocatable, dimension(:,:,:) :: p_u
+    real(r8), allocatable, dimension(:,:,:) :: zp2, zm2
+    real(r8), allocatable, dimension(:,:,:) :: src
 
     real(r8) :: u2_sum, b2_sum
     real(r8) :: u2dot_sum, b2dot_sum
@@ -95,21 +96,23 @@ contains
     endif
     if (proc0) call put_time_stamp(timer_diagnostics)
 
-    allocate(u2      (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); u2       = 0.d0
-    allocate(ux2     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); ux2      = 0.d0
-    allocate(uy2     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); uy2      = 0.d0
-    allocate(uz2     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); uz2      = 0.d0
-    allocate(b2      (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); b2       = 0.d0
-    allocate(bx2     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); bx2      = 0.d0
-    allocate(by2     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); by2      = 0.d0
-    allocate(bz2     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); bz2      = 0.d0
-    allocate(u2old1  (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); u2old1   = 0.d0
-    allocate(b2old1  (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); b2old1   = 0.d0
-    allocate(u2dissip(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); u2dissip = 0.d0
-    allocate(b2dissip(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); b2dissip = 0.d0
-    allocate(p_u     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); p_u      = 0.d0
-    allocate(zp2     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); zp2      = 0.d0
-    allocate(zm2     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); zm2      = 0.d0
+    allocate(src(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=0.d0)
+    allocate(u2      , source=src)
+    allocate(ux2     , source=src)
+    allocate(uy2     , source=src)
+    allocate(uz2     , source=src)
+    allocate(b2      , source=src)
+    allocate(bx2     , source=src)
+    allocate(by2     , source=src)
+    allocate(bz2     , source=src)
+    allocate(u2old1  , source=src)
+    allocate(b2old1  , source=src)
+    allocate(u2dissip, source=src)
+    allocate(b2dissip, source=src)
+    allocate(p_u     , source=src)
+    allocate(zp2     , source=src)
+    allocate(zm2     , source=src)
+    deallocate(src)
 
     allocate( u2_bin(1:nkpolar));  u2_bin = 0.d0
     allocate(ux2_bin(1:nkpolar)); ux2_bin = 0.d0
@@ -308,6 +311,9 @@ contains
     real(r8)   , allocatable, dimension(:,:)   :: u2_kxy, u2_kyz, u2_kxz
     real(r8)   , allocatable, dimension(:,:)   :: b2_kxy, b2_kyz, b2_kxz
 
+    real(r8)   , allocatable, dimension(:,:)   :: src1, src2, src3
+    complex(r8), allocatable, dimension(:,:,:) :: src4
+
     integer :: i, j, k
 
     if(nremap > 0 .and. tsc <= 5.*dt) then
@@ -318,70 +324,76 @@ contains
     allocate(f (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); f   = 0.d0
     allocate(fr(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); fr  = 0.d0
 
-    allocate(ux_r_z0(nlx, nly)); ux_r_z0 = 0.d0
-    allocate(ux_r_x0(nly, nlz)); ux_r_x0 = 0.d0
-    allocate(ux_r_y0(nlx, nlz)); ux_r_y0 = 0.d0
+    allocate(src1(nlx, nly), source=0.d0); allocate(src2(nly, nlz), source=0.d0); allocate(src3(nlx, nlz), source=0.d0)
+    allocate(ux_r_z0, source=src1)
+    allocate(ux_r_x0, source=src2)
+    allocate(ux_r_y0, source=src3)
 
-    allocate(uy_r_z0(nlx, nly)); uy_r_z0 = 0.d0
-    allocate(uy_r_x0(nly, nlz)); uy_r_x0 = 0.d0
-    allocate(uy_r_y0(nlx, nlz)); uy_r_y0 = 0.d0
+    allocate(uy_r_z0, source=src1)
+    allocate(uy_r_x0, source=src2)
+    allocate(uy_r_y0, source=src3)
 
-    allocate(uz_r_z0(nlx, nly)); uz_r_z0 = 0.d0
-    allocate(uz_r_x0(nly, nlz)); uz_r_x0 = 0.d0
-    allocate(uz_r_y0(nlx, nlz)); uz_r_y0 = 0.d0
+    allocate(uz_r_z0, source=src1)
+    allocate(uz_r_x0, source=src2)
+    allocate(uz_r_y0, source=src3)
 
-    allocate(wx_r_z0(nlx, nly)); wx_r_z0 = 0.d0
-    allocate(wx_r_x0(nly, nlz)); wx_r_x0 = 0.d0
-    allocate(wx_r_y0(nlx, nlz)); wx_r_y0 = 0.d0
+    allocate(wx_r_z0, source=src1)
+    allocate(wx_r_x0, source=src2)
+    allocate(wx_r_y0, source=src3)
 
-    allocate(wy_r_z0(nlx, nly)); wy_r_z0 = 0.d0
-    allocate(wy_r_x0(nly, nlz)); wy_r_x0 = 0.d0
-    allocate(wy_r_y0(nlx, nlz)); wy_r_y0 = 0.d0
+    allocate(wy_r_z0, source=src1)
+    allocate(wy_r_x0, source=src2)
+    allocate(wy_r_y0, source=src3)
 
-    allocate(wz_r_z0(nlx, nly)); wz_r_z0 = 0.d0
-    allocate(wz_r_x0(nly, nlz)); wz_r_x0 = 0.d0
-    allocate(wz_r_y0(nlx, nlz)); wz_r_y0 = 0.d0
+    allocate(wz_r_z0, source=src1)
+    allocate(wz_r_x0, source=src2)
+    allocate(wz_r_y0, source=src3)
 
-    allocate(bx_r_z0(nlx, nly)); bx_r_z0 = 0.d0
-    allocate(bx_r_x0(nly, nlz)); bx_r_x0 = 0.d0
-    allocate(bx_r_y0(nlx, nlz)); bx_r_y0 = 0.d0
+    allocate(bx_r_z0, source=src1)
+    allocate(bx_r_x0, source=src2)
+    allocate(bx_r_y0, source=src3)
 
-    allocate(by_r_z0(nlx, nly)); by_r_z0 = 0.d0
-    allocate(by_r_x0(nly, nlz)); by_r_x0 = 0.d0
-    allocate(by_r_y0(nlx, nlz)); by_r_y0 = 0.d0
+    allocate(by_r_z0, source=src1)
+    allocate(by_r_x0, source=src2)
+    allocate(by_r_y0, source=src3)
 
-    allocate(bz_r_z0(nlx, nly)); bz_r_z0 = 0.d0
-    allocate(bz_r_x0(nly, nlz)); bz_r_x0 = 0.d0
-    allocate(bz_r_y0(nlx, nlz)); bz_r_y0 = 0.d0
+    allocate(bz_r_z0, source=src1)
+    allocate(bz_r_x0, source=src2)
+    allocate(bz_r_y0, source=src3)
 
-    allocate(jx_r_z0(nlx, nly)); jx_r_z0 = 0.d0
-    allocate(jx_r_x0(nly, nlz)); jx_r_x0 = 0.d0
-    allocate(jx_r_y0(nlx, nlz)); jx_r_y0 = 0.d0
+    allocate(jx_r_z0, source=src1)
+    allocate(jx_r_x0, source=src2)
+    allocate(jx_r_y0, source=src3)
 
-    allocate(jy_r_z0(nlx, nly)); jy_r_z0 = 0.d0
-    allocate(jy_r_x0(nly, nlz)); jy_r_x0 = 0.d0
-    allocate(jy_r_y0(nlx, nlz)); jy_r_y0 = 0.d0
+    allocate(jy_r_z0, source=src1)
+    allocate(jy_r_x0, source=src2)
+    allocate(jy_r_y0, source=src3)
 
-    allocate(jz_r_z0(nlx, nly)); jz_r_z0 = 0.d0
-    allocate(jz_r_x0(nly, nlz)); jz_r_x0 = 0.d0
-    allocate(jz_r_y0(nlx, nlz)); jz_r_y0 = 0.d0
+    allocate(jz_r_z0, source=src1)
+    allocate(jz_r_x0, source=src2)
+    allocate(jz_r_y0, source=src3)
+    deallocate(src1, src2, src3)
 
-    allocate(wx (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); wx  = 0.d0
-    allocate(wy (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); wy  = 0.d0
-    allocate(wz (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); wz  = 0.d0
-    allocate(jx (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); jx  = 0.d0
-    allocate(jy (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); jy  = 0.d0
-    allocate(jz (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); jz  = 0.d0
+    allocate(src4(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0,0.d0))
+    allocate(wx, source=src4)
+    allocate(wy, source=src4)
+    allocate(wz, source=src4)
+    allocate(jx, source=src4)
+    allocate(jy, source=src4)
+    allocate(jz, source=src4)
+    deallocate(src4)
 
-    allocate(u2 (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); u2  = 0.d0
-    allocate(b2 (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); b2  = 0.d0
+    allocate(u2 (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=0.d0)
+    allocate(b2 (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=0.d0)
 
-    allocate(u2_kxy(nkx, nky)); u2_kxy = 0.d0
-    allocate(u2_kyz(nky, nkz)); u2_kyz = 0.d0
-    allocate(u2_kxz(nkx, nkz)); u2_kxz = 0.d0
-    allocate(b2_kxy(nkx, nky)); b2_kxy = 0.d0
-    allocate(b2_kyz(nky, nkz)); b2_kyz = 0.d0
-    allocate(b2_kxz(nkx, nkz)); b2_kxz = 0.d0
+    allocate(src1(nkx, nky), source=0.d0); allocate(src2(nky, nkz), source=0.d0); allocate(src3(nkx, nkz), source=0.d0)
+    allocate(u2_kxy(nkx, nky), source=0.d0)
+    allocate(u2_kyz(nky, nkz), source=0.d0)
+    allocate(u2_kxz(nkx, nkz), source=0.d0)
+    allocate(b2_kxy(nkx, nky), source=0.d0)
+    allocate(b2_kyz(nky, nkz), source=0.d0)
+    allocate(b2_kxz(nkx, nkz), source=0.d0)
+    deallocate(src1, src2, src3)
 
     !vvvvvvvvvvvvvvvvvv         2D cut of fields          vvvvvvvvvvvvvvvvvv!
     call curl(ux, uy, uz, wx, wy, wz)
@@ -596,17 +608,21 @@ contains
     integer  :: ilpar, ilper
     complex(r8), allocatable, dimension(:,:,:) :: f
     real(r8), allocatable, dimension(:,:,:) :: bx_r, by_r, bz_r, ux_r, uy_r, uz_r
+    real(r8), allocatable, dimension(:,:,:) :: src
 
     if (proc0) call put_time_stamp(timer_diagnostics)
     if (proc0) call put_time_stamp(timer_diagnostics_SF2)
 
-    allocate( f   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); f    = 0.d0
-    allocate( bx_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); bx_r = 0.d0
-    allocate( by_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); by_r = 0.d0
-    allocate( bz_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); bz_r = 0.d0
-    allocate( ux_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); ux_r = 0.d0
-    allocate( uy_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); uy_r = 0.d0
-    allocate( uz_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); uz_r = 0.d0
+    allocate(f   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); f    = 0.d0
+
+    allocate(src(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
+    allocate(bx_r, source=src)
+    allocate(by_r, source=src)
+    allocate(bz_r, source=src)
+    allocate(ux_r, source=src)
+    allocate(uy_r, source=src)
+    allocate(uz_r, source=src)
+    deallocate(src)
 
     f = bx ; call p3dfft_btran_c2r(f, bx_r , 'tff')
     f = by ; call p3dfft_btran_c2r(f, by_r , 'tff')
@@ -777,6 +793,273 @@ contains
     if (proc0) call put_time_stamp(timer_diagnostics)
     if (proc0) call put_time_stamp(timer_diagnostics_SF2)
   end subroutine loop_diagnostics_SF2
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    26 Jul 2019
+!! @brief   Return kpar(k) & delta b/b0
+!           k_\|(k) = \left(\frac{\langle|\mathbf{b}_{0,k} \cdot\nabla \delta\mathbf{b}_k|^2\rangle}
+!           {\langle b_{0,k}^2\rangle\langle \delta b_k^2\rangle}\right)^{1/2}  \\ 
+!           \mathbf{b}_{0,k}(\mathbf{x}) = \calF^{-1}\sum_{|\bm{k}|' \le k/2} \mathbf{b}_{\mathbf{k}'} \\  
+!           \delta\mathbf{b}_{k}(\mathbf{x}) = \calF^{-1}\sum_{k/2 \le |\bm{k}|' \le 2k} \mathbf{b}_{\mathbf{k}'}
+!-----------------------------------------------!
+  subroutine loop_diagnostics_kpar
+    use fields, only: bx, by, bz, ux, uy, uz
+    use mp, only: sum_reduce
+    use grid, only: kx, ky, kz, nlx, nly, nlz
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
+    use params, only: zi
+    use shearing_box, only: k2t
+    use io, only: loop_io_kpar
+    implicit none
+    integer :: ii, i, j, k
+
+    real   (r8), dimension(:), allocatable :: kpar_b, kpar_u, b1_ovr_b0
+
+    complex(r8), allocatable, dimension(:,:,:) :: bx0, by0, bz0                ! local mean field
+    complex(r8), allocatable, dimension(:,:,:) :: bx1, by1, bz1                ! local fluctuating field
+    complex(r8), allocatable, dimension(:,:,:) :: ux1, uy1, uz1                ! local fluctuating field
+    complex(r8), allocatable, dimension(:,:,:) :: dbx1_dx, dby1_dx, dbz1_dx    
+    complex(r8), allocatable, dimension(:,:,:) :: dbx1_dy, dby1_dy, dbz1_dy    
+    complex(r8), allocatable, dimension(:,:,:) :: dbx1_dz, dby1_dz, dbz1_dz    
+    complex(r8), allocatable, dimension(:,:,:) :: dux1_dx, duy1_dx, duz1_dx    
+    complex(r8), allocatable, dimension(:,:,:) :: dux1_dy, duy1_dy, duz1_dy    
+    complex(r8), allocatable, dimension(:,:,:) :: dux1_dz, duy1_dz, duz1_dz    
+    real   (r8), allocatable, dimension(:,:,:) :: bx0r, by0r, bz0r             
+    real   (r8), allocatable, dimension(:,:,:) :: bx1r, by1r, bz1r             
+    real   (r8), allocatable, dimension(:,:,:) :: ux1r, uy1r, uz1r             
+    real   (r8), allocatable, dimension(:,:,:) :: dbx1_dxr, dby1_dxr, dbz1_dxr 
+    real   (r8), allocatable, dimension(:,:,:) :: dbx1_dyr, dby1_dyr, dbz1_dyr 
+    real   (r8), allocatable, dimension(:,:,:) :: dbx1_dzr, dby1_dzr, dbz1_dzr 
+    real   (r8), allocatable, dimension(:,:,:) :: dux1_dxr, duy1_dxr, duz1_dxr 
+    real   (r8), allocatable, dimension(:,:,:) :: dux1_dyr, duy1_dyr, duz1_dyr 
+    real   (r8), allocatable, dimension(:,:,:) :: dux1_dzr, duy1_dzr, duz1_dzr 
+
+    real   (r8), allocatable, dimension(:,:,:) :: b0_gradb1_sq, b0_gradu1_sq, b0sq, b1sq, u1sq
+    real   (r8) :: b0_gradb1_sq_avg, b0_gradu1_sq_avg, b0sq_avg, b1sq_avg, u1sq_avg
+
+    complex(r8), allocatable, dimension(:,:,:) :: src_c
+    real   (r8), allocatable, dimension(:,:,:) :: src_r
+
+    allocate(kpar_b   (nkpolar))
+    allocate(kpar_u   (nkpolar))
+    allocate(b1_ovr_b0(nkpolar))
+
+    allocate(src_c(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0,0.d0))
+    allocate(bx0    , source=src_c)
+    allocate(by0    , source=src_c)
+    allocate(bz0    , source=src_c)
+    allocate(bx1    , source=src_c)
+    allocate(by1    , source=src_c)
+    allocate(bz1    , source=src_c)
+    allocate(ux1    , source=src_c)
+    allocate(uy1    , source=src_c)
+    allocate(uz1    , source=src_c)
+    allocate(dbx1_dx, source=src_c)
+    allocate(dby1_dx, source=src_c)
+    allocate(dbz1_dx, source=src_c)
+    allocate(dbx1_dy, source=src_c)
+    allocate(dby1_dy, source=src_c)
+    allocate(dbz1_dy, source=src_c)
+    allocate(dbx1_dz, source=src_c)
+    allocate(dby1_dz, source=src_c)
+    allocate(dbz1_dz, source=src_c)
+    allocate(dux1_dx, source=src_c)
+    allocate(duy1_dx, source=src_c)
+    allocate(duz1_dx, source=src_c)
+    allocate(dux1_dy, source=src_c)
+    allocate(duy1_dy, source=src_c)
+    allocate(duz1_dy, source=src_c)
+    allocate(dux1_dz, source=src_c)
+    allocate(duy1_dz, source=src_c)
+    allocate(duz1_dz, source=src_c)
+    deallocate(src_c)
+
+    allocate(src_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
+    allocate(bx0r    , source=src_r)
+    allocate(by0r    , source=src_r)
+    allocate(bz0r    , source=src_r)
+    allocate(bx1r    , source=src_r)
+    allocate(by1r    , source=src_r)
+    allocate(bz1r    , source=src_r)
+    allocate(ux1r    , source=src_r)
+    allocate(uy1r    , source=src_r)
+    allocate(uz1r    , source=src_r)
+    allocate(dbx1_dxr, source=src_r)
+    allocate(dby1_dxr, source=src_r)
+    allocate(dbz1_dxr, source=src_r)
+    allocate(dbx1_dyr, source=src_r)
+    allocate(dby1_dyr, source=src_r)
+    allocate(dbz1_dyr, source=src_r)
+    allocate(dbx1_dzr, source=src_r)
+    allocate(dby1_dzr, source=src_r)
+    allocate(dbz1_dzr, source=src_r)
+    allocate(dux1_dxr, source=src_r)
+    allocate(duy1_dxr, source=src_r)
+    allocate(duz1_dxr, source=src_r)
+    allocate(dux1_dyr, source=src_r)
+    allocate(duy1_dyr, source=src_r)
+    allocate(duz1_dyr, source=src_r)
+    allocate(dux1_dzr, source=src_r)
+    allocate(duy1_dzr, source=src_r)
+    allocate(duz1_dzr, source=src_r)
+    deallocate(src_r)
+
+    allocate(src_r(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=0.d0)
+    allocate(b0_gradb1_sq, source=src_r)
+    allocate(b0_gradu1_sq, source=src_r)
+    allocate(b0sq        , source=src_r)
+    allocate(b1sq        , source=src_r)
+    allocate(u1sq        , source=src_r)
+    deallocate(src_r)
+
+    ! get kpar for each kprp(ii)
+    do ii = 1, nkpolar
+
+      ! filter out to get local mean field and local fluctuating field
+      do j = iky_st, iky_en
+        do k = ikz_st, ikz_en
+          do i = ikx_st, ikx_en
+            ! smaller than kprp/2
+            if(k2t(i, k, j) < (0.5d0*kpbin(ii))**2) then
+              bx0(i, k, j) = bx(i, k, j)
+              by0(i, k, j) = by(i, k, j)
+              bz0(i, k, j) = bz(i, k, j)
+            else
+              bx0(i, k, j) = 0.d0
+              by0(i, k, j) = 0.d0
+              bz0(i, k, j) = 0.d0
+            endif
+
+            ! larger than kprp/2 and smaller than 2*kprp
+            if(k2t(i, k, j) >= (0.5d0*kpbin(ii))**2 .and. k2t(i, k, j) < (2.0d0*kpbin(ii))**2) then
+              bx1(i, k, j) = bx(i, k, j)
+              by1(i, k, j) = by(i, k, j)
+              bz1(i, k, j) = bz(i, k, j)
+              ux1(i, k, j) = ux(i, k, j)
+              uy1(i, k, j) = uy(i, k, j)
+              uz1(i, k, j) = uz(i, k, j)
+            else
+              bx1(i, k, j) = 0.d0
+              by1(i, k, j) = 0.d0
+              bz1(i, k, j) = 0.d0
+              ux1(i, k, j) = 0.d0
+              uy1(i, k, j) = 0.d0
+              uz1(i, k, j) = 0.d0
+            endif
+
+            dbx1_dx(i, k, j) = zi*kx(i)*bx1(i, k, j)
+            dby1_dx(i, k, j) = zi*kx(i)*by1(i, k, j)
+            dbz1_dx(i, k, j) = zi*kx(i)*bz1(i, k, j)
+
+            dbx1_dy(i, k, j) = zi*ky(j)*bx1(i, k, j)
+            dby1_dy(i, k, j) = zi*ky(j)*by1(i, k, j)
+            dbz1_dy(i, k, j) = zi*ky(j)*bz1(i, k, j)
+
+            dbx1_dz(i, k, j) = zi*kz(k)*bx1(i, k, j)
+            dby1_dz(i, k, j) = zi*kz(k)*by1(i, k, j)
+            dbz1_dz(i, k, j) = zi*kz(k)*bz1(i, k, j)
+
+            dux1_dx(i, k, j) = zi*kx(i)*ux1(i, k, j)
+            duy1_dx(i, k, j) = zi*kx(i)*uy1(i, k, j)
+            duz1_dx(i, k, j) = zi*kx(i)*uz1(i, k, j)
+
+            dux1_dy(i, k, j) = zi*ky(j)*ux1(i, k, j)
+            duy1_dy(i, k, j) = zi*ky(j)*uy1(i, k, j)
+            duz1_dy(i, k, j) = zi*ky(j)*uz1(i, k, j)
+
+            dux1_dz(i, k, j) = zi*kz(k)*ux1(i, k, j)
+            duy1_dz(i, k, j) = zi*kz(k)*uy1(i, k, j)
+            duz1_dz(i, k, j) = zi*kz(k)*uz1(i, k, j)
+          end do
+        end do
+      end do
+
+      call p3dfft_btran_c2r(bx0, bx0r, 'tff')
+      call p3dfft_btran_c2r(by0, by0r, 'tff')
+      call p3dfft_btran_c2r(bz0, bz0r, 'tff')
+      call p3dfft_btran_c2r(bx1, bx1r, 'tff')
+      call p3dfft_btran_c2r(by1, by1r, 'tff')
+      call p3dfft_btran_c2r(bz1, bz1r, 'tff')
+      call p3dfft_btran_c2r(ux1, ux1r, 'tff')
+      call p3dfft_btran_c2r(uy1, uy1r, 'tff')
+      call p3dfft_btran_c2r(uz1, uz1r, 'tff')
+
+      call p3dfft_btran_c2r(dbx1_dx, dbx1_dxr, 'tff')
+      call p3dfft_btran_c2r(dby1_dx, dby1_dxr, 'tff')
+      call p3dfft_btran_c2r(dbz1_dx, dbz1_dxr, 'tff')
+      call p3dfft_btran_c2r(dbx1_dy, dbx1_dyr, 'tff')
+      call p3dfft_btran_c2r(dby1_dy, dby1_dyr, 'tff')
+      call p3dfft_btran_c2r(dbz1_dy, dbz1_dyr, 'tff')
+      call p3dfft_btran_c2r(dbx1_dz, dbx1_dzr, 'tff')
+      call p3dfft_btran_c2r(dby1_dz, dby1_dzr, 'tff')
+      call p3dfft_btran_c2r(dbz1_dz, dbz1_dzr, 'tff')
+
+      call p3dfft_btran_c2r(dux1_dx, dux1_dxr, 'tff')
+      call p3dfft_btran_c2r(duy1_dx, duy1_dxr, 'tff')
+      call p3dfft_btran_c2r(duz1_dx, duz1_dxr, 'tff')
+      call p3dfft_btran_c2r(dux1_dy, dux1_dyr, 'tff')
+      call p3dfft_btran_c2r(duy1_dy, duy1_dyr, 'tff')
+      call p3dfft_btran_c2r(duz1_dy, duz1_dyr, 'tff')
+      call p3dfft_btran_c2r(dux1_dz, dux1_dzr, 'tff')
+      call p3dfft_btran_c2r(duy1_dz, duy1_dzr, 'tff')
+      call p3dfft_btran_c2r(duz1_dz, duz1_dzr, 'tff')
+
+      b0_gradb1_sq =   (bx0r*dbx1_dxr + by0r*dbx1_dyr + bz0r*dbx1_dzr)**2 &
+                     + (bx0r*dby1_dxr + by0r*dby1_dyr + bz0r*dby1_dzr)**2 &
+                     + (bx0r*dbz1_dxr + by0r*dbz1_dyr + bz0r*dbz1_dzr)**2 
+      b0_gradu1_sq =   (bx0r*dux1_dxr + by0r*dux1_dyr + bz0r*dux1_dzr)**2 &
+                     + (bx0r*duy1_dxr + by0r*duy1_dyr + bz0r*duy1_dzr)**2 &
+                     + (bx0r*duz1_dxr + by0r*duz1_dyr + bz0r*duz1_dzr)**2 
+      b0sq = bx0r**2 + by0r**2 + bz0r**2
+      b1sq = bx1r**2 + by1r**2 + bz1r**2
+      u1sq = ux1r**2 + uy1r**2 + uz1r**2
+
+      b0_gradb1_sq_avg = sum(b0_gradb1_sq); call sum_reduce(b0_gradb1_sq_avg, 0); b0_gradb1_sq_avg = b0_gradb1_sq_avg/(nlx*nly*nlz)
+      b0_gradu1_sq_avg = sum(b0_gradu1_sq); call sum_reduce(b0_gradu1_sq_avg, 0); b0_gradu1_sq_avg = b0_gradu1_sq_avg/(nlx*nly*nlz)
+      b0sq_avg         = sum(b0sq)        ; call sum_reduce(b0sq_avg        , 0); b0sq_avg         = b0sq_avg        /(nlx*nly*nlz)
+      b1sq_avg         = sum(b1sq)        ; call sum_reduce(b1sq_avg        , 0); b1sq_avg         = b1sq_avg        /(nlx*nly*nlz)
+      u1sq_avg         = sum(u1sq)        ; call sum_reduce(u1sq_avg        , 0); u1sq_avg         = u1sq_avg        /(nlx*nly*nlz)
+
+      if (b0sq_avg /= 0.d0 .and. b1sq_avg /= 0.d0 .and. u1sq_avg /= 0.d0) then
+        kpar_b   (ii) = dsqrt( b0_gradb1_sq_avg/(b1sq_avg*b0sq_avg) )
+        kpar_u   (ii) = dsqrt( b0_gradu1_sq_avg/(u1sq_avg*b0sq_avg) )
+        b1_ovr_b0(ii) = dsqrt( b1sq_avg/b0sq_avg )
+      else
+        kpar_b   (ii) = 0.d0
+        kpar_u   (ii) = 0.d0
+        b1_ovr_b0(ii) = 0.d0
+      endif
+    enddo
+
+    call loop_io_kpar(nkpolar, kpar_b, kpar_u, b1_ovr_b0)
+
+    deallocate(kpar_b)
+    deallocate(kpar_u)
+    deallocate(b1_ovr_b0)
+    deallocate(bx0, by0, bz0)
+    deallocate(bx1, by1, bz1)
+    deallocate(ux1, uy1, uz1)
+    deallocate(dbx1_dx, dby1_dx, dbz1_dx)
+    deallocate(dbx1_dy, dby1_dy, dbz1_dy)
+    deallocate(dbx1_dz, dby1_dz, dbz1_dz)
+    deallocate(dux1_dx, duy1_dx, duz1_dx)
+    deallocate(dux1_dy, duy1_dy, duz1_dy)
+    deallocate(dux1_dz, duy1_dz, duz1_dz)
+    deallocate(bx0r, by0r, bz0r)
+    deallocate(bx1r, by1r, bz1r)
+    deallocate(ux1r, uy1r, uz1r)
+    deallocate(dbx1_dxr, dby1_dxr, dbz1_dxr)
+    deallocate(dbx1_dyr, dby1_dyr, dbz1_dyr)
+    deallocate(dbx1_dzr, dby1_dzr, dbz1_dzr)
+    deallocate(dux1_dxr, duy1_dxr, duz1_dxr)
+    deallocate(dux1_dyr, duy1_dyr, duz1_dyr)
+    deallocate(dux1_dzr, duy1_dzr, duz1_dzr)
+    deallocate(b0_gradb1_sq, b0_gradu1_sq, b0sq, b1sq, u1sq)
+
+  end subroutine loop_diagnostics_kpar
 
 end module diagnostics
 

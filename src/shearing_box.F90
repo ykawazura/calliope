@@ -40,10 +40,8 @@ contains
     implicit none
     integer :: i, j, k
 
-    allocate(k2t    (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
-    allocate(k2t_inv(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
-    k2t     = k2
-    k2t_inv = k2inv
+    allocate(k2t    , source=k2)
+    allocate(k2t_inv, source=k2inv)
 
     allocate(kxt     (ikx_st:ikx_en, iky_st:iky_en))
     allocate(kxt_old1(ikx_st:ikx_en, iky_st:iky_en))
@@ -95,7 +93,7 @@ contains
     complex(r8), allocatable, dimension(:,:,:) :: tmp
     integer :: i, j, inew, ikxnew, dikx
 
-    allocate(tmp(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); tmp = 0.d0
+    allocate(tmp(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
 
     do j = iky_st, iky_en
       dikx = floor(q*shear_flg*tremap*ky(j)/dkx)
@@ -129,7 +127,7 @@ contains
     real(r8), allocatable, dimension(:,:,:) :: tmp
     integer :: i, j, dj, j_nsc
 
-    allocate(tmp(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); tmp = 0.d0
+    allocate(tmp(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
 
     do i = ilx_st, ilx_en
       dj = floor(q*shear_flg*tsc*xx(i)/dly)

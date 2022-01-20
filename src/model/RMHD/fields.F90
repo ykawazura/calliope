@@ -29,13 +29,16 @@ contains
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use params, only: inputfile
     implicit none
+    complex(r8), allocatable, dimension(:,:,:) :: src
 
-    allocate(phi     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
-    allocate(omg     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
-    allocate(psi     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
-    allocate(phi_old1(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
-    allocate(omg_old1(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
-    allocate(psi_old1(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
+    allocate(src(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
+    allocate(phi     , source=src)
+    allocate(omg     , source=src)
+    allocate(psi     , source=src)
+    allocate(phi_old1, source=src)
+    allocate(omg_old1, source=src)
+    allocate(psi_old1, source=src)
+    deallocate(src)
 
     call read_parameters(inputfile)
 
@@ -124,7 +127,7 @@ contains
   subroutine init_single_mode
     use p3dfft
     use mp, only: proc0
-    use grid, only: kperp2 
+    use grid, only: kprp2 
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     implicit none
     integer :: i, j, k
@@ -148,7 +151,7 @@ contains
     do j = iky_st, iky_en
       do k = ikz_st, ikz_en
         do i = ikx_st, ikx_en
-          omg(i, k, j) = phi(i, k, j)*(-kperp2(i, k, j))
+          omg(i, k, j) = phi(i, k, j)*(-kprp2(i, k, j))
         enddo
       enddo
     enddo
@@ -167,7 +170,7 @@ contains
 !-----------------------------------------------!
   subroutine init_random
     use p3dfft
-    use grid, only: kx, ky, kz, nlx, nly, nlz, kperp2 
+    use grid, only: kx, ky, kz, nlx, nly, nlz, kprp2 
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use mp, only: proc0, proc_id
@@ -184,9 +187,9 @@ contains
       print *
     endif
 
-    allocate(phi_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); phi_r = 0.d0
-    allocate(psi_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); psi_r = 0.d0
-    allocate(phi_ (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); phi_  = 0.d0
+    allocate(phi_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
+    allocate(psi_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
+    allocate(phi_ (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
 
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
     !v             create random number             v
@@ -231,7 +234,7 @@ contains
     do j = iky_st, iky_en
       do k = ikz_st, ikz_en
         do i = ikx_st, ikx_en
-          omg(i, k, j) = phi(i, k, j)*(-kperp2(i, k, j))
+          omg(i, k, j) = phi(i, k, j)*(-kprp2(i, k, j))
         enddo
       enddo
     enddo
@@ -253,7 +256,7 @@ contains
 !-----------------------------------------------!
   subroutine init_OT2
     use params, only: pi, zi
-    use grid, only: lx, ly, xx, yy, kperp2
+    use grid, only: lx, ly, xx, yy, kprp2
     use grid, only: nlx, nly, nlz
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
@@ -270,8 +273,8 @@ contains
     x0 = lx/(2.d0*pi)
     y0 = ly/(2.d0*pi)
 
-    allocate(phi_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); phi_r = 0.d0
-    allocate(psi_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); psi_r = 0.d0
+    allocate(phi_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
+    allocate(psi_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
 
     do i = ilx_st, ilx_en
       do k = ilz_st, ilz_en
@@ -288,7 +291,7 @@ contains
     do j = iky_st, iky_en
       do k = ikz_st, ikz_en
         do i = ikx_st, ikx_en
-          omg(i, k, j) = phi(i, k, j)*(-kperp2(i, k, j))
+          omg(i, k, j) = phi(i, k, j)*(-kprp2(i, k, j))
         enddo
       enddo
     enddo
@@ -309,7 +312,7 @@ contains
 !-----------------------------------------------!
   subroutine init_OT3
     use params, only: pi, zi
-    use grid, only: lx, ly, lz, xx, yy, zz, kperp2
+    use grid, only: lx, ly, lz, xx, yy, zz, kprp2
     use grid, only: nlx, nly, nlz
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
@@ -327,8 +330,8 @@ contains
     y0 = ly/(2.d0*pi)
     z0 = lz/(2.d0*pi)
 
-    allocate(phi_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); phi_r = 0.d0
-    allocate(psi_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); psi_r = 0.d0
+    allocate(phi_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
+    allocate(psi_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
     phi_r = 0.d0
     psi_r = 0.d0
 
@@ -347,7 +350,7 @@ contains
     do j = iky_st, iky_en
       do k = ikz_st, ikz_en
         do i = ikx_st, ikx_en
-          omg(i, k, j) = phi(i, k, j)*(-kperp2(i, k, j))
+          omg(i, k, j) = phi(i, k, j)*(-kprp2(i, k, j))
         enddo
       enddo
     enddo
@@ -458,7 +461,7 @@ contains
       ! ! k = 1
       ! ! do j = sp%zst(2), sp%zen(2)
         ! ! do i = sp%zst(1), sp%zen(1)
-          ! ! omg(i, j, k) = phi(i, j, k)*(-kperp2(i, j, k))
+          ! ! omg(i, j, k) = phi(i, j, k)*(-kprp2(i, j, k))
           ! ! if(abs(phi(i, j, k)) > 1e-10_mytype) then
             ! ! print *, i, j, kx(i), ky(j), phi(i, j, k)
           ! ! else

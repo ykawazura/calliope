@@ -542,8 +542,8 @@ contains
     endif
 
     ! Div u & b cleaing
-    allocate(nbl2inv_div_u(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nbl2inv_div_u = 0.d0
-    allocate(nbl2inv_div_b(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nbl2inv_div_b = 0.d0
+    allocate(nbl2inv_div_u(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
+    allocate(nbl2inv_div_b(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
     !$omp parallel do private(i, k) schedule(static)
     do j = iky_st, iky_en
       do k = ikz_st, ikz_en
@@ -587,57 +587,60 @@ contains
     use shearing_box, only: shear_flg, tsc, k2t, k2t_inv
     use file, only: open_output_file
     implicit none
+    complex(r8), allocatable, dimension(:,:,:) :: src
     integer :: i, j, k
 
-    allocate(ux_new    (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); ux_new     = 0.d0
-    allocate(ux_old2   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); ux_old2    = 0.d0
+    allocate(src(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0,0.d0))
+    allocate(ux_new    , source=src)
+    allocate(ux_old2   , source=src)
 
-    allocate(uy_new    (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); uy_new     = 0.d0
-    allocate(uy_old2   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); uy_old2    = 0.d0
+    allocate(uy_new    , source=src)
+    allocate(uy_old2   , source=src)
 
-    allocate(uz_new    (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); uz_new     = 0.d0
-    allocate(uz_old2   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); uz_old2    = 0.d0
+    allocate(uz_new    , source=src)
+    allocate(uz_old2   , source=src)
 
-    allocate(bx_new    (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); bx_new     = 0.d0
-    allocate(bx_old2   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); bx_old2    = 0.d0
+    allocate(bx_new    , source=src)
+    allocate(bx_old2   , source=src)
 
-    allocate(by_new    (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); by_new     = 0.d0
-    allocate(by_old2   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); by_old2    = 0.d0
+    allocate(by_new    , source=src)
+    allocate(by_old2   , source=src)
 
-    allocate(bz_new    (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); bz_new     = 0.d0
-    allocate(bz_old2   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); bz_old2    = 0.d0
+    allocate(bz_new    , source=src)
+    allocate(bz_old2   , source=src)
 
-    allocate( p_old2   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en));  p_old2    = 0.d0
+    allocate( p_old2   , source=src)
 
-    allocate(nl_ux     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_ux      = 0.d0
-    allocate(nl_ux_old1(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_ux_old1 = 0.d0
-    allocate(nl_ux_old2(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_ux_old2 = 0.d0
+    allocate(nl_ux     , source=src)
+    allocate(nl_ux_old1, source=src)
+    allocate(nl_ux_old2, source=src)
 
-    allocate(nl_uy     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_uy      = 0.d0
-    allocate(nl_uy_old1(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_uy_old1 = 0.d0
-    allocate(nl_uy_old2(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_uy_old2 = 0.d0
+    allocate(nl_uy     , source=src)
+    allocate(nl_uy_old1, source=src)
+    allocate(nl_uy_old2, source=src)
 
-    allocate(nl_uz     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_uz      = 0.d0
-    allocate(nl_uz_old1(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_uz_old1 = 0.d0
-    allocate(nl_uz_old2(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_uz_old2 = 0.d0
+    allocate(nl_uz     , source=src)
+    allocate(nl_uz_old1, source=src)
+    allocate(nl_uz_old2, source=src)
 
-    allocate(nl_bx     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_bx      = 0.d0
-    allocate(nl_bx_old1(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_bx_old1 = 0.d0
-    allocate(nl_bx_old2(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_bx_old2 = 0.d0
+    allocate(nl_bx     , source=src)
+    allocate(nl_bx_old1, source=src)
+    allocate(nl_bx_old2, source=src)
 
-    allocate(nl_by     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_by      = 0.d0
-    allocate(nl_by_old1(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_by_old1 = 0.d0
-    allocate(nl_by_old2(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_by_old2 = 0.d0
+    allocate(nl_by     , source=src)
+    allocate(nl_by_old1, source=src)
+    allocate(nl_by_old2, source=src)
 
-    allocate(nl_bz     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_bz      = 0.d0
-    allocate(nl_bz_old1(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_bz_old1 = 0.d0
-    allocate(nl_bz_old2(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); nl_bz_old2 = 0.d0
+    allocate(nl_bz     , source=src)
+    allocate(nl_bz_old1, source=src)
+    allocate(nl_bz_old2, source=src)
 
-    allocate(flx       (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nftran)); flx = 0.d0
+    allocate(fux_old2  , source=src)
+    allocate(fuy_old2  , source=src)
+    allocate(fuz_old2  , source=src)
+    deallocate(src)
 
-    allocate(fux_old2  (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); fux_old2   = 0.d0
-    allocate(fuy_old2  (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); fuy_old2   = 0.d0
-    allocate(fuz_old2  (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); fuz_old2   = 0.d0
+    allocate(flx(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nftran)); flx = 0.d0
 
     allocate(kxt     (ikx_st:ikx_en, iky_st:iky_en))
     allocate(kxt_old1(ikx_st:ikx_en, iky_st:iky_en))
@@ -728,9 +731,9 @@ contains
 
     if (proc0) call put_time_stamp(timer_nonlinear_terms)
 
-    allocate(wbk(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nbtran)); wbk = 0.d0
-    allocate(wb (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nbtran)); wb  = 0.d0
-    allocate(wf (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nftran)); wf  = 0.d0
+    allocate(wbk(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nbtran), source=(0.d0, 0.d0))
+    allocate(wb (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nbtran), source=0.d0)
+    allocate(wf (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nftran), source=0.d0)
 
     ! 1. Calculate grad in Fourier space
     !$omp parallel do private(i, k) schedule(static)

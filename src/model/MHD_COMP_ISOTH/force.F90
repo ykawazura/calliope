@@ -29,13 +29,16 @@ contains
   subroutine alloc_force
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     implicit none
+    complex(r8), allocatable, dimension(:,:,:) :: src
 
-    allocate(fmx     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); fmx      = 0.d0
-    allocate(fmx_old1(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); fmx_old1 = 0.d0
-    allocate(fmy     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); fmy      = 0.d0
-    allocate(fmy_old1(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); fmy_old1 = 0.d0
-    allocate(fmz     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); fmz      = 0.d0
-    allocate(fmz_old1(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); fmz_old1 = 0.d0
+    allocate(src(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0,0.d0))
+    allocate(fmx     , source=src)
+    allocate(fmx_old1, source=src)
+    allocate(fmy     , source=src)
+    allocate(fmy_old1, source=src)
+    allocate(fmz     , source=src)
+    allocate(fmz_old1, source=src)
+    deallocate(src)
   end subroutine alloc_force
 
 end module force

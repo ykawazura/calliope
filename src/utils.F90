@@ -98,7 +98,7 @@ contains
     real(r8), allocatable, dimension(:,:,:) :: u_r
     integer :: i, j, k
 
-    allocate(u_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); u_r = 0.d0
+    allocate(u_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
 
     call p3dfft_btran_c2r(u, u_r, 'tff')
 

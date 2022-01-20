@@ -13,7 +13,7 @@ module grid
   public  nkx, nky, nkz
   public  nk_local_tot, nl_local_tot
   public  xx, yy, zz
-  public  kx, ky, kz, kperp2, kperp2inv, kz2, kperp2_max, kz2_max
+  public  kx, ky, kz, kprp2, kprp2inv, kz2, kprp2_max, kz2_max
   public  ikx, iky, ikz
   public  dlx, dly, dlz, dkx, dky, dkz
   public  k2, k2inv, k2_max
@@ -27,12 +27,12 @@ module grid
   integer  :: nk_local_tot, nl_local_tot
   real(r8), allocatable :: xx(:), yy(:), zz(:)
   real(r8), allocatable :: kx(:), ky(:), kz(:), kz2(:)
-  real(r8), allocatable :: k2(:, :, :), k2inv(:, :, :), kperp2(:, :, :), kperp2inv(:, :, :)
+  real(r8), allocatable :: k2(:, :, :), k2inv(:, :, :), kprp2(:, :, :), kprp2inv(:, :, :)
   integer , allocatable :: ikx(:), iky(:), ikz(:)
   real(r8) :: dlx, dly, dlz, dkx, dky, dkz
   integer  :: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
   integer  :: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
-  real(r8) :: kperp2_max, kz2_max, k2_max
+  real(r8) :: kprp2_max, kz2_max, k2_max
 
 contains
 
@@ -112,9 +112,9 @@ contains
     dky = abs(ky(2) - ky(1))
     dkz = abs(kz(2) - kz(1))
 
-    kperp2_max = maxval(abs(kx))**2 + maxval(abs(ky))**2
-    kz2_max    = maxval(kz2)
-    k2_max     = maxval(abs(kx))**2 + maxval(abs(ky))**2 + maxval(abs(kz))**2
+    kprp2_max = maxval(abs(kx))**2 + maxval(abs(ky))**2
+    kz2_max   = maxval(kz2)
+    k2_max    = maxval(abs(kx))**2 + maxval(abs(ky))**2 + maxval(abs(kz))**2
 
     ! P3DFFT initialization
     call p3dfft_setup (dims, nly, nlz, nlx, MPI_COMM_WORLD, nlyc, nlzc, nlxc, .true.)
@@ -192,19 +192,19 @@ contains
     call sleep(1)
 #endif
 
-    allocate(k2       (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
-    allocate(k2inv    (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
-    allocate(kperp2   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
-    allocate(kperp2inv(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
+    allocate(k2      (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
+    allocate(k2inv   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
+    allocate(kprp2   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
+    allocate(kprp2inv(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
 
     do j = iky_st, iky_en
       do k = ikz_st, ikz_en
         do i = ikx_st, ikx_en
-          kperp2(i, k, j) = kx(i)**2 + ky(j)**2
-          if(kperp2(i, k, j) == 0.d0) then
-            kperp2inv(i, k, j) = 0.d0
+          kprp2(i, k, j) = kx(i)**2 + ky(j)**2
+          if(kprp2(i, k, j) == 0.d0) then
+            kprp2inv(i, k, j) = 0.d0
           else
-            kperp2inv(i, k, j) = 1.0d0/kperp2(i, k, j)
+            kprp2inv(i, k, j) = 1.0d0/kprp2(i, k, j)
           endif
 
           k2(i, k, j) = kx(i)**2 + ky(j)**2 + kz(k)**2

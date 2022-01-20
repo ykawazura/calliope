@@ -103,7 +103,7 @@ contains
     !Initialize ebin
     ebin = 0.d0
 
-    !Loop through all modes and sum number at each kperp
+    !Loop through all modes and sum number at each kprp
     do idx = 1, nkpolar - 1
       do j = iky_st, iky_en
         do k = ikz_st, ikz_en
@@ -138,7 +138,7 @@ contains
     !Initialize ebin
     ebin = 0.d0
 
-    !Loop through all modes and sum number at each kperp
+    !Loop through all modes and sum number at each kprp
     do idx = 1, nkpolar - 1
       do j = iky_st, iky_en
         do k = ikz_st, ikz_en
