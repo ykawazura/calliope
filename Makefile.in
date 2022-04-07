@@ -11,7 +11,8 @@ arch = danann_gfortran
 # 	MHD_INCOMP     ! incompressible MHD
 # 	MHD_COMP_ISOTH ! isothermal compressible MHD
 # 	MHD_COMP_ADIAB ! adiabatic compressible MHD (under development)
-MODEL = MHD_INCOMP
+# 	EMHD           ! electron MHD
+MODEL = RRMHD
 
 # use openm_COMP_ISOTHp
 USE_OPENMP = yes

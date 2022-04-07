@@ -10,9 +10,10 @@ module params_common
   public  init_params_common
   public  zi, pi
   public  runname, inputfile
+  public  time_step_scheme
   public  dealias
-  public  nwrite, nwrite_fld_section, nwrite_fld_3D, nwrite_kpar, nwrite_SF2, SF2_nsample
-  public  nsave_restart
+  public  write_intvl, write_intvl_2D, write_intvl_3D, write_intvl_kpar, write_intvl_SF2, SF2_nsample
+  public  save_restart_intvl
   public  restart_dir
   public  series_output, n_series_modes, series_modes
   private read_parameters
@@ -27,10 +28,11 @@ module params_common
   character(len=100) :: runname = 'calliope'
   character(len=100) :: inputfile
 
+  character(len=100) :: time_step_scheme
   character(len=100) :: dealias
 
-  integer            :: nwrite, nwrite_fld_section, nwrite_fld_3D, nwrite_kpar, nwrite_SF2, SF2_nsample
-  integer            :: nsave_restart
+  real(r8)           :: write_intvl, write_intvl_2D, write_intvl_3D, write_intvl_kpar, write_intvl_SF2, SF2_nsample
+  real(r8)           :: save_restart_intvl
   character(len=100) :: restart_dir
   integer            :: n_series_modes
   integer, allocatable :: series_modes(:, :)
@@ -76,9 +78,29 @@ contains
     integer :: output_modes(100)
     integer  :: i, ierr
 
+    namelist /scheme_parameters/ time_step_scheme
     namelist /dealias_parameters/ dealias
-    namelist /diagnostics_parameters/ nwrite, nwrite_fld_section, nwrite_fld_3D, nwrite_kpar, &
-                                      nwrite_SF2, SF2_nsample, nsave_restart, restart_dir, output_modes
+    namelist /diagnostics_parameters/ write_intvl, write_intvl_2D, write_intvl_3D, write_intvl_kpar, &
+                                      write_intvl_SF2, SF2_nsample, save_restart_intvl, restart_dir, output_modes
+
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v    used only when the corresponding value   v!
+    !v    does not exist in the input file         v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    time_step_scheme = 'eSSPIFRK3'
+    !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
+
+    call get_unused_unit (unit)
+    open(unit=unit,file=filename,status='old')
+
+    read(unit,nml=scheme_parameters,iostat=ierr)
+        if (ierr/=0) write(*,*) "Reading scheme_parameters failed"
+    close(unit)
+
+    if(time_step_scheme /= 'eSSPIFRK3' .and. time_step_scheme /= 'gear3') then
+      print *, 'time_step_scheme must be eSSPIFRK3 or gear3'
+      stop
+    endif
 
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
     !v    used only when the corresponding value   v!
@@ -98,14 +120,14 @@ contains
     !v    used only when the corresponding value   v!
     !v    does not exist in the input file         v!
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
-    nwrite             = 0
-    nwrite_fld_section = 0
-    nwrite_fld_3D      = 0
-    nwrite_kpar        = 0
-    nwrite_SF2         = 0
+    write_intvl        = 0.d0
+    write_intvl_2D     = 0.d0
+    write_intvl_3D     = 0.d0
+    write_intvl_kpar   = 0.d0
+    write_intvl_SF2    = 0.d0
     SF2_nsample        = 100000
-    nsave_restart      = 0
-    restart_dir = './restart/'
+    save_restart_intvl = 0.d0
+    restart_dir        = './restart/'
     output_modes(:)    = 0
     !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
 
@@ -116,12 +138,12 @@ contains
         if (ierr/=0) write(*,*) "Reading diagnostics_parameters failed"
     close(unit)
 
-    if (nwrite             == 0) nwrite             = huge(1)
-    if (nwrite_fld_section == 0) nwrite_fld_section = huge(1)
-    if (nwrite_fld_3D      == 0) nwrite_fld_3D      = huge(1)
-    if (nwrite_kpar        == 0) nwrite_kpar        = huge(1)
-    if (nwrite_SF2         == 0) nwrite_SF2         = huge(1)
-    if (nsave_restart      == 0) nsave_restart      = huge(1)
+    if (write_intvl        == 0.d0) write_intvl        = dble(huge(1))
+    if (write_intvl_2D     == 0.d0) write_intvl_2D     = dble(huge(1))
+    if (write_intvl_3D     == 0.d0) write_intvl_3D     = dble(huge(1))
+    if (write_intvl_kpar   == 0.d0) write_intvl_kpar   = dble(huge(1))
+    if (write_intvl_SF2    == 0.d0) write_intvl_SF2    = dble(huge(1))
+    if (save_restart_intvl == 0.d0) save_restart_intvl = dble(huge(1))
 
     ! Time series output of modes
     if(count(output_modes /= 0) > 0) then

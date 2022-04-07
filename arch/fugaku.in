@@ -5,6 +5,7 @@ P3DFFT_INC=-I$(P3DFFT_HOME)/include/
 P3DFFT_LIB=-L$(P3DFFT_HOME)/lib/ -lp3dfft
 
 FFTW3_HOME=/vol0004/apps/oss/spack-v0.16.2/opt/spack/linux-rhel8-a64fx/fj-4.6.1/fujitsu-fftw-master-ytok4j4l2qa355nopq524zx6ecktzjg2
+FFTW3_INC=-I$(FFTW3_HOME)/include/
 FFTW3_LIB=-L$(FFTW3_HOME)/lib/ -lfftw3
 
 NETCDF_PATH=/vol0004/apps/oss/spack-v0.16.2/opt/spack/linux-rhel8-a64fx/fj-4.6.1/netcdf-c-4.7.4-h3jxiqc2hquhexqlmiohcu3bwemuahhe

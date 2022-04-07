@@ -7,23 +7,11 @@ include ../../arch/$(arch).in
 
 MODEL_DIR = model/$(MODEL)
 
-FFLAGS += -cpp
+F90FLAGS = -cpp
 
 #vvvvvvv  2decomp option setting  vvvvvvv#
 DECOMP_DIR = ./2decomp
-
-ifeq ($(DECOMP_DOUBLE_PREC),yes)
-	DECOMP_FLGS += -DDOUBLE_PREC
-endif
-ifeq ($(DECOMP_SAVE_SINGLE),yes)
-	DECOMP_FLGS += -DSAVE_SINGLE
-endif
-ifeq ($(DECOMP_DEBG),yes)
-	DECOMP_FLGS += -DDEBG
-endif
-ifeq ($(DECOMP_OVERWRITE),yes)
-	DECOMP_FLGS += -DOVERWRITE
-endif
+DECOMP_FLGS = -DDOUBLE_PREC
 #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^#
 
 ### List of files for 2DECOMP&FFT
@@ -36,10 +24,10 @@ OBJ = $(SRC:.f90=.o)
 all: expand
 
 expand : $(OBJ)
-	$(FC) $(FFLAGS) -o ../../$@ $(OBJ) $(FFTW3_LIB)
+	$(FC) $(F90FLAGS) -o ../../$@ $(OBJ) $(FFTW3_LIB)
 
 %.o : %.f90
-	$(FC) $(FFLAGS) $(DECOMP_FLGS) $(FFTW3_INC) -I$(DECOMP_DIR) -c $< -o $@
+	$(FC) $(F90FLAGS) $(DECOMP_FLGS) $(FFTW3_INC) -I$(DECOMP_DIR) -c $< -o $@
 
 .PHONY: clean
 clean:

@@ -14,10 +14,14 @@ ys = [
        wkin_dissip_sum, 
        wmag_dissip_sum, 
        wrho_dissip_sum, 
-       -p_u_sum, 
-			 wkin_dot_sum + wmag_dot_sum + wrho_dot_sum + wkin_dissip_sum + wmag_dissip_sum + wrho_dissip_sum - p_u_sum,
+       -p_ext_sum, 
+       -p_re_sum, 
+       -p_ma_sum, 
+			 wkin_dot_sum + wmag_dot_sum + wrho_dot_sum + wkin_dissip_sum + wmag_dissip_sum + wrho_dissip_sum - p_ext_sum - p_re_sum - p_ma_sum,
      ]
 xs = [
+       tt,
+       tt,
        tt,
        tt,
        tt,
@@ -35,6 +39,8 @@ ls = [
         '', 
         '', 
         '', 
+        '', 
+        '', 
         'k--', 
      ]
 legends = [ 
@@ -44,7 +50,9 @@ legends = [
        r'$D_\mr{kin}$', 
        r'$D_\mr{mag}$', 
        r'$D_\rho$', 
-       r'$P$', 
+       r'$P_\mr{ext}$', 
+       r'$P_\mr{Re}$', 
+       r'$P_\mr{M}$', 
 			 r'balance', 
      ]
 plot_1d_many(xs, ys, xlab=tlab, legends=legends, ls=ls, legendloc='upper left', title='', ylab='', term=True, save=outdir + 'balance_all.pdf')
@@ -88,16 +96,16 @@ plot_1d(tt, beta_rms , xlab=tlab, ylab=r'$\beta_\mr{rms}$', save=outdir+'beta_rm
 np.savetxt(outdir + 'energies.txt' , np.column_stack((tt, wkin_sum, wmag_sum, wrho_sum, 
 	                                                        wkin_dot_sum, wmag_dot_sum, wrho_dot_sum,
 	                                                        wkin_dissip_sum, wmag_dissip_sum, wrho_dissip_sum,
-	                                                        p_u_sum
+	                                                        p_ext_sum, p_re_sum, p_ma_sum
 																													)), fmt='%E')
-np.savetxt(outdir + 'balance.txt' , np.column_stack((tt, wkin_dot_sum + wmag_dot_sum + wrho_dot_sum + wkin_dissip_sum + wmag_dissip_sum + wrho_dissip_sum - p_u_sum
+np.savetxt(outdir + 'balance.txt' , np.column_stack((tt, wkin_dot_sum + wmag_dot_sum + wrho_dot_sum + wkin_dissip_sum + wmag_dissip_sum + wrho_dissip_sum - p_ext_sum - p_re_sum - p_ma_sum
 																													)), fmt='%E')
 np.savetxt(outdir + 'energy_dot.txt' , np.column_stack((tt, wkin_dot_sum + wmag_dot_sum + wrho_dot_sum
 																													)), fmt='%E')
 
 
 # calculate balance
-balance = wkin_dot_sum + wmag_dot_sum + wrho_dot_sum + wkin_dissip_sum + wmag_dissip_sum + wrho_dissip_sum - p_u_sum
+balance = wkin_dot_sum + wmag_dot_sum + wrho_dot_sum + wkin_dissip_sum + wmag_dissip_sum + wrho_dissip_sum - p_ext_sum - p_re_sum - p_ma_sum
 
 print ('|balance| > 1e1 at')
 print (np.where(abs(balance) > 1e1)[0])

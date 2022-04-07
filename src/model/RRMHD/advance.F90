@@ -5,21 +5,45 @@ include "../../advance_common.F90"
 !-----------------------------------------------!
 !> @author  YK
 !! @date    20 Sep 2019
-!! @brief   Time stepping for RMHD
+!! @brief   Time stepping for RRMHD
 !-----------------------------------------------!
 module advance
   use p3dfft
+  use fields, only: nfields
+  use fields, only: iomg, ipsi, iupa, ibpa
   implicit none
 
   public solve
 
   integer :: counter = 0
-  complex(r8), allocatable, dimension(:,:,:)   :: phi_new, phi_old2
-  complex(r8), allocatable, dimension(:,:,:)   :: omg_new, omg_old2
-  complex(r8), allocatable, dimension(:,:,:)   :: psi_new, psi_old2
-  complex(r8), allocatable, dimension(:,:,:)   :: upa_new, upa_old2
-  complex(r8), allocatable, dimension(:,:,:)   :: bpa_new, bpa_old2
-  complex(r8), allocatable, dimension(:,:,:,:) :: nonlin, nonlin_old1, nonlin_old2
+  complex(r8), allocatable, dimension(:,:,:)   :: phi_new
+  complex(r8), allocatable, dimension(:,:,:)   :: omg_new
+  complex(r8), allocatable, dimension(:,:,:)   :: psi_new
+  complex(r8), allocatable, dimension(:,:,:)   :: upa_new
+  complex(r8), allocatable, dimension(:,:,:)   :: bpa_new
+  complex(r8), allocatable, dimension(:,:,:,:) :: nonlin
+  complex(r8), allocatable, dimension(:,:,:,:) :: exp_terms
+
+  !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+  !v                For eSSPIFRK3                v!
+  !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+  complex(r8), allocatable, dimension(:,:,:)   :: phi_tmp
+  complex(r8), allocatable, dimension(:,:,:)   :: omg_tmp
+  complex(r8), allocatable, dimension(:,:,:)   :: psi_tmp
+  complex(r8), allocatable, dimension(:,:,:)   :: upa_tmp
+  complex(r8), allocatable, dimension(:,:,:)   :: bpa_tmp
+  complex(r8), allocatable, dimension(:,:,:,:) :: exp_terms0
+
+  !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+  !v                  For Gear3                  v!
+  !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+  complex(r8), allocatable, dimension(:,:,:)   :: phi_old2
+  complex(r8), allocatable, dimension(:,:,:)   :: omg_old2
+  complex(r8), allocatable, dimension(:,:,:)   :: psi_old2
+  complex(r8), allocatable, dimension(:,:,:)   :: upa_old2
+  complex(r8), allocatable, dimension(:,:,:)   :: bpa_old2
+  complex(r8), allocatable, dimension(:,:,:,:) :: exp_terms_old, exp_terms_old2
+
   real   (r8) :: cflx, cfly
   integer :: max_vel_unit
 
@@ -31,9 +55,6 @@ module advance
   integer, parameter :: idjpa_dx = 7 , idjpa_dy = 8
   integer, parameter :: idupa_dx = 9 , idupa_dy = 10
   integer, parameter :: idbpa_dx = 11, idbpa_dy = 12
-  ! Forward FFT variables
-  integer, parameter :: nftran = 4
-  integer, parameter :: inonlin_omg = 1, inonlin_psi = 2, inonlin_upa = 3, inonlin_bpa = 4
 
 contains
 
@@ -41,16 +62,11 @@ contains
 !-----------------------------------------------!
 !> @author  YK
 !! @date    29 Dec 2018
-!! @brief   Solve the equation of motion
-!!          3rd Order Gear's method
-!!               linear terms: explicit
-!!            nonlinear terms: explicit
-!!          dissipation terms: implicit
-!!          [Karniadakis and Israeli, JCP 1991]
+!! @brief   Solve the time evolution
 !-----------------------------------------------!
   subroutine solve
     use fields, only: phi, omg, psi, upa, bpa
-    use fields, only: phi_old1, omg_old1, psi_old1, upa_old1, bpa_old1
+    use fields, only: phi_old, omg_old, psi_old, upa_old, bpa_old
     use grid, only: kprp2, kprp2inv, kz2, kprp2_max, kz2_max
     use grid, only: kx, ky, kz
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
@@ -64,8 +80,12 @@ contains
                                      etape_x, etape_x_exp, etape_z, etape_z_exp, &
                                      etapa_x, etapa_x_exp, etapa_z, etapa_z_exp, &
                       zi, nonlinear, q
+    use advance_common, only: eSSPIFRK1, eSSPIFRK2, eSSPIFRK3
     use advance_common, only: gear1, gear2, gear3
+    use params, only: time_step_scheme
     implicit none
+    real(r8) :: imp_terms_tintg0(nfields), imp_terms_tintg1(nfields)
+    real(r8) :: imp_terms_tintg2(nfields), imp_terms_tintg3(nfields)  
     integer :: i, j, k
 
     if (proc0) call put_time_stamp(timer_advance)
@@ -79,179 +99,333 @@ contains
       counter = 1
     endif
 
-    ! Calcualte nonlinear terms
-    if(nonlinear) call get_nonlinear_terms
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v                For eSSPIFRK3                v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    if(time_step_scheme == 'eSSPIFRK3') then
+      !---------------  RK 1st step  ---------------
+      ! Calcualte nonlinear terms
+      if(nonlinear) call get_nonlinear_terms(phi, psi, upa, bpa, .true.)
 
-    ! 1st order 
-    if(counter == 1) then
       !$omp parallel do private(i, k) schedule(static)
       do j = iky_st, iky_en
         do k = ikz_st, ikz_en
           do i = ikx_st, ikx_en
-            call gear1(dt, omg_new(i, k, j), omg(i, k, j), &
-               nonlin(i, k, j, inonlin_omg) - zi*kz(k)*kprp2(i, k, j)*psi(i, k, j) &
-                 - 2.d0*zi*ky(j)*upa(i, k, j), &
-               nupe_x*(kprp2(i, k, j)/kprp2_max)**nupe_x_exp + nupe_z*(kz2(k)/kz2_max)**nupe_z_exp &
+
+            ! Calculate explicit terms
+            call get_ext_terms(exp_terms(i,k,j,:), &
+                               phi(i,k,j), psi(i,k,j), upa(i,k,j), bpa(i,k,j), &
+                               nonlin(i,k,j,:), &
+                               ky(j), kz(k), kprp2(i,k,j))
+
+            ! Calculate time integral of explicit terms
+            call get_imp_terms_tintg(imp_terms_tintg0(iomg),         0.d0, kprp2(i,k,j), kz2(k), &
+                                     nupe_x , nupe_z , nupe_x_exp , nupe_z_exp )
+            call get_imp_terms_tintg(imp_terms_tintg1(iomg), 2.d0/3.d0*dt, kprp2(i,k,j), kz2(k), &
+                                     nupe_x , nupe_z , nupe_x_exp , nupe_z_exp )
+
+            call get_imp_terms_tintg(imp_terms_tintg0(ipsi),         0.d0, kprp2(i,k,j), kz2(k), &
+                                     etape_x, etape_z, etape_x_exp, etape_z_exp)
+            call get_imp_terms_tintg(imp_terms_tintg1(ipsi), 2.d0/3.d0*dt, kprp2(i,k,j), kz2(k), &
+                                     etape_x, etape_z, etape_x_exp, etape_z_exp)
+
+            call get_imp_terms_tintg(imp_terms_tintg0(iupa),         0.d0, kprp2(i,k,j), kz2(k), &
+                                     nupa_x , nupa_z , nupa_x_exp , nupa_z_exp )
+            call get_imp_terms_tintg(imp_terms_tintg1(iupa), 2.d0/3.d0*dt, kprp2(i,k,j), kz2(k), &
+                                     nupa_x , nupa_z , nupa_x_exp , nupa_z_exp )
+
+            call get_imp_terms_tintg(imp_terms_tintg0(ibpa),         0.d0, kprp2(i,k,j), kz2(k), &
+                                     etapa_x, etapa_z, etapa_x_exp, etapa_z_exp)
+            call get_imp_terms_tintg(imp_terms_tintg1(ibpa), 2.d0/3.d0*dt, kprp2(i,k,j), kz2(k), &
+                                     etapa_x, etapa_z, etapa_x_exp, etapa_z_exp)
+            imp_terms_tintg0(ibpa) = imp_terms_tintg0(ibpa)/va2cs2_plus_1
+            imp_terms_tintg1(ibpa) = imp_terms_tintg1(ibpa)/va2cs2_plus_1
+
+            call eSSPIFRK1(omg_tmp(i,k,j), omg(i,k,j), &
+               exp_terms(i,k,j,iomg), &
+               imp_terms_tintg1(iomg), imp_terms_tintg0(iomg) &
             )
-            call gear1(dt, psi_new(i, k, j), psi(i, k, j), &
-               nonlin(i, k, j, inonlin_psi) + zi*kz(k)*phi(i, k, j), &
-               etape_x*(kprp2(i, k, j)/kprp2_max)**etape_x_exp + etape_z*(kz2(k)/kz2_max)**etape_z_exp &
+            call eSSPIFRK1(psi_tmp(i,k,j), psi(i,k,j), &
+               exp_terms(i,k,j,ipsi), &
+               imp_terms_tintg1(ipsi), imp_terms_tintg0(ipsi) &
             )
-            call gear1(dt, upa_new(i, k, j), upa(i, k, j), &
-               nonlin(i, k, j, inonlin_upa) + zi*kz(k)*bpa(i, k, j) &
-                 + (2.d0 - q)*zi*ky(j)*phi(i, k, j), &
-               nupa_x*(kprp2(i, k, j)/kprp2_max)**nupa_x_exp + nupa_z*(kz2(k)/kz2_max)**nupa_z_exp &
+            call eSSPIFRK1(upa_tmp(i,k,j), upa(i,k,j), &
+               exp_terms(i,k,j,iupa), &
+               imp_terms_tintg1(iupa), imp_terms_tintg0(iupa) &
             )
-            call gear1(dt, bpa_new(i, k, j), bpa(i, k, j), &
-               (nonlin(i, k, j, inonlin_bpa) + zi*kz(k)*upa(i, k, j) &
-                 + q*zi*ky(j)*psi(i, k, j) )/va2cs2_plus_1, &
-               (etapa_x*(kprp2(i, k, j)/kprp2_max)**etapa_x_exp + etapa_z*(kz2(k)/kz2_max)**etapa_z_exp)/va2cs2_plus_1 &
+            call eSSPIFRK1(bpa_tmp(i,k,j), bpa(i,k,j), &
+               exp_terms(i,k,j,ibpa), &
+               imp_terms_tintg1(ibpa), imp_terms_tintg0(ibpa) &
             )
 
-            phi_new(i, k, j) = omg_new(i, k, j)*(-kprp2inv(i, k, j))
+            phi_tmp(i,k,j) = omg_tmp(i,k,j)*(-kprp2inv(i,k,j))
           enddo
         enddo
       enddo
       !$omp end parallel do
 
-      ! values at the previous steps
+      ! save explicit terms at the previous step
       !$omp workshare
-      phi_old1 = phi
-      omg_old1 = omg
-      psi_old1 = psi
-      upa_old1 = upa
-      bpa_old1 = bpa
-
-      nonlin_old1 = nonlin
+      exp_terms0 = exp_terms
       !$omp end workshare
 
-      counter = counter + 1
-    ! 2nd order 
-    elseif(counter == 2) then
+      !---------------  RK 2nd step  ---------------
+      ! Calcualte nonlinear terms
+      if(nonlinear) call get_nonlinear_terms(phi_tmp, psi_tmp, upa_tmp, bpa_tmp, .false.)
+
       !$omp parallel do private(i, k) schedule(static)
       do j = iky_st, iky_en
         do k = ikz_st, ikz_en
           do i = ikx_st, ikx_en
-            call gear2(dt, omg_new(i, k, j), omg(i, k, j), omg_old1(i, k, j), &
-               nonlin     (i, k, j, inonlin_omg) - zi*kz(k)*kprp2(i, k, j)*psi     (i, k, j) &
-                 - 2.d0*zi*ky(j)*upa(i, k, j), &
-               nonlin_old1(i, k, j, inonlin_omg) - zi*kz(k)*kprp2(i, k, j)*psi_old1(i, k, j) &
-                 - 2.d0*zi*ky(j)*upa_old1(i, k, j), &
-               nupe_x*(kprp2(i, k, j)/kprp2_max)**nupe_x_exp + nupe_z*(kz2(k)/kz2_max)**nupe_z_exp &
-            )
-            call gear2(dt, psi_new(i, k, j), psi(i, k, j), psi_old1(i, k, j), &
-               nonlin     (i, k, j, inonlin_psi) + zi*kz(k)*phi     (i, k, j), &
-               nonlin_old1(i, k, j, inonlin_psi) + zi*kz(k)*phi_old1(i, k, j), &
-               etape_x*(kprp2(i, k, j)/kprp2_max)**etape_x_exp + etape_z*(kz2(k)/kz2_max)**etape_z_exp &
-            )
-            call gear2(dt, upa_new(i, k, j), upa(i, k, j), upa_old1(i, k, j), &
-               nonlin     (i, k, j, inonlin_upa) + zi*kz(k)*bpa     (i, k, j) &
-                 + (2.d0 - q)*zi*ky(j)*phi     (i, k, j), &
-               nonlin_old1(i, k, j, inonlin_upa) + zi*kz(k)*bpa_old1(i, k, j) &
-                 + (2.d0 - q)*zi*ky(j)*phi_old1(i, k, j), &
-               nupa_x*(kprp2(i, k, j)/kprp2_max)**nupa_x_exp + nupa_z*(kz2(k)/kz2_max)**nupa_z_exp &
-            )
-            call gear2(dt, bpa_new(i, k, j), bpa(i, k, j), bpa_old1(i, k, j), &
-               (nonlin     (i, k, j, inonlin_bpa) + zi*kz(k)*upa     (i, k, j) &
-                 + q*zi*ky(j)*psi     (i, k, j) )/va2cs2_plus_1, &
-               (nonlin_old1(i, k, j, inonlin_bpa) + zi*kz(k)*upa_old1(i, k, j) &
-                 + q*zi*ky(j)*psi_old1(i, k, j) )/va2cs2_plus_1, &
-               (etapa_x*(kprp2(i, k, j)/kprp2_max)**etapa_x_exp + etapa_z*(kz2(k)/kz2_max)**etapa_z_exp)/va2cs2_plus_1 &
+
+            ! Calculate explicit terms
+            call get_ext_terms(exp_terms(i,k,j,:), &
+                               phi_tmp(i,k,j), psi_tmp(i,k,j), upa_tmp(i,k,j), bpa_tmp(i,k,j), &
+                               nonlin(i,k,j,:), &
+                               ky(j), kz(k), kprp2(i,k,j))
+
+            ! Calculate time integral of explicit terms
+            call get_imp_terms_tintg(imp_terms_tintg0(iomg),         0.d0, kprp2(i,k,j), kz2(k), &
+                                     nupe_x , nupe_z , nupe_x_exp , nupe_z_exp )
+            call get_imp_terms_tintg(imp_terms_tintg2(iomg), 2.d0/3.d0*dt, kprp2(i,k,j), kz2(k), &
+                                     nupe_x , nupe_z , nupe_x_exp , nupe_z_exp )
+
+            call get_imp_terms_tintg(imp_terms_tintg0(ipsi),         0.d0, kprp2(i,k,j), kz2(k), &
+                                     etape_x, etape_z, etape_x_exp, etape_z_exp)
+            call get_imp_terms_tintg(imp_terms_tintg2(ipsi), 2.d0/3.d0*dt, kprp2(i,k,j), kz2(k), &
+                                     etape_x, etape_z, etape_x_exp, etape_z_exp)
+
+            call get_imp_terms_tintg(imp_terms_tintg0(iupa),         0.d0, kprp2(i,k,j), kz2(k), &
+                                     nupa_x , nupa_z , nupa_x_exp , nupa_z_exp )
+            call get_imp_terms_tintg(imp_terms_tintg2(iupa), 2.d0/3.d0*dt, kprp2(i,k,j), kz2(k), &
+                                     nupa_x , nupa_z , nupa_x_exp , nupa_z_exp )
+
+            call get_imp_terms_tintg(imp_terms_tintg0(ibpa),         0.d0, kprp2(i,k,j), kz2(k), &
+                                     etapa_x, etapa_z, etapa_x_exp, etapa_z_exp)
+            call get_imp_terms_tintg(imp_terms_tintg2(ibpa), 2.d0/3.d0*dt, kprp2(i,k,j), kz2(k), &
+                                     etapa_x, etapa_z, etapa_x_exp, etapa_z_exp)
+            imp_terms_tintg0(ibpa) = imp_terms_tintg0(ibpa)/va2cs2_plus_1
+            imp_terms_tintg2(ibpa) = imp_terms_tintg2(ibpa)/va2cs2_plus_1
+
+            call eSSPIFRK2(omg_tmp(i,k,j), omg_tmp(i,k,j), omg(i,k,j), &
+               exp_terms(i,k,j,iomg), &
+               imp_terms_tintg2(iomg), imp_terms_tintg0(iomg) &
             )
 
-            phi_new(i, k, j) = omg_new(i, k, j)*(-kprp2inv(i, k, j))
+            call eSSPIFRK2(psi_tmp(i,k,j), psi_tmp(i,k,j), psi(i,k,j), &
+               exp_terms(i,k,j,ipsi), &
+               imp_terms_tintg2(ipsi), imp_terms_tintg0(ipsi) &
+            )
+            call eSSPIFRK2(upa_tmp(i,k,j), upa_tmp(i,k,j), upa(i,k,j), &
+               exp_terms(i,k,j,iupa), &
+               imp_terms_tintg2(iupa), imp_terms_tintg0(iupa) &
+            )
+            call eSSPIFRK2(bpa_tmp(i,k,j), bpa_tmp(i,k,j), bpa(i,k,j), &
+               exp_terms(i,k,j,ibpa), &
+               imp_terms_tintg2(ibpa), imp_terms_tintg0(ibpa) &
+            )
+
+            phi_tmp(i,k,j) = omg_tmp(i,k,j)*(-kprp2inv(i,k,j))
           enddo
         enddo
       enddo
       !$omp end parallel do
 
-      ! values at the previous steps
+      !---------------  RK 3rd step  ---------------
+      ! Calcualte nonlinear terms
+      if(nonlinear) call get_nonlinear_terms(phi_tmp, psi_tmp, upa_tmp, bpa_tmp, .false.)
+
+      !$omp parallel do private(i, k) schedule(static)
+      do j = iky_st, iky_en
+        do k = ikz_st, ikz_en
+          do i = ikx_st, ikx_en
+
+            ! Calculate explicit terms
+            call get_ext_terms(exp_terms(i,k,j,:), &
+                               phi_tmp(i,k,j), psi_tmp(i,k,j), upa_tmp(i,k,j), bpa_tmp(i,k,j), &
+                               nonlin(i,k,j,:), &
+                               ky(j), kz(k), kprp2(i,k,j))
+
+            ! Calculate time integral of explicit terms
+            call get_imp_terms_tintg(imp_terms_tintg0(iomg),         0.d0, kprp2(i,k,j), kz2(k), &
+                                     nupe_x , nupe_z , nupe_x_exp , nupe_z_exp )
+            call get_imp_terms_tintg(imp_terms_tintg2(iomg), 2.d0/3.d0*dt, kprp2(i,k,j), kz2(k), &
+                                     nupe_x , nupe_z , nupe_x_exp , nupe_z_exp )
+            call get_imp_terms_tintg(imp_terms_tintg3(iomg),           dt, kprp2(i,k,j), kz2(k), &
+                                     nupe_x , nupe_z , nupe_x_exp , nupe_z_exp )
+
+            call get_imp_terms_tintg(imp_terms_tintg0(ipsi),         0.d0, kprp2(i,k,j), kz2(k), &
+                                     etape_x, etape_z, etape_x_exp, etape_z_exp)
+            call get_imp_terms_tintg(imp_terms_tintg2(ipsi), 2.d0/3.d0*dt, kprp2(i,k,j), kz2(k), &
+                                     etape_x, etape_z, etape_x_exp, etape_z_exp)
+            call get_imp_terms_tintg(imp_terms_tintg3(ipsi),           dt, kprp2(i,k,j), kz2(k), &
+                                     etape_x, etape_z, etape_x_exp, etape_z_exp)
+
+            call get_imp_terms_tintg(imp_terms_tintg0(iupa),         0.d0, kprp2(i,k,j), kz2(k), &
+                                     nupa_x , nupa_z , nupa_x_exp , nupa_z_exp )
+            call get_imp_terms_tintg(imp_terms_tintg2(iupa), 2.d0/3.d0*dt, kprp2(i,k,j), kz2(k), &
+                                     nupa_x , nupa_z , nupa_x_exp , nupa_z_exp )
+            call get_imp_terms_tintg(imp_terms_tintg3(iupa),           dt, kprp2(i,k,j), kz2(k), &
+                                     nupa_x , nupa_z , nupa_x_exp , nupa_z_exp )
+
+            call get_imp_terms_tintg(imp_terms_tintg0(ibpa),         0.d0, kprp2(i,k,j), kz2(k), &
+                                     etapa_x, etapa_z, etapa_x_exp, etapa_z_exp)
+            call get_imp_terms_tintg(imp_terms_tintg2(ibpa), 2.d0/3.d0*dt, kprp2(i,k,j), kz2(k), &
+                                     etapa_x, etapa_z, etapa_x_exp, etapa_z_exp)
+            call get_imp_terms_tintg(imp_terms_tintg3(ibpa),           dt, kprp2(i,k,j), kz2(k), &
+                                     etapa_x, etapa_z, etapa_x_exp, etapa_z_exp)
+            imp_terms_tintg0(ibpa) = imp_terms_tintg0(ibpa)/va2cs2_plus_1
+            imp_terms_tintg2(ibpa) = imp_terms_tintg2(ibpa)/va2cs2_plus_1
+            imp_terms_tintg3(ibpa) = imp_terms_tintg3(ibpa)/va2cs2_plus_1
+
+            call eSSPIFRK3(omg_new(i,k,j), omg_tmp(i,k,j), omg(i,k,j), &
+               exp_terms(i,k,j,iomg), exp_terms0(i,k,j,iomg), &
+               imp_terms_tintg3(iomg), imp_terms_tintg2(iomg), imp_terms_tintg0(iomg) &
+            )
+            call eSSPIFRK3(psi_new(i,k,j), psi_tmp(i,k,j), psi(i,k,j), &
+               exp_terms(i,k,j,ipsi), exp_terms0(i,k,j,ipsi), &
+               imp_terms_tintg3(ipsi), imp_terms_tintg2(ipsi), imp_terms_tintg0(ipsi) &
+            )
+            call eSSPIFRK3(upa_new(i,k,j), upa_tmp(i,k,j), upa(i,k,j), &
+               exp_terms(i,k,j,iupa), exp_terms0(i,k,j,iupa), &
+               imp_terms_tintg3(iupa), imp_terms_tintg2(iupa), imp_terms_tintg0(iupa) &
+            )
+            call eSSPIFRK3(bpa_new(i,k,j), bpa_tmp(i,k,j), bpa(i,k,j), &
+               exp_terms(i,k,j,ibpa), exp_terms0(i,k,j,ibpa), &
+               imp_terms_tintg3(ibpa), imp_terms_tintg2(ibpa), imp_terms_tintg0(ibpa) &
+            )
+
+            phi_new(i,k,j) = omg_new(i,k,j)*(-kprp2inv(i,k,j))
+          enddo
+        enddo
+      enddo
+      !$omp end parallel do
+
+      ! save fields at the previous step
       !$omp workshare
-      phi_old2 = phi_old1
-      phi_old1 = phi
-
-      omg_old2 = omg_old1
-      omg_old1 = omg
-
-      psi_old2 = psi_old1
-      psi_old1 = psi
-
-      upa_old2 = upa_old1
-      upa_old1 = upa
-
-      bpa_old2 = bpa_old1
-      bpa_old1 = bpa
-
-      nonlin_old2 = nonlin_old1
-      nonlin_old1 = nonlin
+      phi_old = phi
+      omg_old = omg
+      psi_old = psi
+      upa_old = upa
+      bpa_old = bpa
       !$omp end workshare
+    endif
 
-      counter = counter + 1
-    ! 3rd order 
-    else
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v                  For Gear3                  v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    if(time_step_scheme == 'gear3') then
+      ! Calcualte nonlinear terms
+      if(nonlinear) call get_nonlinear_terms(phi, psi, upa, bpa, .true.)
+
       !$omp parallel do private(i, k) schedule(static)
       do j = iky_st, iky_en
         do k = ikz_st, ikz_en
           do i = ikx_st, ikx_en
-            call gear3(dt, omg_new(i, k, j), omg(i, k, j), omg_old1(i, k, j), omg_old2(i, k, j), &
-               nonlin     (i, k, j, inonlin_omg) - zi*kz(k)*kprp2(i, k, j)*psi     (i, k, j) &
-                 - 2.d0*zi*ky(j)*upa(i, k, j), &
-               nonlin_old1(i, k, j, inonlin_omg) - zi*kz(k)*kprp2(i, k, j)*psi_old1(i, k, j) &
-                 - 2.d0*zi*ky(j)*upa_old1(i, k, j), &
-               nonlin_old2(i, k, j, inonlin_omg) - zi*kz(k)*kprp2(i, k, j)*psi_old2(i, k, j) &
-                 - 2.d0*zi*ky(j)*upa_old2(i, k, j), &
-               nupe_x*(kprp2(i, k, j)/kprp2_max)**nupe_x_exp + nupe_z*(kz2(k)/kz2_max)**nupe_z_exp &
-            )
-            call gear3(dt, psi_new(i, k, j), psi(i, k, j), psi_old1(i, k, j), psi_old2(i, k, j), &
-               nonlin     (i, k, j, inonlin_psi) + zi*kz(k)*phi     (i, k, j), &
-               nonlin_old1(i, k, j, inonlin_psi) + zi*kz(k)*phi_old1(i, k, j), &
-               nonlin_old2(i, k, j, inonlin_psi) + zi*kz(k)*phi_old2(i, k, j), &
-               etape_x*(kprp2(i, k, j)/kprp2_max)**etape_x_exp + etape_z*(kz2(k)/kz2_max)**etape_z_exp &
-            )
-            call gear3(dt, upa_new(i, k, j), upa(i, k, j), upa_old1(i, k, j), upa_old2(i, k, j), &
-               nonlin     (i, k, j, inonlin_upa) + zi*kz(k)*bpa     (i, k, j) &
-                 + (2.d0 - q)*zi*ky(j)*phi     (i, k, j), &
-               nonlin_old1(i, k, j, inonlin_upa) + zi*kz(k)*bpa_old1(i, k, j) &
-                 + (2.d0 - q)*zi*ky(j)*phi_old1(i, k, j), &
-               nonlin_old2(i, k, j, inonlin_upa) + zi*kz(k)*bpa_old2(i, k, j) &
-                 + (2.d0 - q)*zi*ky(j)*phi_old2(i, k, j), &
-               nupa_x*(kprp2(i, k, j)/kprp2_max)**nupa_x_exp + nupa_z*(kz2(k)/kz2_max)**nupa_z_exp &
-            )
-            call gear3(dt, bpa_new(i, k, j), bpa(i, k, j), bpa_old1(i, k, j), bpa_old2(i, k, j), &
-               (nonlin     (i, k, j, inonlin_bpa) + zi*kz(k)*upa     (i, k, j) &
-                 + q*zi*ky(j)*psi     (i, k, j) )/va2cs2_plus_1, &
-               (nonlin_old1(i, k, j, inonlin_bpa) + zi*kz(k)*upa_old1(i, k, j) &
-                 + q*zi*ky(j)*psi_old1(i, k, j) )/va2cs2_plus_1, &
-               (nonlin_old2(i, k, j, inonlin_bpa) + zi*kz(k)*upa_old2(i, k, j) &
-                 + q*zi*ky(j)*psi_old2(i, k, j) )/va2cs2_plus_1, &
-               (etapa_x*(kprp2(i, k, j)/kprp2_max)**etapa_x_exp + etapa_z*(kz2(k)/kz2_max)**etapa_z_exp)/va2cs2_plus_1 &
-            )
 
-            phi_new(i, k, j) = omg_new(i, k, j)*(-kprp2inv(i, k, j))
+            exp_terms(i,k,j,iomg) = nonlin(i,k,j,iomg) - zi*kz(k)*kprp2(i,k,j)*psi(i,k,j) &
+                                         - 2.d0*zi*ky(j)*upa(i,k,j)
+            exp_terms(i,k,j,ipsi) = nonlin(i,k,j,ipsi) + zi*kz(k)*phi(i,k,j)
+            exp_terms(i,k,j,iupa) = nonlin(i,k,j,iupa) + zi*kz(k)*bpa(i,k,j) + (2.d0 - q)*zi*ky(j)*phi(i,k,j)
+            exp_terms(i,k,j,ibpa) = (nonlin(i,k,j,ibpa) + zi*kz(k)*upa(i,k,j) + q*zi*ky(j)*psi(i,k,j) ) &
+                                         /va2cs2_plus_1
+            ! 1st order 
+            if(counter == 1) then
+              call gear1(omg_new(i,k,j), omg(i,k,j), &
+                 exp_terms(i,k,j,iomg), &
+                 nupe_x*(kprp2(i,k,j)/kprp2_max)**nupe_x_exp + nupe_z*(kz2(k)/kz2_max)**nupe_z_exp &
+              )
+              call gear1(psi_new(i,k,j), psi(i,k,j), &
+                 exp_terms(i,k,j,ipsi), &
+                 etape_x*(kprp2(i,k,j)/kprp2_max)**etape_x_exp + etape_z*(kz2(k)/kz2_max)**etape_z_exp &
+              )
+              call gear1(upa_new(i,k,j), upa(i,k,j), &
+                 exp_terms(i,k,j,iupa), &
+                 nupa_x*(kprp2(i,k,j)/kprp2_max)**nupa_x_exp + nupa_z*(kz2(k)/kz2_max)**nupa_z_exp &
+              )
+              call gear1(bpa_new(i,k,j), bpa(i,k,j), &
+                 exp_terms(i,k,j,ibpa), &
+                 (etapa_x*(kprp2(i,k,j)/kprp2_max)**etapa_x_exp + etapa_z*(kz2(k)/kz2_max)**etapa_z_exp)/va2cs2_plus_1 &
+              )
+
+            ! 2nd order 
+            elseif(counter == 2) then
+              call gear2(omg_new(i,k,j), omg(i,k,j), omg_old(i,k,j), &
+                 exp_terms    (i,k,j,iomg), &
+                 exp_terms_old(i,k,j,iomg), &
+                 nupe_x*(kprp2(i,k,j)/kprp2_max)**nupe_x_exp + nupe_z*(kz2(k)/kz2_max)**nupe_z_exp &
+              )
+              call gear2(psi_new(i,k,j), psi(i,k,j), psi_old(i,k,j), &
+                 exp_terms    (i,k,j,ipsi), &
+                 exp_terms_old(i,k,j,ipsi), &
+                 etape_x*(kprp2(i,k,j)/kprp2_max)**etape_x_exp + etape_z*(kz2(k)/kz2_max)**etape_z_exp &
+              )
+              call gear2(upa_new(i,k,j), upa(i,k,j), upa_old(i,k,j), &
+                 exp_terms    (i,k,j,iupa), &
+                 exp_terms_old(i,k,j,iupa), &
+                 nupa_x*(kprp2(i,k,j)/kprp2_max)**nupa_x_exp + nupa_z*(kz2(k)/kz2_max)**nupa_z_exp &
+              )
+              call gear2(bpa_new(i,k,j), bpa(i,k,j), bpa_old(i,k,j), &
+                 exp_terms    (i,k,j,ibpa), &
+                 exp_terms_old(i,k,j,ibpa), &
+                 (etapa_x*(kprp2(i,k,j)/kprp2_max)**etapa_x_exp + etapa_z*(kz2(k)/kz2_max)**etapa_z_exp)/va2cs2_plus_1 &
+              )
+
+            ! 3rd order 
+            else
+              call gear3(omg_new(i,k,j), omg(i,k,j), omg_old(i,k,j), omg_old2(i,k,j), &
+                 exp_terms     (i,k,j,iomg), &
+                 exp_terms_old (i,k,j,iomg), &
+                 exp_terms_old2(i,k,j,iomg), &
+                 nupe_x*(kprp2(i,k,j)/kprp2_max)**nupe_x_exp + nupe_z*(kz2(k)/kz2_max)**nupe_z_exp &
+              )
+              call gear3(psi_new(i,k,j), psi(i,k,j), psi_old(i,k,j), psi_old2(i,k,j), &
+                 exp_terms     (i,k,j,ipsi), &
+                 exp_terms_old (i,k,j,ipsi), &
+                 exp_terms_old2(i,k,j,ipsi), &
+                 etape_x*(kprp2(i,k,j)/kprp2_max)**etape_x_exp + etape_z*(kz2(k)/kz2_max)**etape_z_exp &
+              )
+              call gear3(upa_new(i,k,j), upa(i,k,j), upa_old(i,k,j), upa_old2(i,k,j), &
+                 exp_terms     (i,k,j,iupa), &
+                 exp_terms_old (i,k,j,iupa), &
+                 exp_terms_old2(i,k,j,iupa), &
+                 nupa_x*(kprp2(i,k,j)/kprp2_max)**nupa_x_exp + nupa_z*(kz2(k)/kz2_max)**nupa_z_exp &
+              )
+              call gear3(bpa_new(i,k,j), bpa(i,k,j), bpa_old(i,k,j), bpa_old2(i,k,j), &
+                 exp_terms     (i,k,j,ibpa), &
+                 exp_terms_old (i,k,j,ibpa), &
+                 exp_terms_old2(i,k,j,ibpa), &
+                 (etapa_x*(kprp2(i,k,j)/kprp2_max)**etapa_x_exp + etapa_z*(kz2(k)/kz2_max)**etapa_z_exp)/va2cs2_plus_1 &
+              )
+
+            endif
+            phi_new(i,k,j) = omg_new(i,k,j)*(-kprp2inv(i,k,j))
           enddo
         enddo
       enddo
       !$omp end parallel do
 
-      ! values at the previous steps
+      if(counter <= 2) counter = counter + 1
+
+      ! save fields at the previous steps
       !$omp workshare
-      phi_old2 = phi_old1
-      phi_old1 = phi
+      phi_old2 = phi_old
+      phi_old  = phi
 
-      omg_old2 = omg_old1
-      omg_old1 = omg
+      omg_old2 = omg_old 
+      omg_old  = omg
 
-      psi_old2 = psi_old1
-      psi_old1 = psi
+      psi_old2 = psi_old 
+      psi_old  = psi
 
-      upa_old2 = upa_old1
-      upa_old1 = upa
+      upa_old2 = upa_old 
+      upa_old  = upa
 
-      bpa_old2 = bpa_old1
-      bpa_old1 = bpa
+      bpa_old2 = bpa_old 
+      bpa_old  = bpa
 
-      nonlin_old2 = nonlin_old1
-      nonlin_old1 = nonlin
+      exp_terms_old2 = exp_terms_old
+      exp_terms_old  = exp_terms
       !$omp end workshare
     endif
 
@@ -293,29 +467,49 @@ contains
   subroutine init_multistep_fields
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use file, only: open_output_file
+    use params, only: time_step_scheme
     implicit none
     complex(r8), allocatable, dimension(:,:,:) :: src
 
     allocate(src(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0,0.d0))
-    allocate(phi_new  , source=src)
-    allocate(phi_old2 , source=src)
 
-    allocate(omg_new  , source=src)
-    allocate(omg_old2 , source=src)
+    allocate(phi_new, source=src)
+    allocate(omg_new, source=src)
+    allocate(psi_new, source=src)
+    allocate(upa_new, source=src)
+    allocate(bpa_new, source=src)
 
-    allocate(psi_new  , source=src)
-    allocate(psi_old2 , source=src)
+    allocate(nonlin   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nfields)); nonlin    = 0.d0
+    allocate(exp_terms(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nfields)); exp_terms = 0.d0
 
-    allocate(upa_new  , source=src)
-    allocate(upa_old2 , source=src)
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v                For eSSPIFRK3                v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    if(time_step_scheme == 'eSSPIFRK3') then
+      allocate(phi_tmp, source=src)
+      allocate(omg_tmp, source=src)
+      allocate(psi_tmp, source=src)
+      allocate(upa_tmp, source=src)
+      allocate(bpa_tmp, source=src)
 
-    allocate(bpa_new  , source=src)
-    allocate(bpa_old2 , source=src)
+      allocate(exp_terms0(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nfields)); exp_terms0 = 0.d0
+    endif
+
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v                  For Gear3                  v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    if(time_step_scheme == 'gear3') then
+      allocate(phi_old2, source=src)
+      allocate(omg_old2, source=src)
+      allocate(psi_old2, source=src)
+      allocate(upa_old2, source=src)
+      allocate(bpa_old2, source=src)
+
+      allocate(exp_terms_old (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nfields)); exp_terms_old  = 0.d0
+      allocate(exp_terms_old2(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nfields)); exp_terms_old2 = 0.d0
+    endif
+
     deallocate(src)
-
-    allocate(nonlin     (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nftran)); nonlin      = 0.d0
-    allocate(nonlin_old1(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nftran)); nonlin_old1 = 0.d0
-    allocate(nonlin_old2(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nftran)); nonlin_old2 = 0.d0
 
     call open_output_file (max_vel_unit, 'max_vel.dat')
 
@@ -328,12 +522,11 @@ contains
 !! @brief   Calculate nonlinear terms via
 !!          1. Calculate grad in Fourier space
 !!          2. Inverse FFT
-!!          3. Calculate poisson brackets 
+!!          3. Calculate nonlineaer terms 
 !!             in real space
 !!          4. Forward FFT
 !-----------------------------------------------!
-  subroutine get_nonlinear_terms
-    use fields, only: phi, psi, upa, bpa
+  subroutine get_nonlinear_terms(phi, psi, upa, bpa, dt_reset)
     use grid, only: kprp2, nlx, nly, nlz, kx, ky
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
@@ -343,18 +536,22 @@ contains
     use time, only: cfl, dt, tt, reset_method, increase_dt
     use time_stamp, only: put_time_stamp, timer_nonlinear_terms, timer_fft
     implicit none
+    complex(r8), dimension (ikx_st:ikx_en, &
+                            ikz_st:ikz_en, &
+                            iky_st:iky_en), intent(in) :: phi, psi, upa, bpa
 
     complex(r8), allocatable, dimension(:,:,:,:) :: wbk
     real   (r8), allocatable, dimension(:,:,:,:) :: wb , wf 
+    logical, intent(in) :: dt_reset
 
     integer :: i, j, k
     real   (r8) :: max_vel, dt_cfl, dt_digit
 
     if (proc0) call put_time_stamp(timer_nonlinear_terms)
 
-    allocate(wbk(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nbtran), source=(0.d0, 0.d0))
-    allocate(wb (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nbtran), source=0.d0)
-    allocate(wf (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nftran), source=0.d0)
+    allocate(wbk(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nbtran ), source=(0.d0, 0.d0))
+    allocate(wb (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nbtran ), source=0.d0)
+    allocate(wf (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nfields), source=0.d0)
 
     ! 1. Calculate grad in Fourier space
     !$omp parallel do private(i, k) schedule(static)
@@ -387,80 +584,82 @@ contains
     if (proc0) call put_time_stamp(timer_fft)
 
     ! (get max_vel for dt reset)
-    max_vel = max( &
-              maxval(abs(wb(:,:,:,idphi_dx)))*cfly, maxval(abs(wb(:,:,:,idphi_dy))*cflx) &
-            )
-    call max_allreduce(max_vel)
-    dt_cfl = 1.d0/max_vel
-    if(proc0) then
-      write (unit=max_vel_unit, fmt="(100es30.21)") tt, max_vel
-      call flush(max_vel_unit) 
-    endif
-
-    if(dt_cfl < dt) then
+    if(dt_reset) then
+      max_vel = max( &
+                maxval(abs(wb(:,:,:,idphi_dx)))*cfly, maxval(abs(wb(:,:,:,idphi_dy))*cflx) &
+              )
+      call max_allreduce(max_vel)
+      dt_cfl = 1.d0/max_vel
       if(proc0) then
-        print *
-        write (*, '("dt is decreased from ", es12.4e3)', advance='no') dt
+        write (unit=max_vel_unit, fmt="(100es30.21)") tt, max_vel
+        call flush(max_vel_unit) 
       endif
 
-      dt_digit = (log10(dt_cfl)/abs(log10(dt_cfl)))*ceiling(abs(log10(dt_cfl)))
-      dt = floor(dt_cfl*10.d0**(-dt_digit))*10.d0**dt_digit
+      if(dt_cfl < dt) then
+        if(proc0) then
+          print *
+          write (*, '("dt is decreased from ", es12.4e3)', advance='no') dt
+        endif
 
-      if (reset_method == 'multiply') then
-        dt = 0.5d0*dt
-      elseif (reset_method == 'decrement') then
-        dt_digit = (log10(dt)/abs(log10(dt)))*ceiling(abs(log10(dt)))
+        dt_digit = (log10(dt_cfl)/abs(log10(dt_cfl)))*ceiling(abs(log10(dt_cfl)))
+        ! dt = floor(dt_cfl*10.d0**(-dt_digit))*10.d0**dt_digit
 
-        ! when dt = 0.0**01***
-        if (dt*10.d0**(-dt_digit) - 1.0d0 < 1.0d0) then
-          dt = 0.9d0*10.d0**dt_digit
-        else
-          dt = (dt*10.d0**(-dt_digit) - 1.0d0)*10.d0**dt_digit
+        if (reset_method == 'multiply') then
+          dt = 0.5d0*dt
+        elseif (reset_method == 'decrement') then
+          dt_digit = (log10(dt)/abs(log10(dt)))*ceiling(abs(log10(dt)))
+
+          ! when dt = 0.0**01***
+          if (dt*10.d0**(-dt_digit) - 1.0d0 < 1.0d0) then
+            dt = 0.9d0*10.d0**dt_digit
+          else
+            dt = (dt*10.d0**(-dt_digit) - 1.0d0)*10.d0**dt_digit
+          endif
+        endif
+
+        counter = 1
+
+        if(proc0) then
+          print '("  to ", es12.4e3)', dt
+          print *
         endif
       endif
+      if(dt_cfl > 0.d0 .and. dt_cfl > increase_dt .and. dt < increase_dt) then
+        if(proc0) then
+          print *
+          write (*, '("dt is increased from ", es12.4e3)', advance='no') dt
+        endif
 
-      counter = 1
+        dt = increase_dt
 
-      if(proc0) then
-        print '("  to ", es12.4e3)', dt
-        print *
-      endif
-    endif
-    if(dt_cfl > increase_dt .and. dt < increase_dt) then
-      if(proc0) then
-        print *
-        write (*, '("dt is increased from ", es12.4e3)', advance='no') dt
-      endif
+        counter = 1
 
-      dt = increase_dt
-
-      counter = 1
-
-      if(proc0) then
-        print '("  to ", es12.4e3)', dt
-        print *
+        if(proc0) then
+          print '("  to ", es12.4e3)', dt
+          print *
+        endif
       endif
     endif
 
-    ! 3. Calculate poisson brackets in real space
+    ! 3. Calculate nonlineaer terms in real space
     !$omp parallel do private(j, k) schedule(static)
     do i = ilx_st, ilx_en
       do k = ilz_st, ilz_en
         do j = ily_st, ily_en
-          wf(j,k,i,inonlin_omg) = - wb(j,k,i,idphi_dx)*wb(j,k,i,idomg_dy) &
-                                  + wb(j,k,i,idphi_dy)*wb(j,k,i,idomg_dx) &
-                                  + wb(j,k,i,idpsi_dx)*wb(j,k,i,idjpa_dy) &
-                                  - wb(j,k,i,idpsi_dy)*wb(j,k,i,idjpa_dx)
-          wf(j,k,i,inonlin_psi) = - wb(j,k,i,idphi_dx)*wb(j,k,i,idpsi_dy) &
-                                  + wb(j,k,i,idphi_dy)*wb(j,k,i,idpsi_dx)
-          wf(j,k,i,inonlin_upa) = - wb(j,k,i,idphi_dx)*wb(j,k,i,idupa_dy) &
-                                  + wb(j,k,i,idphi_dy)*wb(j,k,i,idupa_dx) &
-                                  + wb(j,k,i,idpsi_dx)*wb(j,k,i,idbpa_dy) &
-                                  - wb(j,k,i,idpsi_dy)*wb(j,k,i,idbpa_dx)
-          wf(j,k,i,inonlin_bpa) =(- wb(j,k,i,idphi_dx)*wb(j,k,i,idbpa_dy) &
-                                  + wb(j,k,i,idphi_dy)*wb(j,k,i,idbpa_dx))*va2cs2_plus_1 &
-                                  + wb(j,k,i,idpsi_dx)*wb(j,k,i,idupa_dy) &
-                                  - wb(j,k,i,idpsi_dy)*wb(j,k,i,idupa_dx)
+          wf(j,k,i,iomg) = - wb(j,k,i,idphi_dx)*wb(j,k,i,idomg_dy) &
+                           + wb(j,k,i,idphi_dy)*wb(j,k,i,idomg_dx) &
+                           + wb(j,k,i,idpsi_dx)*wb(j,k,i,idjpa_dy) &
+                           - wb(j,k,i,idpsi_dy)*wb(j,k,i,idjpa_dx)
+          wf(j,k,i,ipsi) = - wb(j,k,i,idphi_dx)*wb(j,k,i,idpsi_dy) &
+                           + wb(j,k,i,idphi_dy)*wb(j,k,i,idpsi_dx)
+          wf(j,k,i,iupa) = - wb(j,k,i,idphi_dx)*wb(j,k,i,idupa_dy) &
+                           + wb(j,k,i,idphi_dy)*wb(j,k,i,idupa_dx) &
+                           + wb(j,k,i,idpsi_dx)*wb(j,k,i,idbpa_dy) &
+                           - wb(j,k,i,idpsi_dy)*wb(j,k,i,idbpa_dx)
+          wf(j,k,i,ibpa) =(- wb(j,k,i,idphi_dx)*wb(j,k,i,idbpa_dy) &
+                           + wb(j,k,i,idphi_dy)*wb(j,k,i,idbpa_dx))*va2cs2_plus_1 &
+                           + wb(j,k,i,idpsi_dx)*wb(j,k,i,idupa_dy) &
+                           - wb(j,k,i,idpsi_dy)*wb(j,k,i,idupa_dx)
         enddo
       enddo
     enddo
@@ -468,7 +667,7 @@ contains
 
     ! 4. Forward FFT
     if (proc0) call put_time_stamp(timer_fft)
-    call p3dfft_ftran_r2c_many(wf, nl_local_tot, nonlin, nk_local_tot, nftran, 'fft')
+    call p3dfft_ftran_r2c_many(wf, nl_local_tot, nonlin, nk_local_tot, nfields, 'fft')
     if (proc0) call put_time_stamp(timer_fft)
     !$omp workshare
     nonlin = nonlin/nlx/nly/nlz
@@ -480,6 +679,46 @@ contains
 
     if (proc0) call put_time_stamp(timer_nonlinear_terms)
   end subroutine get_nonlinear_terms
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    4 Apr 2022
+!! @brief   Calculate explicit terms
+!-----------------------------------------------!
+  subroutine get_ext_terms(exp_terms, &
+                           phi, psi, upa, bpa, &
+                           nonlin, &
+                           ky, kz, kprp2)
+    use params, only: zi, va2cs2_plus_1, q
+    implicit none
+    complex(r8), intent(out) :: exp_terms(nfields)
+    complex(r8), intent(in ) :: phi, psi, upa, bpa
+    complex(r8), intent(in ) :: nonlin(nfields)
+    real(r8)   , intent(in)  :: ky, kz, kprp2
+
+    exp_terms(iomg) = nonlin(iomg) - zi*kz*kprp2*psi - 2.d0*zi*ky*upa
+    exp_terms(ipsi) = nonlin(ipsi) + zi*kz*phi
+    exp_terms(iupa) = nonlin(iupa) + zi*kz*bpa + (2.d0 - q)*zi*ky*phi
+    exp_terms(ibpa) = ( nonlin(ibpa) + zi*kz*upa + q*zi*ky*psi )/va2cs2_plus_1
+
+  end subroutine get_ext_terms
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    4 Apr 2022
+!! @brief   Time integral of hyperdissipation
+!-----------------------------------------------!
+  subroutine get_imp_terms_tintg(imp_terms_tintg, t, kprp2, kz2, coeff_x, coeff_z, nexp_x, nexp_z)
+    use grid, only: kprp2_max, kz2_max
+    implicit none
+    real(r8), intent(out) :: imp_terms_tintg
+    real(r8), intent(in) :: t, kprp2, kz2, coeff_x, coeff_z
+    integer, intent(in) :: nexp_x, nexp_z
+
+    imp_terms_tintg = -(coeff_x*(kprp2/kprp2_max)**nexp_x + coeff_z*(kz2/kz2_max)**nexp_z)*t
+  end subroutine get_imp_terms_tintg
 
 end module advance
 

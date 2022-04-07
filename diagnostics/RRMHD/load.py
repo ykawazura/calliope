@@ -8,7 +8,7 @@ from scipy.io import netcdf
 ####### time index for final cut #########
 input_dir = '../../'
 runname = 'calliope'
-restart_num = '_all'
+restart_num = ''
 final_idx     = -1
 final_fld_idx = -1
 
@@ -115,7 +115,7 @@ zpam2_bin       = np.copy(ncfile.variables['zpam2_bin'      ][:]); zpam2_bin    
 ncfile.close()
 
 # Load 2D cut
-ncfile = netcdf.netcdf_file(input_dir+runname+'.out.fields_section.nc'+restart_num, 'r')   
+ncfile = netcdf.netcdf_file(input_dir+runname+'.out.2D.nc'+restart_num, 'r')   
 
 tt_fld  = np.copy(ncfile.variables['tt' ][:]); tt_fld  = np.delete(tt_fld , ignored_points_fld, axis = 0)
 xx_fld  = np.copy(ncfile.variables['xx' ][:])

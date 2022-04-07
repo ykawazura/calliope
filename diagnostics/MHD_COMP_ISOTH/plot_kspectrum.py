@@ -288,7 +288,7 @@ if ismovie:
 #--------------------------------------------------------#
 #                       2D spectra                       #
 #--------------------------------------------------------#
-ncfile = netcdf.netcdf_file(input_dir+runname+'.out.fields_section.nc'+restart_num, 'r')   
+ncfile = netcdf.netcdf_file(input_dir+runname+'.out.2D.nc'+restart_num, 'r')   
 
 tt_fld  = np.copy(ncfile.variables['tt' ][:]); tt_fld  = np.delete(tt_fld , ignored_points_fld, axis = 0)
 kx_fld  = np.copy(ncfile.variables['kx' ][:])

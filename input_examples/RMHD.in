@@ -1,0 +1,169 @@
+!--------------------------------------------------!
+!                  INPUTS for RMHD                 !
+!--------------------------------------------------!
+&mpi_settings
+  dim_decomp = 2
+/
+
+!==============================================================================
+&box_parameters
+  lx = 1.0 ! to be multiplied by 2pi
+  ly = 1.0 ! to be multiplied by 2pi
+  lz = 1.0 ! to be multiplied by 2pi
+
+  nlx = 32
+  nly = 32
+  nlz = 32
+/
+
+!==============================================================================
+&time_parameters
+  dt    = 2.0d-3
+  nstep = 2000 
+  cfl   = 9.0d0
+  reset_method = 'multiply'  !'multiply'  => multiply by a factor of 0.5
+                             !'decrement' => decrement the top integer of dt
+  increase_dt = 1e+0         !When max dt computed from the cfl condition is 
+                             ! larger than this value, set dt = increase_dt.
+/
+
+!==============================================================================
+&scheme_parameters
+  time_step_scheme = 'eSSPIFRK3' ! 'gear3' or 'eSSPIFRK3'
+/
+
+!==============================================================================
+&operation_parameters
+  nonlinear = T
+/
+
+!==============================================================================
+&dealias_parameters
+  dealias = '2/3' !: 2/3 or 3/2
+/
+
+!==============================================================================
+&physical_parameters
+  ! hyper dissipation ~ nu*kperp^(2*nuexp)
+  nupe_x      = 1d+3  ! perp viscosity   for phi
+  nupe_x_exp  = 4
+  etape_x     = 1d+3  ! perp resistivity for psi
+  etape_x_exp = 4
+
+  ! hyper dissipation ~ nu*kz^(2*nuexp)
+  nupe_z      = 1d+3  ! para viscosity   for phi
+  nupe_z_exp  = 4
+  etape_z     = 1d+3  ! para resistivity for psi
+  etape_z_exp = 4
+/
+
+!==============================================================================
+&initial_condition
+  init_type = 'zero'
+  !init_type = 'test'
+  !init_type = 'single_mode'
+  !init_type = 'OT2'
+  !init_type = 'OT3'
+  init_type = 'random'
+  !init_type = 'restart'
+/
+
+!==============================================================================
+&force
+  driven = T
+  nk_stir = 8  !Number of independent driven Fourier modes
+/
+
+!vvvvvvvvvvvvvvvvvvv       drive omg       vvvvvvvvvvvvvvvvvvv
+&stir_1
+ field_name = 'omg' 
+ mode_amplitude = 0.5         !Amplitude of Langevin antenna.
+ mode_frequency = (0.9, -0.6) !Frequency of Langevin antenna.
+ kx = 1
+ ky = 0
+ kz = 1
+/
+&stir_2
+ field_name = 'omg' 
+ mode_amplitude = 0.5         !Amplitude of Langevin antenna.
+ mode_frequency = (0.9, -0.6) !Frequency of Langevin antenna.
+ kx = 1
+ ky = 0
+ kz = -1
+/
+&stir_3
+ field_name = 'omg' 
+ mode_amplitude = 0.5         !Amplitude of Langevin antenna.
+ mode_frequency = (0.9, -0.6) !Frequency of Langevin antenna.
+ kx = 0
+ ky = 1
+ kz = 1
+/
+&stir_4
+ field_name = 'omg' 
+ mode_amplitude = 0.5         !Amplitude of Langevin antenna.
+ mode_frequency = (0.9, -0.6) !Frequency of Langevin antenna.
+ kx = 0
+ ky = 1
+ kz = -1
+/
+!^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+!vvvvvvvvvvvvvvvvvvv       drive psi       vvvvvvvvvvvvvvvvvvv
+&stir_5
+ field_name = 'psi' 
+ mode_amplitude = 0.5         !Amplitude of Langevin antenna.
+ mode_frequency = (0.9, -0.6) !Frequency of Langevin antenna.
+ kx = 1
+ ky = 0
+ kz = 1
+/
+&stir_6
+ field_name = 'psi' 
+ mode_amplitude = 0.5         !Amplitude of Langevin antenna.
+ mode_frequency = (0.9, -0.6) !Frequency of Langevin antenna.
+ kx = 1
+ ky = 0
+ kz = -1
+/
+&stir_7
+ field_name = 'psi' 
+ mode_amplitude = 0.5         !Amplitude of Langevin antenna.
+ mode_frequency = (0.9, -0.6) !Frequency of Langevin antenna.
+ kx = 0
+ ky = 1
+ kz = 1
+/
+&stir_8
+ field_name = 'psi' 
+ mode_amplitude = 0.5         !Amplitude of Langevin antenna.
+ mode_frequency = (0.9, -0.6) !Frequency of Langevin antenna.
+ kx = 0
+ ky = 1
+ kz = -1
+/
+!^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+!==============================================================================
+&terminate
+  max_wall_time   = 12.             ! The simulation will be terminated when the wall  
+                                    ! time exceeds this value (in the unit of hour).
+
+  terminate_file_name = 'terminate' ! The simulation will be terminated when the file 
+                                    ! named this value is created in the root directory
+                                    ! in the middle of simulaiton.
+/
+
+!==============================================================================
+&diagnostics_parameters
+  write_intvl       = 0.1d0  ! output every this value.
+  write_intvl_2D    = 1.0d0  ! output every this value.
+  write_intvl_3D    = 1.0d0  ! output every this value.
+!  write_intvl_kpar = 0.2d0  ! output every this value.
+!  write_intvl_SF2  = 0.2d0  ! output every this value.
+  SF2_nsample = 100000 ! number of sample points for each separation
+
+  save_restart_intvl = 1.0d0      ! save every this value.
+  restart_dir = './restart/'
+/
+

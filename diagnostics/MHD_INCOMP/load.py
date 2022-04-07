@@ -8,10 +8,11 @@ from scipy.io import netcdf
 ####### time index for final cut #########
 input_dir = '../../'
 runname = 'calliope'
-restart_num = ''
-final_idx     = -1
-final_fld_idx = -1
-final_SF2_idx = -1
+restart_num = '_all'
+final_idx      = -1
+final_fld_idx  = -1
+final_kpar_idx = -1
+final_SF2_idx  = -1
 
 if final_idx != -1:
   print ('\n!!! CAUTION: final_idx = %d !!!\n' % final_idx)
@@ -20,9 +21,10 @@ if final_idx != -1:
 ismovie = False
 
 ####### ignore these points #########
-ignored_points     = [ ]
-ignored_points_fld = [ ]
-ignored_points_SF2 = [ ]
+ignored_points      = [0]
+ignored_points_fld  = [ ]
+ignored_points_kpar = [ ]
+ignored_points_SF2  = [ ]
 
 
 ####### load netcdf file #########
@@ -62,7 +64,9 @@ u2dot_sum     = np.copy(ncfile.variables['u2dot_sum'    ][:]); u2dot_sum     = n
 b2dot_sum     = np.copy(ncfile.variables['b2dot_sum'    ][:]); b2dot_sum     = np.delete(b2dot_sum    , ignored_points, axis = 0)
 u2dissip_sum  = np.copy(ncfile.variables['u2dissip_sum' ][:]); u2dissip_sum  = np.delete(u2dissip_sum , ignored_points, axis = 0)
 b2dissip_sum  = np.copy(ncfile.variables['b2dissip_sum' ][:]); b2dissip_sum  = np.delete(b2dissip_sum , ignored_points, axis = 0)
-p_u_sum       = np.copy(ncfile.variables['p_u_sum'      ][:]); p_u_sum       = np.delete(p_u_sum      , ignored_points, axis = 0)
+p_ext_sum     = np.copy(ncfile.variables['p_ext_sum'    ][:]); p_ext_sum     = np.delete(p_ext_sum    , ignored_points, axis = 0)
+p_re_sum      = np.copy(ncfile.variables['p_re_sum'     ][:]); p_re_sum      = np.delete(p_re_sum     , ignored_points, axis = 0)
+p_ma_sum      = np.copy(ncfile.variables['p_ma_sum'     ][:]); p_ma_sum      = np.delete(p_ma_sum     , ignored_points, axis = 0)
 zp2_sum       = np.copy(ncfile.variables['zp2_sum'      ][:]); zp2_sum       = np.delete(zp2_sum      , ignored_points, axis = 0)
 zm2_sum       = np.copy(ncfile.variables['zm2_sum'      ][:]); zm2_sum       = np.delete(zm2_sum      , ignored_points, axis = 0)
 
@@ -83,9 +87,19 @@ zm2_bin       = np.copy(ncfile.variables['zm2_bin'      ][:]); zm2_bin       = n
 
 ncfile.close()
 
+# Load kpar
+ncfile = netcdf.netcdf_file(input_dir+runname+'.out.kpar.nc'+restart_num, 'r')   
+try:
+  tt_kpar   = np.copy(ncfile.variables['tt'       ][:]); tt_kpar   = np.delete(tt_kpar  , ignored_points_kpar, axis = 0)
+  kpar_b    = np.copy(ncfile.variables['kpar_b'   ][:]); kpar_b    = np.delete(kpar_b   , ignored_points_kpar, axis = 0)
+  kpar_u    = np.copy(ncfile.variables['kpar_u'   ][:]); kpar_u    = np.delete(kpar_u   , ignored_points_kpar, axis = 0)
+  b1_ovr_b0 = np.copy(ncfile.variables['b1_ovr_b0'][:]); b1_ovr_b0 = np.delete(b1_ovr_b0, ignored_points_kpar, axis = 0)
+except KeyError:
+  pass
+ncfile.close()
+
 # Load SF2
 ncfile = netcdf.netcdf_file(input_dir+runname+'.out.SF2.nc'+restart_num, 'r')   
-
 try:
   tt_SF2 = np.copy(ncfile.variables['tt'  ][:]); tt_SF2  = np.delete(tt_SF2 , ignored_points_SF2, axis = 0)
   lpar   = np.copy(ncfile.variables['lpar'][:])

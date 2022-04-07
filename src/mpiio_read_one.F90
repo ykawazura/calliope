@@ -14,8 +14,7 @@
     call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, &
          MPI_MODE_RDONLY, MPI_INFO_NULL, &
          fh, ierror)
-    disp = 0_MPI_OFFSET_KIND
-    call MPI_FILE_SET_VIEW(fh,disp,data_type, &
+    call MPI_FILE_SET_VIEW(fh,0_MPI_OFFSET_KIND,data_type, &
          newtype,'native',MPI_INFO_NULL,ierror)
     call MPI_FILE_READ_ALL(fh, var, &
          subsizes(1)*subsizes(2)*subsizes(3), &

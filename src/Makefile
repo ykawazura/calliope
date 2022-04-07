@@ -76,6 +76,18 @@ SRC_MHD_COMP_ADIAB = \
 			$(MODEL_DIR)/io.F90 $(MODEL_DIR)/diagnostics.F90 \
 			$(MODEL_DIR)/advance.F90 calliope.F90
 
+### List of files for 'EMHD'
+SRC_EMHD = \
+			time_stamp.F90 file.F90 \
+			$(MODEL_DIR)/params.F90 mp.F90 mpiio.F90 \
+			terminate.F90 grid.F90 time.F90 utils.F90 dealias.F90 \
+			shearing_box.F90 \
+			$(MODEL_DIR)/fields.F90 \
+			$(MODEL_DIR)/force.F90 \
+			$(MODEL_DIR)/$(MODEL)_specific.F90 \
+			$(MODEL_DIR)/io.F90 $(MODEL_DIR)/diagnostics.F90 \
+			$(MODEL_DIR)/advance.F90 calliope.F90
+
 OBJ = $(SRC_$(MODEL):.F90=.o)
 
 calliope : $(OBJ)

@@ -5,7 +5,7 @@ include "../../force_common.F90"
 !-----------------------------------------------!
 !> @author  YK
 !! @date    20 Sep 2021
-!! @brief   Forcing setting specific to RMHD
+!! @brief   Forcing setting specific to RRMHD
 !!          'force_common' is inherited
 !-----------------------------------------------!
 module force
@@ -14,8 +14,8 @@ module force
 
   public get_force
 
-  complex(r8), allocatable, dimension(:,:,:) :: fomg, fomg_old1
-  complex(r8), allocatable, dimension(:,:,:) :: fpsi, fpsi_old1
+  complex(r8), allocatable, dimension(:,:,:) :: fomg, fomg_old
+  complex(r8), allocatable, dimension(:,:,:) :: fpsi, fpsi_old
 
 contains
 
@@ -31,10 +31,10 @@ contains
     complex(r8), allocatable, dimension(:,:,:) :: src
 
     allocate(src(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0,0.d0))
-    allocate(fomg     , source=src)
-    allocate(fomg_old1, source=src)
-    allocate(fpsi     , source=src)
-    allocate(fpsi_old1, source=src)
+    allocate(fomg    , source=src)
+    allocate(fomg_old, source=src)
+    allocate(fpsi    , source=src)
+    allocate(fpsi_old, source=src)
     deallocate(src)
   end subroutine alloc_force
 

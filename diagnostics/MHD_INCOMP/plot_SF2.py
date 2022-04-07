@@ -57,7 +57,7 @@ kpar_u = 2*np.pi/lpar[idx_u]
 
 ys = [ 
       kpar_b, 
-      kpar_b, 
+      kpar_u, 
       kper**(2./3.), 
       kper**(1./2.), 
      ]

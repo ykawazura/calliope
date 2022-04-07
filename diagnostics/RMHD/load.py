@@ -16,7 +16,7 @@ if final_idx != -1:
   print ('\n!!! CAUTION: final_idx = %d !!!\n' % final_idx)
 
 ####### movie or final cut #########
-ismovie = True
+ismovie = False
 
 ####### ignore these points #########
 ignored_points     = [0]
@@ -69,7 +69,7 @@ bpe2_bin        = np.copy(ncfile.variables['bpe2_bin'       ][:]); bpe2_bin     
 ncfile.close()
 
 # Load 2D cut
-ncfile = netcdf.netcdf_file(input_dir+runname+'.out.fields_section.nc'+restart_num, 'r')   
+ncfile = netcdf.netcdf_file(input_dir+runname+'.out.2D.nc'+restart_num, 'r')   
 
 tt_fld  = np.copy(ncfile.variables['tt' ][:]); tt_fld  = np.delete(tt_fld , ignored_points_fld, axis = 0)
 xx_fld  = np.copy(ncfile.variables['xx' ][:])

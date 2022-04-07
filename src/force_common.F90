@@ -173,14 +173,15 @@ contains
 !           must be called every time step
 !           when forcing
 !-----------------------------------------------!
-  subroutine update_force
+  subroutine update_force(dt)
     use params, only: pi, zi
-    use time, only: tt, dt
+    use time, only: tt
     use grid, only: lz
     use mp, only: proc0
     use mp, only: broadcast
     use file, only: open_output_file
     implicit none
+    real(r8), intent(in) :: dt
     complex(r8), dimension(:), allocatable :: w_stir
     complex(r8) :: fa, fb
     real(r8) :: sigma
@@ -207,7 +208,7 @@ contains
     call broadcast (b_force)
 
     if(proc0) then
-      write (unit=force_unit, fmt="(100es30.21)", advance='no') tt
+      write (unit=force_unit, fmt="(100es30.21)", advance='no') tt + dt
       do istir = 1, nk_stir
         write (unit=force_unit, fmt="(100es30.21)", advance='no') &
                                    real(a_force(istir)), imag(a_force(istir)), &

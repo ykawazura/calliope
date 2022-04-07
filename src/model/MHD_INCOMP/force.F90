@@ -5,7 +5,7 @@ include "../../force_common.F90"
 !-----------------------------------------------!
 !> @author  YK
 !! @date    20 Sep 2021
-!! @brief   Forcing setting specific to RMHD
+!! @brief   Forcing setting specific to MHD_INCOMP
 !!          'force_common' is inherited
 !-----------------------------------------------!
 module force
@@ -14,9 +14,9 @@ module force
 
   public get_force
 
-  complex(r8), allocatable, dimension(:,:,:) :: fux, fux_old1
-  complex(r8), allocatable, dimension(:,:,:) :: fuy, fuy_old1
-  complex(r8), allocatable, dimension(:,:,:) :: fuz, fuz_old1
+  complex(r8), allocatable, dimension(:,:,:) :: fux, fux_old
+  complex(r8), allocatable, dimension(:,:,:) :: fuy, fuy_old
+  complex(r8), allocatable, dimension(:,:,:) :: fuz, fuz_old
 
 contains
 
@@ -32,12 +32,12 @@ contains
     complex(r8), allocatable, dimension(:,:,:) :: src
 
     allocate(src(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0,0.d0))
-    allocate(fux     , source=src)
-    allocate(fux_old1, source=src)
-    allocate(fuy     , source=src)
-    allocate(fuy_old1, source=src)
-    allocate(fuz     , source=src)
-    allocate(fuz_old1, source=src)
+    allocate(fux    , source=src)
+    allocate(fux_old, source=src)
+    allocate(fuy    , source=src)
+    allocate(fuy_old, source=src)
+    allocate(fuz    , source=src)
+    allocate(fuz_old, source=src)
     deallocate(src)
   end subroutine alloc_force
 

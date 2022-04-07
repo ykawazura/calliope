@@ -1,0 +1,495 @@
+!-----------------------------------------------!
+!> @author  YK
+!! @date    25 Feb 2021
+!! @brief   Field setting for EMHD
+!-----------------------------------------------!
+module fields
+  use p3dfft
+  implicit none
+
+  public :: init_fields, finish_fields
+  public :: bx, by, bz
+  public :: bx_old, by_old, bz_old
+  public :: nfields
+  public :: ibx, iby, ibz
+
+  private
+
+  complex(r8), allocatable, dimension(:,:,:) :: bx, by, bz
+  complex(r8), allocatable, dimension(:,:,:) :: bx_old, by_old, bz_old
+  character(100) :: init_type
+  real   (r8) :: b0(3)
+
+  ! Field index
+  integer, parameter :: nfields = 3
+  integer, parameter :: ibx = 1, iby = 2, ibz = 3
+
+contains
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    16 Feb 2021
+!! @brief   Initialization of fields
+!-----------------------------------------------!
+  subroutine init_fields
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use params, only: inputfile
+    implicit none
+    complex(r8), allocatable, dimension(:,:,:) :: src
+
+    allocate(src(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
+    allocate(bx    , source=src)
+    allocate(by    , source=src)
+    allocate(bz    , source=src)
+    allocate(bx_old, source=src)
+    allocate(by_old, source=src)
+    allocate(bz_old, source=src)
+    deallocate(src)
+
+    call read_parameters(inputfile)
+
+    if(init_type == 'zero') then
+      call init_zero
+    endif
+    if(init_type == 'single_mode') then
+      call init_single_mode
+    endif
+    if(init_type == 'random') then
+      call init_random
+    endif
+    if(init_type == 'restart') then
+      call restart
+    endif
+
+  end subroutine init_fields
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    29 Dec 2018
+!! @brief   Read inputfile for initial condition
+!-----------------------------------------------!
+  subroutine read_parameters(filename)
+    use file, only: get_unused_unit
+    implicit none
+    character(len=100), intent(in) :: filename
+    integer  :: unit, ierr
+
+    namelist /initial_condition/ init_type
+
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v    used only when the corresponding value   v!
+    !v    does not exist in the input file         v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+
+    init_type = 'zero'
+    !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
+
+    call get_unused_unit (unit)
+    open(unit=unit,file=filename,status='old')
+
+    read(unit,nml=initial_condition,iostat=ierr)
+        if (ierr/=0) write(*,*) "Reading initial_condition failed"
+    close(unit)
+
+  end subroutine read_parameters
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    16 Feb 2021
+!! @brief   Zero initialization
+!-----------------------------------------------!
+  subroutine init_zero
+    use mp, only: proc0
+    implicit none
+
+    if(proc0) then
+      print *, 'Zero initialization'
+    endif
+
+    bx = 0.d0
+    by = 0.d0
+    bz = 0.d0
+
+  end subroutine init_zero
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    16 Feb 2021
+!! @brief   Single mode initialization
+!-----------------------------------------------!
+  subroutine init_single_mode
+    use p3dfft
+    use mp, only: nproc, proc0
+    use grid, only: nlx, nly, nlz
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
+    use params, only: zi, inputfile
+    use file, only: get_unused_unit
+    implicit none
+    character(20) :: mode_type
+    integer :: mode(3)
+    real(r8) :: b1(3)
+    real(r8), allocatable, dimension(:,:,:) :: bz_r
+    integer :: i, j, k
+
+    integer  :: unit, ierr
+    namelist /initial_condition_params/ mode_type, mode, b0, b1
+
+    if(proc0) then
+      print '("Single mode initialization")'
+      print *
+    endif
+
+    if(nproc /= 1 .and. proc0) then
+      print *, '!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!'
+      print *, '!              Error!              !'
+      print *, '!  nproc must one for single_mode  !'
+      print *, '!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!'
+      stop
+    endif
+
+    allocate(bz_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); bz_r = 0.d0
+
+
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v                read inputfile               v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    mode_type = 'arbitrary'
+    mode = (/1, 1, 1/)
+    b0  = (/0.d0, 0.d0, 0.d0/)
+    b1   = 0.d0
+
+    call get_unused_unit (unit)
+    open(unit=unit,file=inputfile,status='old')
+
+    read(unit,nml=initial_condition_params,iostat=ierr)
+        if (ierr/=0) write(*,*) "Reading initial_condition failed"
+    close(unit)
+    !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
+
+    if(trim(mode_type) /= 'MRI' .and. trim(mode_type) /= 'arbitrary' .and. proc0) then
+      print *, '!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!'
+      print *, '!              Error!              !'
+      print *, '!      mode_type must be either    !'
+      print *, '!      "MRI" or "arbitrary".       !'
+      print *, '!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!'
+      stop
+    endif
+
+    ! Arbitrary mode
+    if(trim(mode_type) == 'arbitrary') then
+      bx = 0.d0
+      by = 0.d0
+      bz = 0.d0
+      do j = iky_st, iky_en
+        do k = ikz_st, ikz_en
+          do i = ikx_st, ikx_en
+            if (i == 2 .and. j == 1 .and. k == 2) then
+              bx(i, k, j) = 1.d0
+              by(i, k, j) = 1.d0
+              bz(i, k, j) = 1.d0
+            endif
+          end do
+        end do
+      end do
+    endif
+
+    bx_old = bx
+    by_old = by
+    bz_old = bz
+
+    deallocate(bz_r)
+
+  end subroutine init_single_mode
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    29 Dec 2018
+!! @brief   Random initialization
+!-----------------------------------------------!
+  subroutine init_random
+    use p3dfft
+    use grid, only: kx, ky, kz, nlx, nly, nlz, nkx, nky, nkz
+    use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use mp, only: proc0, proc_id
+    use params, only: zi
+    use mp, only: sum_allreduce, sum_reduce
+    use params, only: inputfile
+    use file, only: get_unused_unit
+    use time, only: microsleep
+    implicit none
+    real(r8), allocatable, dimension(:,:,:) :: bx_r, by_r, bz_r
+    real(r8), allocatable, dimension(:,:,:) :: src
+    integer :: seedsize
+    integer, allocatable :: seed(:)
+    real(r8) :: rms, kmin(3), kmax(3)
+    real(r8) :: b1(3)
+    integer :: i, j, k
+
+    integer  :: unit, ierr
+    namelist /initial_condition_params/ kmin, kmax, b0, b1
+
+    if(proc0) then
+      print *, 'Random initialization'
+    endif
+
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v                read inputfile               v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    kmin = (/0.d0, 0.d0, 0.d0/)
+    kmax = (/maxval(kx), maxval(ky), maxval(kz)/)
+    b0  = (/0.d0, 0.d0, 0.d0/)
+    b1   = 0.d0
+
+    call get_unused_unit (unit)
+    open(unit=unit,file=inputfile,status='old')
+
+    read(unit,nml=initial_condition_params,iostat=ierr)
+        if (ierr/=0) write(*,*) "Reading initial_condition failed"
+    close(unit)
+    !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
+
+    allocate(src(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
+    allocate(bx_r, source=src)
+    allocate(by_r, source=src)
+    allocate(bz_r, source=src)
+    deallocate(src)
+
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v             create random number             v
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    call random_seed(size=seedsize)
+    allocate(seed(seedsize)) 
+
+    do i = 1, seedsize
+      call system_clock(count=seed(i))
+      call microsleep(1000)
+      call system_clock(count=seed(i))
+    end do
+    call random_seed(put=(proc_id+1)*seed(:)) 
+
+    call random_number(bx_r)
+    call random_number(by_r)
+    call random_number(bz_r)
+    !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
+
+    ! compute r2c transform
+    call p3dfft_ftran_r2c(bx_r, bx, 'fft'); bx = bx/nlx/nly/nlz 
+    call p3dfft_ftran_r2c(by_r, by, 'fft'); by = by/nlx/nly/nlz 
+    call p3dfft_ftran_r2c(bz_r, bz, 'fft'); bz = bz/nlx/nly/nlz 
+
+    do j = iky_st, iky_en
+      do k = ikz_st, ikz_en
+        do i = ikx_st, ikx_en
+          ! remove mean fields
+          if (kx(i) == 0.d0 .and. ky(j) == 0.d0 .and. kz(k) == 0.d0) then
+            bx(i, k, j) = 0.d0
+            by(i, k, j) = 0.d0
+            bz(i, k, j) = 0.d0
+          endif
+
+          if(nkx > 1)then
+            if (kx(i)**2 <= kmin(1)**2) then
+              bx(i, k, j) = 0.d0
+              by(i, k, j) = 0.d0
+              bz(i, k, j) = 0.d0
+            endif
+            if (kx(i)**2 >= kmax(2)**2) then
+              bx(i, k, j) = 0.d0
+              by(i, k, j) = 0.d0
+              bz(i, k, j) = 0.d0
+            endif
+          endif
+
+          if(nky > 1)then
+            if (ky(j)**2 <= kmin(1)**2) then
+              bx(i, k, j) = 0.d0
+              by(i, k, j) = 0.d0
+              bz(i, k, j) = 0.d0
+            endif
+            if (ky(j)**2 >= kmax(3)**2) then
+              bx(i, k, j) = 0.d0
+              by(i, k, j) = 0.d0
+              bz(i, k, j) = 0.d0
+            endif
+          endif
+
+          if(nkz > 1)then
+            if (kz(k)**2 <= kmin(2)**2) then
+              bx(i, k, j) = 0.d0
+              by(i, k, j) = 0.d0
+              bz(i, k, j) = 0.d0
+            endif
+
+            if (kz(k)**2 >= kmax(3)**2) then
+              bx(i, k, j) = 0.d0
+              by(i, k, j) = 0.d0
+              bz(i, k, j) = 0.d0
+            endif
+          endif
+
+
+          if(nky > 1)then
+            if (ky(j) == 0.d0) then
+              by(i, k, j) = 0.d0
+            else
+              by(i, k, j) = -(kx(i)*bx(i, k, j) + kz(k)*bz(i, k, j))/ky(j)
+            endif
+          elseif(nkx > 1)then
+            if (kx(i) == 0.d0) then
+              by(i, k, j) = 0.d0
+            else
+              bx(i, k, j) = -(ky(j)*by(i, k, j) + kz(k)*bz(i, k, j))/kx(i)
+            endif
+          endif
+          ! endif
+        end do
+      end do
+    end do
+
+    ! normalize bx, by, bz by rms of |b|
+    call p3dfft_btran_c2r(bx, bx_r, 'tff')
+    call p3dfft_btran_c2r(by, by_r, 'tff')
+    call p3dfft_btran_c2r(bz, bz_r, 'tff')
+    rms = sum(bx_r**2 + by_r**2 + bz_r**2)
+    call sum_allreduce(rms)
+    rms = sqrt(rms/nlx/nly/nlz)
+
+    bx_r = b1(1)*bx_r/rms + b0(1)
+    by_r = b1(2)*by_r/rms + b0(2)
+    bz_r = b1(3)*bz_r/rms + b0(3)
+
+    call p3dfft_ftran_r2c(bx_r, bx, 'fft'); bx = bx/nlx/nly/nlz 
+    call p3dfft_ftran_r2c(by_r, by, 'fft'); by = by/nlx/nly/nlz 
+    call p3dfft_ftran_r2c(bz_r, bz, 'fft'); bz = bz/nlx/nly/nlz 
+
+    ! check div free of u and b
+    call is_div_free('b', bx, by, bz)
+
+    deallocate(bx_r )
+    deallocate(by_r )
+    deallocate(bz_r )
+  end subroutine init_random
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    29 Dec 2018
+!! @brief   Restart
+!-----------------------------------------------!
+  subroutine restart
+    use p3dfft
+    use mp, only: proc0
+    use time, only: tt, dt
+    use grid, only: nkx, nky, nkz
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use params, only: restart_dir
+    use file, only: open_input_file, close_file
+    use mpiio, only: mpiio_read_one
+    use MPI
+    implicit none
+    integer :: time_unit
+    integer, dimension(3) :: sizes, subsizes, starts
+
+    if(proc0) then
+      print *, 'Restart'
+    endif
+
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v                   Read time                 v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    call open_input_file (time_unit, trim(restart_dir)//'time.dat')
+    read (unit=time_unit, fmt=*)
+    read (unit=time_unit, fmt="(100es30.21)") tt
+    call close_file (time_unit)
+    !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
+
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v               Read Binary file              v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    sizes(1) = nkx
+    sizes(2) = nkz
+    sizes(3) = nky
+    subsizes(1) = ikx_en - ikx_st + 1
+    subsizes(2) = ikz_en - ikz_st + 1
+    subsizes(3) = iky_en - iky_st + 1
+    starts(1) = ikx_st - 1
+    starts(2) = ikz_st - 1
+    starts(3) = iky_st - 1
+
+    call mpiio_read_one(bx, sizes, subsizes, starts, trim(restart_dir)//'bx.dat')
+    call mpiio_read_one(by, sizes, subsizes, starts, trim(restart_dir)//'by.dat')
+    call mpiio_read_one(bz, sizes, subsizes, starts, trim(restart_dir)//'bz.dat')
+
+    bx_old = bx
+    by_old = by
+    bz_old = bz
+  end subroutine restart
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    3 Oct 2020
+!! @brief   Check if divergence free is satisfied
+!-----------------------------------------------!
+  subroutine is_div_free(name, fx, fy, fz)
+    use grid, only: kx, ky, kz, k2
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use mp, only: proc0
+    use params, only: zi
+    use mp, only: sum_reduce
+    implicit none
+    character(*) :: name
+    integer :: i, j, k
+    complex(r8), dimension (ikx_st:ikx_en, &
+                            ikz_st:ikz_en, &
+                            iky_st:iky_en), intent(in) :: fx, fy, fz
+    complex(r8), allocatable, dimension(:,:,:) :: abs_div_f
+    real(r8) :: abs_div_f_sum, abs_f_sum, abs_k_sum
+
+    allocate(abs_div_f(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); abs_div_f = 0.d0
+
+    do j = iky_st, iky_en
+      do k = ikz_st, ikz_en
+        do i = ikx_st, ikx_en
+          abs_div_f(i,k,j) = abs(kx(i)*fx(i,k,j) + ky(j)*fy(i,k,j) + kz(k)*fz(i,k,j))
+        end do
+      end do
+    end do
+
+    abs_div_f_sum = sum(abs(abs_div_f)); call sum_reduce(abs_div_f_sum, 0)
+    abs_f_sum = sum(sqrt(fx**2 + fy**2 + fz**2)); call sum_reduce(abs_f_sum, 0)
+    abs_k_sum = sum(sqrt(k2)); call sum_reduce(abs_k_sum, 0)
+
+    if(proc0) write(*, "('<|k.',A2,'|>/(<|k|><|',A2,'|>) = ', es10.3)") trim(name), trim(name), abs_div_f_sum/(abs_f_sum*abs_k_sum)
+
+    deallocate(abs_div_f)
+
+  end subroutine is_div_free
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    16 Feb 2021
+!! @brief   Finalization of Fields
+!-----------------------------------------------!
+  subroutine finish_fields
+    implicit none
+
+    deallocate(bx)
+    deallocate(by)
+    deallocate(bz)
+    deallocate(bx_old)
+    deallocate(by_old)
+    deallocate(bz_old)
+
+  end subroutine finish_fields
+
+end module fields
+

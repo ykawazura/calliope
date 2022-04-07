@@ -5,7 +5,7 @@ include "../../diagnostics_common.F90"
 !-----------------------------------------------!
 !> @author  YK
 !! @date    16 Feb 2021
-!! @brief   Diagnostics for RMHD
+!! @brief   Diagnostics for RRMHD
 !-----------------------------------------------!
 module diagnostics
   use diagnostics_common
@@ -13,7 +13,7 @@ module diagnostics
   implicit none
 
   public :: init_diagnostics, finish_diagnostics
-  public :: loop_diagnostics, loop_diagnostics_fields_secion, loop_diagnostics_kpar, loop_diagnostics_SF2
+  public :: loop_diagnostics, loop_diagnostics_2D, loop_diagnostics_kpar, loop_diagnostics_SF2
 
   private
 contains
@@ -46,10 +46,10 @@ contains
     use grid, only: nkz
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use fields, only: phi, psi, upa, bpa
-    use fields, only: phi_old1, psi_old1, upa_old1, bpa_old1
+    use fields, only: phi_old, psi_old, upa_old, bpa_old
     use mp, only: sum_reduce
     use time, only: dt
-    use time_stamp, only: put_time_stamp, timer_diagnostics
+    use time_stamp, only: put_time_stamp, timer_diagnostics_total
     use params, only: zi, nonlinear, q, &
                       va2cs2_plus_1, nupe_x , nupe_x_exp , nupe_z , nupe_z_exp , &
                                      nupa_x , nupa_x_exp , nupa_z , nupa_z_exp , &
@@ -59,7 +59,7 @@ contains
     integer :: i, j, k
 
     real(r8), allocatable, dimension(:,:,:) :: upe2, ux2, uy2, bpe2, bx2, by2, upa2, bpa2
-    real(r8), allocatable, dimension(:,:,:) :: upe2old1, bpe2old1, upa2old1, bpa2old1
+    real(r8), allocatable, dimension(:,:,:) :: upe2old, bpe2old, upa2old, bpa2old
     real(r8), allocatable, dimension(:,:,:) :: upe2dissip_x, upe2dissip_z
     real(r8), allocatable, dimension(:,:,:) :: bpe2dissip_x, bpe2dissip_z
     real(r8), allocatable, dimension(:,:,:) :: upa2dissip_x, upa2dissip_z
@@ -91,7 +91,7 @@ contains
     real(r8), dimension(:, :), allocatable :: zpep2_bin, zpem2_bin, zpap2_bin, zpam2_bin  ! [kprp, kz]
     complex(r8) :: phi_mid, psi_mid, jpa_mid, upa_mid, bpa_mid
 
-    if (proc0) call put_time_stamp(timer_diagnostics)
+    if (proc0) call put_time_stamp(timer_diagnostics_total)
 
     allocate(src(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=0.d0)
     allocate(upe2        , source=src)
@@ -102,10 +102,10 @@ contains
     allocate(bx2         , source=src)
     allocate(uy2         , source=src)
     allocate(by2         , source=src)
-    allocate(upe2old1    , source=src)
-    allocate(bpe2old1    , source=src)
-    allocate(upa2old1    , source=src)
-    allocate(bpa2old1    , source=src)
+    allocate(upe2old     , source=src)
+    allocate(bpe2old     , source=src)
+    allocate(upa2old     , source=src)
+    allocate(bpa2old     , source=src)
     allocate(upe2dissip_x, source=src)
     allocate(upe2dissip_z, source=src)
     allocate(bpe2dissip_x, source=src)
@@ -146,26 +146,26 @@ contains
     do j = iky_st, iky_en
       do k = ikz_st, ikz_en
         do i = ikx_st, ikx_en
-          upe2    (i, k, j) = 0.5d0*abs(phi(i, k, j))**2*kprp2(i, k, j)
-          bpe2    (i, k, j) = 0.5d0*abs(psi(i, k, j))**2*kprp2(i, k, j)
-          upa2    (i, k, j) = 0.5d0*abs(upa    (i, k, j))**2
-          bpa2    (i, k, j) = 0.5d0*abs(bpa    (i, k, j))**2*va2cs2_plus_1
+          upe2   (i, k, j) = 0.5d0*abs(phi(i, k, j))**2*kprp2(i, k, j)
+          bpe2   (i, k, j) = 0.5d0*abs(psi(i, k, j))**2*kprp2(i, k, j)
+          upa2   (i, k, j) = 0.5d0*abs(upa    (i, k, j))**2
+          bpa2   (i, k, j) = 0.5d0*abs(bpa    (i, k, j))**2*va2cs2_plus_1
 
-          ux2     (i, k, j) = 0.5d0*abs(ky(j)*phi(i, k, j))**2
-          uy2     (i, k, j) = 0.5d0*abs(kx(i)*phi(i, k, j))**2
-          bx2     (i, k, j) = 0.5d0*abs(ky(j)*psi(i, k, j))**2
-          by2     (i, k, j) = 0.5d0*abs(kx(i)*psi(i, k, j))**2
+          ux2    (i, k, j) = 0.5d0*abs(ky(j)*phi(i, k, j))**2
+          uy2    (i, k, j) = 0.5d0*abs(kx(i)*phi(i, k, j))**2
+          bx2    (i, k, j) = 0.5d0*abs(ky(j)*psi(i, k, j))**2
+          by2    (i, k, j) = 0.5d0*abs(kx(i)*psi(i, k, j))**2
 
-          upe2old1(i, k, j) = 0.5d0*abs(phi_old1(i, k, j))**2*kprp2(i, k, j)
-          bpe2old1(i, k, j) = 0.5d0*abs(psi_old1(i, k, j))**2*kprp2(i, k, j)
-          upa2old1(i, k, j) = 0.5d0*abs(upa_old1(i, k, j))**2
-          bpa2old1(i, k, j) = 0.5d0*abs(bpa_old1(i, k, j))**2*va2cs2_plus_1
+          upe2old(i, k, j) = 0.5d0*abs(phi_old(i, k, j))**2*kprp2(i, k, j)
+          bpe2old(i, k, j) = 0.5d0*abs(psi_old(i, k, j))**2*kprp2(i, k, j)
+          upa2old(i, k, j) = 0.5d0*abs(upa_old(i, k, j))**2
+          bpa2old(i, k, j) = 0.5d0*abs(bpa_old(i, k, j))**2*va2cs2_plus_1
 
-          phi_mid = 0.5d0*(phi (i, k, j) + phi_old1 (i, k, j))
-          psi_mid = 0.5d0*(psi (i, k, j) + psi_old1 (i, k, j))
+          phi_mid = 0.5d0*(phi(i, k, j) + phi_old(i, k, j))
+          psi_mid = 0.5d0*(psi(i, k, j) + psi_old(i, k, j))
           jpa_mid = -kprp2(i, k, j)*psi_mid
-          upa_mid = 0.5d0*(upa(i, k, j) + upa_old1(i, k, j))
-          bpa_mid = 0.5d0*(bpa(i, k, j) + bpa_old1(i, k, j))
+          upa_mid = 0.5d0*(upa(i, k, j) + upa_old(i, k, j))
+          bpa_mid = 0.5d0*(bpa(i, k, j) + bpa_old(i, k, j))
 
           upe2dissip_x(i, k, j) =  nupe_x*(kprp2(i, k, j)/kprp2_max)** nupe_x_exp*abs(phi_mid)**2*kprp2(i, k, j)
           upe2dissip_z(i, k, j) =  nupe_z*(kz2  (k)      /kz2_max  )** nupe_z_exp*abs(phi_mid)**2*kprp2(i, k, j)
@@ -195,20 +195,20 @@ contains
           ! Since FFTW only computes the second and third terms, we need to compensate the first term, which is equivalent to the third term.
           !-----------------------------------------------------------------------------------------------------------------------------------
           if (j /= 1) then
-            upe2    (i, k, j) = 2.0d0*upe2    (i, k, j)
-            bpe2    (i, k, j) = 2.0d0*bpe2    (i, k, j)
-            upa2    (i, k, j) = 2.0d0*upa2    (i, k, j)
-            bpa2    (i, k, j) = 2.0d0*bpa2    (i, k, j)
+            upe2   (i, k, j) = 2.0d0*upe2   (i, k, j)
+            bpe2   (i, k, j) = 2.0d0*bpe2   (i, k, j)
+            upa2   (i, k, j) = 2.0d0*upa2   (i, k, j)
+            bpa2   (i, k, j) = 2.0d0*bpa2   (i, k, j)
 
-            ux2     (i, k, j) = 2.0d0*ux2     (i, k, j)
-            uy2     (i, k, j) = 2.0d0*uy2     (i, k, j)
-            bx2     (i, k, j) = 2.0d0*bx2     (i, k, j)
-            by2     (i, k, j) = 2.0d0*by2     (i, k, j)
+            ux2    (i, k, j) = 2.0d0*ux2    (i, k, j)
+            uy2    (i, k, j) = 2.0d0*uy2    (i, k, j)
+            bx2    (i, k, j) = 2.0d0*bx2    (i, k, j)
+            by2    (i, k, j) = 2.0d0*by2    (i, k, j)
 
-            upe2old1(i, k, j) = 2.0d0*upe2old1(i, k, j)
-            bpe2old1(i, k, j) = 2.0d0*bpe2old1(i, k, j)
-            upa2old1(i, k, j) = 2.0d0*upa2old1(i, k, j)
-            bpa2old1(i, k, j) = 2.0d0*bpa2old1(i, k, j)
+            upe2old(i, k, j) = 2.0d0*upe2old(i, k, j)
+            bpe2old(i, k, j) = 2.0d0*bpe2old(i, k, j)
+            upa2old(i, k, j) = 2.0d0*upa2old(i, k, j)
+            bpa2old(i, k, j) = 2.0d0*bpa2old(i, k, j)
 
             upe2dissip_x(i, k, j) = 2.0d0*upe2dissip_x(i, k, j)
             upe2dissip_z(i, k, j) = 2.0d0*upe2dissip_z(i, k, j)
@@ -238,10 +238,10 @@ contains
     upa2_sum = sum(upa2); call sum_reduce(upa2_sum, 0)
     bpa2_sum = sum(bpa2); call sum_reduce(bpa2_sum, 0)
 
-    upe2dot_sum = sum((upe2 - upe2old1)/dt); call sum_reduce(upe2dot_sum, 0)
-    bpe2dot_sum = sum((bpe2 - bpe2old1)/dt); call sum_reduce(bpe2dot_sum, 0)
-    upa2dot_sum = sum((upa2 - upa2old1)/dt); call sum_reduce(upa2dot_sum, 0)
-    bpa2dot_sum = sum((bpa2 - bpa2old1)/dt); call sum_reduce(bpa2dot_sum, 0)
+    upe2dot_sum = sum((upe2 - upe2old)/dt); call sum_reduce(upe2dot_sum, 0)
+    bpe2dot_sum = sum((bpe2 - bpe2old)/dt); call sum_reduce(bpe2dot_sum, 0)
+    upa2dot_sum = sum((upa2 - upa2old)/dt); call sum_reduce(upa2dot_sum, 0)
+    bpa2dot_sum = sum((bpa2 - bpa2old)/dt); call sum_reduce(bpa2dot_sum, 0)
 
     upe2dissip_sum = sum(upe2dissip_x + upe2dissip_z); call sum_reduce(upe2dissip_sum, 0)
     bpe2dissip_sum = sum(bpe2dissip_x + bpe2dissip_z); call sum_reduce(bpe2dissip_sum, 0)
@@ -277,6 +277,7 @@ contains
   
     ! call get_nonlinear_transfer(ntrans_aw_l_bin, ntrans_aw_g_bin, ntrans_compr_l_bin, ntrans_compr_g_bin)
 
+    if (proc0) call put_time_stamp(timer_diagnostics_total)
     call loop_io( &
                   upe2_sum, bpe2_sum, upa2_sum, bpa2_sum, &
                   upe2dot_sum, bpe2dot_sum, upa2dot_sum, bpa2dot_sum, &
@@ -298,10 +299,10 @@ contains
     deallocate(bpe2)
     deallocate(upa2)
     deallocate(bpa2)
-    deallocate(upe2old1)
-    deallocate(bpe2old1)
-    deallocate(upa2old1)
-    deallocate(bpa2old1)
+    deallocate(upe2old)
+    deallocate(bpe2old)
+    deallocate(upa2old)
+    deallocate(bpa2old)
     deallocate(upe2dissip_x)
     deallocate(upe2dissip_z)
     deallocate(bpe2dissip_x)
@@ -329,8 +330,6 @@ contains
     deallocate (zpem2_bin)
     deallocate (zpap2_bin)
     deallocate (zpam2_bin)
-
-    if (proc0) call put_time_stamp(timer_diagnostics)
   end subroutine loop_diagnostics
 
 
@@ -339,15 +338,15 @@ contains
 !! @date    15 Apr 2020
 !! @brief   Diagnostics in loop
 !-----------------------------------------------!
-  subroutine loop_diagnostics_fields_secion
-    use io, only: loop_io, loop_io_fields_section
+  subroutine loop_diagnostics_2D
+    use io, only: loop_io, loop_io_2D
     use mp, only: proc0
     use grid, only: nlx, nly, nlz
     use grid, only: kx, ky, kprp2
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     use fields, only: phi, psi, upa, bpa
-    use time_stamp, only: put_time_stamp, timer_diagnostics
+    use time_stamp, only: put_time_stamp, timer_diagnostics_total
     use params, only: zi
     implicit none
     integer :: i, j, k
@@ -369,7 +368,7 @@ contains
     real(r8)   , allocatable, dimension(:,:)   :: src1, src2, src3
     complex(r8), allocatable, dimension(:,:,:) :: src4
 
-    if (proc0) call put_time_stamp(timer_diagnostics)
+    if (proc0) call put_time_stamp(timer_diagnostics_total)
 
     allocate(f  (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); f   = 0.d0
     allocate(fr (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); fr  = 0.d0
@@ -452,7 +451,8 @@ contains
     f = by ; call p3dfft_btran_c2r(f, fr, 'tff'); call cut_2d_r(fr,  by_r_z0,  by_r_x0,  by_r_y0)
     !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
 
-    call loop_io_fields_section( &
+    if (proc0) call put_time_stamp(timer_diagnostics_total)
+    call loop_io_2D( &
                   phi_r_z0, phi_r_x0, phi_r_y0, &
                   psi_r_z0, psi_r_x0, psi_r_y0, &
                   upa_r_z0, upa_r_x0, upa_r_y0, &
@@ -513,9 +513,7 @@ contains
     deallocate ( by_r_z0)
     deallocate ( by_r_x0)
     deallocate ( by_r_y0)
-
-    if (proc0) call put_time_stamp(timer_diagnostics)
-  end subroutine loop_diagnostics_fields_secion
+  end subroutine loop_diagnostics_2D
 
 
 !-----------------------------------------------!

@@ -7,7 +7,7 @@ print('\nplotting fields\n')
 outdir = './fig_fields/'
 
 # Load 2D cut
-ncfile = netcdf.netcdf_file(input_dir+runname+'.out.fields_section.nc'+restart_num, 'r')   
+ncfile = netcdf.netcdf_file(input_dir+runname+'.out.2D.nc'+restart_num, 'r')   
 
 tt_fld  = np.copy(ncfile.variables['tt' ][:]); tt_fld  = np.delete(tt_fld , ignored_points_fld, axis = 0)
 xx_fld  = np.copy(ncfile.variables['xx' ][:])
@@ -190,64 +190,64 @@ from scipy.io import savemat
 
 savemat(outdir + 'grid' , {'xx':xx, 'yy':yy, 'zz':zz})
 savemat(outdir + 'rho_r' , {
-                            'tt'       :tt[final_idx],
-                            'rho_r_z0' :rho_r_z0[final_idx,:,:],
-                            'rho_r_x0' :rho_r_x0[final_idx,:,:],
-                            'rho_r_y0' :rho_r_y0[final_idx,:,:],
+                            'tt'       :tt[final_fld_idx],
+                            'rho_r_z0' :rho_r_z0[final_fld_idx,:,:],
+                            'rho_r_x0' :rho_r_x0[final_fld_idx,:,:],
+                            'rho_r_y0' :rho_r_y0[final_fld_idx,:,:],
                           })
 savemat(outdir + 'u_r' , {
-                            'tt'       :tt[final_idx],
-                            'ux_r_z0'  :ux_r_z0 [final_idx,:,:],
-                            'ux_r_x0'  :ux_r_x0 [final_idx,:,:],
-                            'ux_r_y0'  :ux_r_y0 [final_idx,:,:],
+                            'tt'       :tt[final_fld_idx],
+                            'ux_r_z0'  :ux_r_z0 [final_fld_idx,:,:],
+                            'ux_r_x0'  :ux_r_x0 [final_fld_idx,:,:],
+                            'ux_r_y0'  :ux_r_y0 [final_fld_idx,:,:],
                             #
-                            'uy_r_z0'  :uy_r_z0 [final_idx,:,:],
-                            'uy_r_x0'  :uy_r_x0 [final_idx,:,:],
-                            'uy_r_y0'  :uy_r_y0 [final_idx,:,:],
+                            'uy_r_z0'  :uy_r_z0 [final_fld_idx,:,:],
+                            'uy_r_x0'  :uy_r_x0 [final_fld_idx,:,:],
+                            'uy_r_y0'  :uy_r_y0 [final_fld_idx,:,:],
                             #
-                            'uz_r_z0'  :uz_r_z0 [final_idx,:,:],
-                            'uz_r_x0'  :uz_r_x0 [final_idx,:,:],
-                            'uz_r_y0'  :uz_r_y0 [final_idx,:,:],
+                            'uz_r_z0'  :uz_r_z0 [final_fld_idx,:,:],
+                            'uz_r_x0'  :uz_r_x0 [final_fld_idx,:,:],
+                            'uz_r_y0'  :uz_r_y0 [final_fld_idx,:,:],
                           })
 savemat(outdir + 'b_r' , {
-                            'tt'       :tt[final_idx],
-                            'bx_r_z0'  :bx_r_z0 [final_idx,:,:],
-                            'bx_r_x0'  :bx_r_x0 [final_idx,:,:],
-                            'bx_r_y0'  :bx_r_y0 [final_idx,:,:],
+                            'tt'       :tt[final_fld_idx],
+                            'bx_r_z0'  :bx_r_z0 [final_fld_idx,:,:],
+                            'bx_r_x0'  :bx_r_x0 [final_fld_idx,:,:],
+                            'bx_r_y0'  :bx_r_y0 [final_fld_idx,:,:],
                             #
-                            'by_r_z0'  :by_r_z0 [final_idx,:,:],
-                            'by_r_x0'  :by_r_x0 [final_idx,:,:],
-                            'by_r_y0'  :by_r_y0 [final_idx,:,:],
+                            'by_r_z0'  :by_r_z0 [final_fld_idx,:,:],
+                            'by_r_x0'  :by_r_x0 [final_fld_idx,:,:],
+                            'by_r_y0'  :by_r_y0 [final_fld_idx,:,:],
                             #
-                            'bz_r_z0'  :bz_r_z0 [final_idx,:,:],
-                            'bz_r_x0'  :bz_r_x0 [final_idx,:,:],
-                            'bz_r_y0'  :bz_r_y0 [final_idx,:,:],
+                            'bz_r_z0'  :bz_r_z0 [final_fld_idx,:,:],
+                            'bz_r_x0'  :bz_r_x0 [final_fld_idx,:,:],
+                            'bz_r_y0'  :bz_r_y0 [final_fld_idx,:,:],
                           })
 savemat(outdir + 'w_r' , {
-                            'tt'       :tt[final_idx],
-                            'wx_r_z0'  :wx_r_z0 [final_idx,:,:],
-                            'wx_r_x0'  :wx_r_x0 [final_idx,:,:],
-                            'wx_r_y0'  :wx_r_y0 [final_idx,:,:],
+                            'tt'       :tt[final_fld_idx],
+                            'wx_r_z0'  :wx_r_z0 [final_fld_idx,:,:],
+                            'wx_r_x0'  :wx_r_x0 [final_fld_idx,:,:],
+                            'wx_r_y0'  :wx_r_y0 [final_fld_idx,:,:],
                             #
-                            'wy_r_z0'  :wy_r_z0 [final_idx,:,:],
-                            'wy_r_x0'  :wy_r_x0 [final_idx,:,:],
-                            'wy_r_y0'  :wy_r_y0 [final_idx,:,:],
+                            'wy_r_z0'  :wy_r_z0 [final_fld_idx,:,:],
+                            'wy_r_x0'  :wy_r_x0 [final_fld_idx,:,:],
+                            'wy_r_y0'  :wy_r_y0 [final_fld_idx,:,:],
                             #
-                            'wz_r_z0'  :wz_r_z0 [final_idx,:,:],
-                            'wz_r_x0'  :wz_r_x0 [final_idx,:,:],
-                            'wz_r_y0'  :wz_r_y0 [final_idx,:,:],
+                            'wz_r_z0'  :wz_r_z0 [final_fld_idx,:,:],
+                            'wz_r_x0'  :wz_r_x0 [final_fld_idx,:,:],
+                            'wz_r_y0'  :wz_r_y0 [final_fld_idx,:,:],
                           })
 savemat(outdir + 'j_r' , {
-                            'tt'       :tt[final_idx],
-                            'jx_r_z0'  :jx_r_z0 [final_idx,:,:],
-                            'jx_r_x0'  :jx_r_x0 [final_idx,:,:],
-                            'jx_r_y0'  :jx_r_y0 [final_idx,:,:],
+                            'tt'       :tt[final_fld_idx],
+                            'jx_r_z0'  :jx_r_z0 [final_fld_idx,:,:],
+                            'jx_r_x0'  :jx_r_x0 [final_fld_idx,:,:],
+                            'jx_r_y0'  :jx_r_y0 [final_fld_idx,:,:],
                             #
-                            'jy_r_z0'  :jy_r_z0 [final_idx,:,:],
-                            'jy_r_x0'  :jy_r_x0 [final_idx,:,:],
-                            'jy_r_y0'  :jy_r_y0 [final_idx,:,:],
+                            'jy_r_z0'  :jy_r_z0 [final_fld_idx,:,:],
+                            'jy_r_x0'  :jy_r_x0 [final_fld_idx,:,:],
+                            'jy_r_y0'  :jy_r_y0 [final_fld_idx,:,:],
                             #
-                            'jz_r_z0'  :jz_r_z0 [final_idx,:,:],
-                            'jz_r_x0'  :jz_r_x0 [final_idx,:,:],
-                            'jz_r_y0'  :jz_r_y0 [final_idx,:,:],
+                            'jz_r_z0'  :jz_r_z0 [final_fld_idx,:,:],
+                            'jz_r_x0'  :jz_r_x0 [final_fld_idx,:,:],
+                            'jz_r_y0'  :jz_r_y0 [final_fld_idx,:,:],
                           })

@@ -5,41 +5,59 @@ include "../../advance_common.F90"
 !-----------------------------------------------!
 !> @author  YK
 !! @date    25 Sep 2019
-!! @brief   Time stepping for MHD_INCOMP
+!! @brief   Time stepping for MHD_COMP_ISOTH
 !-----------------------------------------------!
 module advance
   use p3dfft
+  use fields, only: nfields
+  use fields, only: irho
+  use fields, only: imx, imy, imz
+  use fields, only: ibx, iby, ibz
   implicit none
 
   public solve
 
   integer :: counter = 0
-  complex(r8), allocatable, dimension(:,:,:)   :: rho_new, rho_old2
-  complex(r8), allocatable, dimension(:,:,:)   ::  mx_new,  mx_old2
-  complex(r8), allocatable, dimension(:,:,:)   ::  my_new,  my_old2
-  complex(r8), allocatable, dimension(:,:,:)   ::  mz_new,  mz_old2
-  complex(r8), allocatable, dimension(:,:,:)   ::  bx_new,  bx_old2
-  complex(r8), allocatable, dimension(:,:,:)   ::  by_new,  by_old2
-  complex(r8), allocatable, dimension(:,:,:)   ::  bz_new,  bz_old2
-  complex(r8), allocatable, dimension(:,:,:,:) :: flx
-  complex(r8), allocatable, dimension(:,:,:)   :: nl_rho, nl_rho_old1, nl_rho_old2
-  complex(r8), allocatable, dimension(:,:,:)   :: nl_mx , nl_mx_old1 , nl_mx_old2
-  complex(r8), allocatable, dimension(:,:,:)   :: nl_my , nl_my_old1 , nl_my_old2
-  complex(r8), allocatable, dimension(:,:,:)   :: nl_mz , nl_mz_old1 , nl_mz_old2
-  complex(r8), allocatable, dimension(:,:,:)   :: nl_bx , nl_bx_old1 , nl_bx_old2
-  complex(r8), allocatable, dimension(:,:,:)   :: nl_by , nl_by_old1 , nl_by_old2
-  complex(r8), allocatable, dimension(:,:,:)   :: nl_bz , nl_bz_old1 , nl_bz_old2
-  complex(r8), allocatable, dimension(:,:,:)   :: fmx_old2, fmy_old2, fmz_old2
+  complex(r8), allocatable, dimension(:,:,:)   :: rho_new
+  complex(r8), allocatable, dimension(:,:,:)   ::  mx_new
+  complex(r8), allocatable, dimension(:,:,:)   ::  my_new
+  complex(r8), allocatable, dimension(:,:,:)   ::  mz_new
+  complex(r8), allocatable, dimension(:,:,:)   ::  bx_new
+  complex(r8), allocatable, dimension(:,:,:)   ::  by_new
+  complex(r8), allocatable, dimension(:,:,:)   ::  bz_new
+  complex(r8), allocatable, dimension(:,:,:,:) :: flx, exp_terms
   complex(r8), allocatable, dimension(:,:,:)   :: nbl2inv_div_b ! nabla^-2 (div b)
-  real   (r8), allocatable, dimension(:,:)     :: kxt, kxt_old1, kxt_old2
+  real   (r8), allocatable, dimension(:,:)     :: kxt
+
+  !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+  !v                For eSSPIFRK3                v!
+  !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+  complex(r8), allocatable, dimension(:,:,:)   :: rho_tmp
+  complex(r8), allocatable, dimension(:,:,:)   ::  mx_tmp
+  complex(r8), allocatable, dimension(:,:,:)   ::  my_tmp
+  complex(r8), allocatable, dimension(:,:,:)   ::  mz_tmp
+  complex(r8), allocatable, dimension(:,:,:)   ::  bx_tmp
+  complex(r8), allocatable, dimension(:,:,:)   ::  by_tmp
+  complex(r8), allocatable, dimension(:,:,:)   ::  bz_tmp
+  complex(r8), allocatable, dimension(:,:,:,:) :: exp_terms0
+
+  !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+  !v                  For Gear3                  v!
+  !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+  complex(r8), allocatable, dimension(:,:,:)   :: rho_old2
+  complex(r8), allocatable, dimension(:,:,:)   ::  mx_old2
+  complex(r8), allocatable, dimension(:,:,:)   ::  my_old2
+  complex(r8), allocatable, dimension(:,:,:)   ::  mz_old2
+  complex(r8), allocatable, dimension(:,:,:)   ::  bx_old2
+  complex(r8), allocatable, dimension(:,:,:)   ::  by_old2
+  complex(r8), allocatable, dimension(:,:,:)   ::  bz_old2
+  complex(r8), allocatable, dimension(:,:,:)   :: fmx_old2, fmy_old2, fmz_old2
+  complex(r8), allocatable, dimension(:,:,:,:) :: exp_terms_old, exp_terms_old2
+  real   (r8), allocatable, dimension(:,:)     :: kxt_old, kxt_old2
+
   real   (r8) :: cflx, cfly, cflz
   integer :: max_vel_unit
 
-  ! Backward FFT variables
-  integer, parameter :: nbtran = 7
-  integer, parameter :: irho = 1
-  integer, parameter :: imx  = 2, imy = 3, imz = 4
-  integer, parameter :: ibx  = 5, iby = 6, ibz = 7
   ! Forward FFT variables
   integer, parameter :: nftran = 9
   integer, parameter :: iflx_mxx = 1, iflx_mxy = 2, iflx_mxz = 3 ! rho*uu - bb + [(cs^2/va^2)*rho + b^2/2]*I (tensor) 
@@ -53,20 +71,15 @@ contains
 !-----------------------------------------------!
 !> @author  YK
 !! @date    29 Dec 2018
-!! @brief   Solve the equation of motion
-!!          3rd Order Gear's method
-!!               linear terms: explicit
-!!            nonlinear terms: explicit
-!!          dissipation terms: implicit
-!!          [Karniadakis and Israeli, JCP 1991]
+!! @brief   Solve the time evolution
 !-----------------------------------------------!
   subroutine solve
     use fields, only: rho
     use fields, only: mx, my, mz
     use fields, only: bx, by, bz
-    use fields, only: rho_old1
-    use fields, only: mx_old1, my_old1, mz_old1
-    use fields, only: bx_old1, by_old1, bz_old1
+    use fields, only: rho_old
+    use fields, only: mx_old, my_old, mz_old
+    use fields, only: bx_old, by_old, bz_old
     use grid, only: k2_max
     use grid, only: kx, ky, kz
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
@@ -77,11 +90,15 @@ contains
     use params, only: dealias_scheme => dealias, rho_min
     use dealias, only: filter
     use shearing_box, only: shear_flg, k2t, k2t_inv, tsc, tremap
-    use force, only: fmx, fmz, fmy, fmx_old1, fmy_old1, fmz_old1, driven, update_force, get_force
+    use force, only: fmx, fmz, fmy, fmx_old, fmy_old, fmz_old, driven, update_force, get_force
+    use advance_common, only: eSSPIFRK1, eSSPIFRK2, eSSPIFRK3
     use advance_common, only: gear1, gear2, gear3
     use utils, only: check_floor
     use params, only: series_output
+    use params, only: time_step_scheme
     implicit none
+    real(r8) :: imp_terms_tintg0(nfields), imp_terms_tintg1(nfields)
+    real(r8) :: imp_terms_tintg2(nfields), imp_terms_tintg3(nfields)  
     integer :: i, j, k
 
     if (proc0) call put_time_stamp(timer_advance)
@@ -97,408 +114,498 @@ contains
       counter = 1
     endif
 
-    ! Calcualte nonlinear terms
-    if(nonlinear) call get_nonlinear_terms
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v                For eSSPIFRK3                v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    if(time_step_scheme == 'eSSPIFRK3') then
+      ! Calcualte force terms
+      if (driven) then
+        ! at n
+        call get_force('mx', fmx)
+        call get_force('my', fmy)
+        call get_force('mz', fmz)
+      endif
 
-    ! Calcualte force terms
-    if (driven) then
-      call update_force
-      call get_force('mx', fmx)
-      call get_force('my', fmy)
-      call get_force('mz', fmz)
+      !---------------  RK 1st step  ---------------
+      ! Calcualte nonlinear terms
+      if(nonlinear) call get_nonlinear_terms(rho, mx, my, mz, bx, by, bz, .true.)
+
+      !$omp parallel do private(i, k) schedule(static)
+      do j = iky_st, iky_en
+        do k = ikz_st, ikz_en
+          do i = ikx_st, ikx_en
+
+            ! Calculate explicit terms
+            call get_ext_terms(exp_terms(i,k,j,:), &
+                               mx(i,k,j), my(i,k,j), mz(i,k,j), bx(i,k,j), by(i,k,j), bz(i,k,j), &
+                               flx(i,k,j,:), &
+                               fmx(i,k,j), fmy(i,k,j), fmz(i,k,j), &
+                               kxt(i,j), ky(j), kz(k))
+
+            ! Calculate time integral of explicit terms
+            call get_imp_terms_tintg(imp_terms_tintg0(irho), tsc               , kx(i), ky(j), kz(k), lmd, lmd_exp)
+            call get_imp_terms_tintg(imp_terms_tintg1(irho), tsc + 2.d0/3.d0*dt, kx(i), ky(j), kz(k), lmd, lmd_exp)
+
+            call get_imp_terms_tintg(imp_terms_tintg0(imx ), tsc               , kx(i), ky(j), kz(k), nu , nu_exp )
+            call get_imp_terms_tintg(imp_terms_tintg1(imx ), tsc + 2.d0/3.d0*dt, kx(i), ky(j), kz(k), nu , nu_exp )
+            call get_imp_terms_tintg(imp_terms_tintg0(imy ), tsc               , kx(i), ky(j), kz(k), nu , nu_exp )
+            call get_imp_terms_tintg(imp_terms_tintg1(imy ), tsc + 2.d0/3.d0*dt, kx(i), ky(j), kz(k), nu , nu_exp )
+            call get_imp_terms_tintg(imp_terms_tintg0(imz ), tsc               , kx(i), ky(j), kz(k), nu , nu_exp )
+            call get_imp_terms_tintg(imp_terms_tintg1(imz ), tsc + 2.d0/3.d0*dt, kx(i), ky(j), kz(k), nu , nu_exp )
+                                                          
+            call get_imp_terms_tintg(imp_terms_tintg0(ibx ), tsc               , kx(i), ky(j), kz(k), eta, eta_exp)
+            call get_imp_terms_tintg(imp_terms_tintg1(ibx ), tsc + 2.d0/3.d0*dt, kx(i), ky(j), kz(k), eta, eta_exp)
+            call get_imp_terms_tintg(imp_terms_tintg0(iby ), tsc               , kx(i), ky(j), kz(k), eta, eta_exp)
+            call get_imp_terms_tintg(imp_terms_tintg1(iby ), tsc + 2.d0/3.d0*dt, kx(i), ky(j), kz(k), eta, eta_exp)
+            call get_imp_terms_tintg(imp_terms_tintg0(ibz ), tsc               , kx(i), ky(j), kz(k), eta, eta_exp)
+            call get_imp_terms_tintg(imp_terms_tintg1(ibz ), tsc + 2.d0/3.d0*dt, kx(i), ky(j), kz(k), eta, eta_exp)
+
+            ! update rho
+            call eSSPIFRK1(rho_tmp(i,k,j), rho(i,k,j), &
+               exp_terms(i,k,j,irho), &
+               imp_terms_tintg1(irho), imp_terms_tintg0(irho) &
+            )
+
+            ! update m
+            call eSSPIFRK1(mx_tmp(i,k,j), mx(i,k,j), &
+               exp_terms(i,k,j,imx), &
+               imp_terms_tintg1(imx), imp_terms_tintg0(imx) &
+            )
+            call eSSPIFRK1(my_tmp(i,k,j), my(i,k,j), &
+               exp_terms(i,k,j,imy), &
+               imp_terms_tintg1(imy), imp_terms_tintg0(imy) &
+            )
+            call eSSPIFRK1(mz_tmp(i,k,j), mz(i,k,j), &
+               exp_terms(i,k,j,imz), &
+               imp_terms_tintg1(imz), imp_terms_tintg0(imz) &
+            )
+
+            ! update b
+            call eSSPIFRK1(bx_tmp(i,k,j), bx(i,k,j), &
+               exp_terms(i,k,j,ibx), &
+               imp_terms_tintg1(ibx), imp_terms_tintg0(ibx) &
+            )
+            call eSSPIFRK1(by_tmp(i,k,j), by(i,k,j), &
+               exp_terms(i,k,j,iby), &
+               imp_terms_tintg1(iby), imp_terms_tintg0(iby) &
+            )
+            call eSSPIFRK1(bz_tmp(i,k,j), bz(i,k,j), &
+               exp_terms(i,k,j,ibz), &
+               imp_terms_tintg1(ibz), imp_terms_tintg0(ibz) &
+            )
+
+          enddo
+        enddo
+      enddo
+      !$omp end parallel do
+
+      ! save explicit terms at the previous step
+      !$omp workshare
+      exp_terms0 = exp_terms
+      !$omp end workshare
+
+      !---------------  RK 2nd step  ---------------
+      ! Calcualte force terms
+      if (driven) then
+        ! at n + 2/3
+        call update_force(2.d0/3.d0*dt)
+        call get_force('mx', fmx)
+        call get_force('my', fmy)
+        call get_force('mz', fmz)
+
+        ! go to n + 1
+        call update_force(1.d0/3.d0*dt)
+      endif
+
+      ! Calcualte kxt at n + 2/3
+      if(shear) then
+        !$omp parallel do private(i, k) schedule(static)
+        do j = iky_st, iky_en
+          do i = ikx_st, ikx_en
+            kxt(i,j) = kx(i) + q*shear_flg*(tsc + 2.d0/3.d0*dt)*ky(j)
+          enddo
+        enddo
+        !$omp end parallel do
+      endif
+
+      ! Calcualte nonlinear terms
+      if(nonlinear) call get_nonlinear_terms(rho_tmp, mx_tmp, my_tmp, mz_tmp, bx_tmp, by_tmp, bz_tmp, .false.)
+
+      !$omp parallel do private(i, k) schedule(static)
+      do j = iky_st, iky_en
+        do k = ikz_st, ikz_en
+          do i = ikx_st, ikx_en
+
+            ! Calculate explicit terms
+            call get_ext_terms(exp_terms(i,k,j,:), &
+                               mx_tmp(i,k,j), my_tmp(i,k,j), mz_tmp(i,k,j), bx_tmp(i,k,j), by_tmp(i,k,j), bz_tmp(i,k,j), &
+                               flx(i,k,j,:), &
+                               fmx(i,k,j), fmy(i,k,j), fmz(i,k,j), &
+                               kxt(i,j), ky(j), kz(k))
+
+            ! Calculate time integral of explicit terms
+            call get_imp_terms_tintg(imp_terms_tintg0(irho), tsc               , kx(i), ky(j), kz(k), lmd, lmd_exp)
+            call get_imp_terms_tintg(imp_terms_tintg2(irho), tsc + 2.d0/3.d0*dt, kx(i), ky(j), kz(k), lmd, lmd_exp)
+
+            call get_imp_terms_tintg(imp_terms_tintg0(imx ), tsc               , kx(i), ky(j), kz(k), nu , nu_exp )
+            call get_imp_terms_tintg(imp_terms_tintg2(imx ), tsc + 2.d0/3.d0*dt, kx(i), ky(j), kz(k), nu , nu_exp )
+            call get_imp_terms_tintg(imp_terms_tintg0(imy ), tsc               , kx(i), ky(j), kz(k), nu , nu_exp )
+            call get_imp_terms_tintg(imp_terms_tintg2(imy ), tsc + 2.d0/3.d0*dt, kx(i), ky(j), kz(k), nu , nu_exp )
+            call get_imp_terms_tintg(imp_terms_tintg0(imz ), tsc               , kx(i), ky(j), kz(k), nu , nu_exp )
+            call get_imp_terms_tintg(imp_terms_tintg2(imz ), tsc + 2.d0/3.d0*dt, kx(i), ky(j), kz(k), nu , nu_exp )
+                                                          
+            call get_imp_terms_tintg(imp_terms_tintg0(ibx ), tsc               , kx(i), ky(j), kz(k), eta, eta_exp)
+            call get_imp_terms_tintg(imp_terms_tintg2(ibx ), tsc + 2.d0/3.d0*dt, kx(i), ky(j), kz(k), eta, eta_exp)
+            call get_imp_terms_tintg(imp_terms_tintg0(iby ), tsc               , kx(i), ky(j), kz(k), eta, eta_exp)
+            call get_imp_terms_tintg(imp_terms_tintg2(iby ), tsc + 2.d0/3.d0*dt, kx(i), ky(j), kz(k), eta, eta_exp)
+            call get_imp_terms_tintg(imp_terms_tintg0(ibz ), tsc               , kx(i), ky(j), kz(k), eta, eta_exp)
+            call get_imp_terms_tintg(imp_terms_tintg2(ibz ), tsc + 2.d0/3.d0*dt, kx(i), ky(j), kz(k), eta, eta_exp)
+
+
+            ! update rho
+            call eSSPIFRK2(rho_tmp(i,k,j), rho_tmp(i,k,j), rho(i,k,j), &
+               exp_terms(i,k,j,irho), &
+               imp_terms_tintg2(irho), imp_terms_tintg0(irho) &
+            )
+
+            ! update u
+            call eSSPIFRK2(mx_tmp(i,k,j), mx_tmp(i,k,j), mx(i,k,j), &
+               exp_terms(i,k,j,imx), &
+               imp_terms_tintg2(imx), imp_terms_tintg0(imx) &
+            )
+            call eSSPIFRK2(my_tmp(i,k,j), my_tmp(i,k,j), my(i,k,j), &
+               exp_terms(i,k,j,imy), &
+               imp_terms_tintg2(imy), imp_terms_tintg0(imy) &
+            )
+            call eSSPIFRK2(mz_tmp(i,k,j), mz_tmp(i,k,j), mz(i,k,j), &
+               exp_terms(i,k,j,imz), &
+               imp_terms_tintg2(imz), imp_terms_tintg0(imz) &
+            )
+
+            ! update b
+            call eSSPIFRK2(bx_tmp(i,k,j), bx_tmp(i,k,j), bx(i,k,j), &
+               exp_terms(i,k,j,ibx), &
+               imp_terms_tintg2(ibx), imp_terms_tintg0(ibx) &
+            )
+            call eSSPIFRK2(by_tmp(i,k,j), by_tmp(i,k,j), by(i,k,j), &
+               exp_terms(i,k,j,iby), &
+               imp_terms_tintg2(iby), imp_terms_tintg0(iby) &
+            )
+            call eSSPIFRK2(bz_tmp(i,k,j), bz_tmp(i,k,j), bz(i,k,j), &
+               exp_terms(i,k,j,ibz), &
+               imp_terms_tintg2(ibz), imp_terms_tintg0(ibz) &
+            )
+          enddo
+        enddo
+      enddo
+      !$omp end parallel do
+
+      !---------------  RK 3rd step  ---------------
+      ! Calcualte nonlinear terms
+      if(nonlinear) call get_nonlinear_terms(rho_tmp, mx_tmp, my_tmp, mz_tmp, bx_tmp, by_tmp, bz_tmp, .false.)
+
+      !$omp parallel do private(i, k) schedule(static)
+      do j = iky_st, iky_en
+        do k = ikz_st, ikz_en
+          do i = ikx_st, ikx_en
+
+            ! Calculate explicit terms
+            call get_ext_terms(exp_terms(i,k,j,:), &
+                               mx_tmp(i,k,j), my_tmp(i,k,j), mz_tmp(i,k,j), bx_tmp(i,k,j), by_tmp(i,k,j), bz_tmp(i,k,j), &
+                               flx(i,k,j,:), &
+                               fmx(i,k,j), fmy(i,k,j), fmz(i,k,j), &
+                               kxt(i,j), ky(j), kz(k))
+
+            ! Calculate time integral of explicit terms
+            call get_imp_terms_tintg(imp_terms_tintg0(irho), tsc               , kx(i), ky(j), kz(k), lmd, lmd_exp)
+            call get_imp_terms_tintg(imp_terms_tintg2(irho), tsc + 2.d0/3.d0*dt, kx(i), ky(j), kz(k), lmd, lmd_exp)
+            call get_imp_terms_tintg(imp_terms_tintg3(irho), tsc +           dt, kx(i), ky(j), kz(k), lmd, lmd_exp)
+
+            call get_imp_terms_tintg(imp_terms_tintg0(imx) , tsc               , kx(i), ky(j), kz(k), nu , nu_exp )
+            call get_imp_terms_tintg(imp_terms_tintg2(imx) , tsc + 2.d0/3.d0*dt, kx(i), ky(j), kz(k), nu , nu_exp )
+            call get_imp_terms_tintg(imp_terms_tintg3(imx) , tsc +           dt, kx(i), ky(j), kz(k), nu , nu_exp )
+            call get_imp_terms_tintg(imp_terms_tintg0(imy) , tsc               , kx(i), ky(j), kz(k), nu , nu_exp )
+            call get_imp_terms_tintg(imp_terms_tintg2(imy) , tsc + 2.d0/3.d0*dt, kx(i), ky(j), kz(k), nu , nu_exp )
+            call get_imp_terms_tintg(imp_terms_tintg3(imy) , tsc +           dt, kx(i), ky(j), kz(k), nu , nu_exp )
+            call get_imp_terms_tintg(imp_terms_tintg0(imz) , tsc               , kx(i), ky(j), kz(k), nu , nu_exp )
+            call get_imp_terms_tintg(imp_terms_tintg2(imz) , tsc + 2.d0/3.d0*dt, kx(i), ky(j), kz(k), nu , nu_exp )
+            call get_imp_terms_tintg(imp_terms_tintg3(imz) , tsc +           dt, kx(i), ky(j), kz(k), nu , nu_exp )
+                                                           
+            call get_imp_terms_tintg(imp_terms_tintg0(ibx) , tsc               , kx(i), ky(j), kz(k), eta, eta_exp)
+            call get_imp_terms_tintg(imp_terms_tintg2(ibx) , tsc + 2.d0/3.d0*dt, kx(i), ky(j), kz(k), eta, eta_exp)
+            call get_imp_terms_tintg(imp_terms_tintg3(ibx) , tsc +           dt, kx(i), ky(j), kz(k), eta, eta_exp)
+            call get_imp_terms_tintg(imp_terms_tintg0(iby) , tsc               , kx(i), ky(j), kz(k), eta, eta_exp)
+            call get_imp_terms_tintg(imp_terms_tintg2(iby) , tsc + 2.d0/3.d0*dt, kx(i), ky(j), kz(k), eta, eta_exp)
+            call get_imp_terms_tintg(imp_terms_tintg3(iby) , tsc +           dt, kx(i), ky(j), kz(k), eta, eta_exp)
+            call get_imp_terms_tintg(imp_terms_tintg0(ibz) , tsc               , kx(i), ky(j), kz(k), eta, eta_exp)
+            call get_imp_terms_tintg(imp_terms_tintg2(ibz) , tsc + 2.d0/3.d0*dt, kx(i), ky(j), kz(k), eta, eta_exp)
+            call get_imp_terms_tintg(imp_terms_tintg3(ibz) , tsc +           dt, kx(i), ky(j), kz(k), eta, eta_exp)
+
+            ! update rho
+            call eSSPIFRK3(rho_new(i,k,j), rho_tmp(i,k,j), rho(i,k,j), &
+               exp_terms(i,k,j,irho), exp_terms0(i,k,j,irho), &
+               imp_terms_tintg3(irho), imp_terms_tintg2(irho), imp_terms_tintg0(irho) &
+            )
+
+            ! update u
+            call eSSPIFRK3(mx_new(i,k,j), mx_tmp(i,k,j), mx(i,k,j), &
+               exp_terms(i,k,j,imx), exp_terms0(i,k,j,imx), &
+               imp_terms_tintg3(imx), imp_terms_tintg2(imx), imp_terms_tintg0(imx) &
+            )
+            call eSSPIFRK3(my_new(i,k,j), my_tmp(i,k,j), my(i,k,j), &
+               exp_terms(i,k,j,imy), exp_terms0(i,k,j,imy), &
+               imp_terms_tintg3(imy), imp_terms_tintg2(imy), imp_terms_tintg0(imy) &
+            )
+            call eSSPIFRK3(mz_new(i,k,j), mz_tmp(i,k,j), mz(i,k,j), &
+               exp_terms(i,k,j,imz), exp_terms0(i,k,j,imz), &
+               imp_terms_tintg3(imz), imp_terms_tintg2(imz), imp_terms_tintg0(imz) &
+            )
+
+            ! update b
+            call eSSPIFRK3(bx_new(i,k,j), bx_tmp(i,k,j), bx(i,k,j), &
+               exp_terms(i,k,j,ibx), exp_terms0(i,k,j,ibx), &
+               imp_terms_tintg3(ibx), imp_terms_tintg2(ibx), imp_terms_tintg0(ibx) &
+            )
+            call eSSPIFRK3(by_new(i,k,j), by_tmp(i,k,j), by(i,k,j), &
+               exp_terms(i,k,j,iby), exp_terms0(i,k,j,iby), &
+               imp_terms_tintg3(iby), imp_terms_tintg2(iby), imp_terms_tintg0(iby) &
+            )
+            call eSSPIFRK3(bz_new(i,k,j), bz_tmp(i,k,j), bz(i,k,j), &
+               exp_terms(i,k,j,ibz), exp_terms0(i,k,j,ibz), &
+               imp_terms_tintg3(ibz), imp_terms_tintg2(ibz), imp_terms_tintg0(ibz) &
+            )
+          enddo
+        enddo
+      enddo
+      !$omp end parallel do
+
+      ! save fields at the previous step
+      !$omp workshare
+      rho_old = rho
+       mx_old = mx
+       my_old = my
+       mz_old = mz
+       bx_old = bx
+       by_old = by
+       bz_old = bz
+      !$omp end workshare
+
+      if (driven) then
+        !$omp workshare
+        fmx_old = fmx
+        fmy_old = fmy
+        fmz_old = fmz
+        !$omp end workshare
+      endif
     endif
 
-    ! 1st order 
-    if(counter == 1) then
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v                  For Gear3                  v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    if(time_step_scheme == 'gear3') then
+      ! Calcualte force terms
+      if (driven) then
+        call update_force(dt)
+        call get_force('mx', fmx)
+        call get_force('my', fmy)
+        call get_force('mz', fmz)
+      endif
+
+      ! Calcualte nonlinear terms
+      if(nonlinear) call get_nonlinear_terms(rho, mx, my, mz, bx, by, bz, .true.)
+
       !$omp parallel do private(i, k) schedule(static)
       do j = iky_st, iky_en
         do k = ikz_st, ikz_en
           do i = ikx_st, ikx_en
-            nl_rho(i,k,j) = -zi*( kxt(i,j)*mx(i,k,j) &
-                                + ky(j)   *my(i,k,j) &
-                                + kz(k)   *mz(i,k,j) )
 
-            ! div {rho*uu - bb + [(cs^2/va^2)*rho + b^2/2]*I}
-            nl_mx(i,k,j)  = -zi*(  kxt(i,j)*flx(i,k,j,iflx_mxx) &
-                                 + ky(j)   *flx(i,k,j,iflx_mxy) &
-                                 + kz(k)   *flx(i,k,j,iflx_mxz) )
-                                                          
-            nl_my(i,k,j)  = -zi*(  kxt(i,j)*flx(i,k,j,iflx_mxy) &
-                                 + ky(j)   *flx(i,k,j,iflx_myy) &
-                                 + kz(k)   *flx(i,k,j,iflx_myz) )
-                                                          
-            nl_mz(i,k,j)  = -zi*(  kxt(i,j)*flx(i,k,j,iflx_mxz) &
-                                 + ky(j)   *flx(i,k,j,iflx_myz) &
-                                 + kz(k)   *flx(i,k,j,iflx_mzz) )
+            ! Calculate explicit terms
+            call get_ext_terms(exp_terms(i,k,j,:), &
+                               mx(i,k,j), my(i,k,j), mz(i,k,j), bx(i,k,j), by(i,k,j), bz(i,k,j), &
+                               flx(i,k,j,:), &
+                               fmx(i,k,j), fmy(i,k,j), fmz(i,k,j), &
+                               kxt(i,j), ky(j), kz(k))
 
-            ! curl (b x u)
-            nl_bx(i,k,j)  = -zi*(  ky(j)   *flx(i,k,j,iflx_bz ) &
-                                 - kz(k)   *flx(i,k,j,iflx_by ) )
-                                                          
-            nl_by(i,k,j)  = -zi*(  kz(k)   *flx(i,k,j,iflx_bx ) &
-                                 - kxt(i,j)*flx(i,k,j,iflx_bz ) )
-                                                          
-            nl_bz(i,k,j)  = -zi*(  kxt(i,j)*flx(i,k,j,iflx_by ) &
-                                 - ky(j)   *flx(i,k,j,iflx_bx ) )
+            ! 1st order 
+            if(counter == 1) then
+              ! update rho
+              call gear1(rho_new(i,k,j), rho(i,k,j), &
+                 exp_terms(i,k,j,irho), &
+                 lmd*(k2t(i,k,j)/k2_max)**lmd_exp &
+              )
 
+              ! update m
+              call gear1(mx_new(i,k,j), mx(i,k,j), &
+                 exp_terms(i,k,j,imx), &
+                 nu*(k2t(i,k,j)/k2_max)**nu_exp &
+              )
+              call gear1(my_new(i,k,j), my(i,k,j), &
+                 exp_terms(i,k,j,imy), &
+                 nu*(k2t(i,k,j)/k2_max)**nu_exp &
+              )
+              call gear1(mz_new(i,k,j), mz(i,k,j), &
+                 exp_terms(i,k,j,imz), &
+                 nu*(k2t(i,k,j)/k2_max)**nu_exp &
+              )
 
-            ! update rho
-            call gear1(dt, rho_new(i,k,j), rho(i,k,j), &
-               nl_rho(i,k,j), &
-               lmd*(k2t(i,k,j)/k2_max)**lmd_exp &
-            )
+              ! update b
+              call gear1(bx_new(i,k,j), bx(i,k,j), &
+                 exp_terms(i,k,j,ibx), &
+                 eta*(k2t(i,k,j)/k2_max)**eta_exp &
+              )
+              call gear1(by_new(i,k,j), by(i,k,j), &
+                 exp_terms(i,k,j,iby), &
+                 eta*(k2t(i,k,j)/k2_max)**eta_exp &
+              )
+              call gear1(bz_new(i,k,j), bz(i,k,j), &
+                 exp_terms(i,k,j,ibz), &
+                 eta*(k2t(i,k,j)/k2_max)**eta_exp &
+              )
 
-            ! update m
-            call gear1(dt, mx_new(i,k,j), mx(i,k,j), &
-               nl_mx(i,k,j) + fmx(i,k,j) + 2.d0*shear_flg*my(i,k,j), &
-               nu*(k2t(i,k,j)/k2_max)**nu_exp &
-            )
-            call gear1(dt, my_new(i,k,j), my(i,k,j), &
-               nl_my(i,k,j) + fmy(i,k,j) - (2.d0 - q)*shear_flg*mx(i,k,j), &
-               nu*(k2t(i,k,j)/k2_max)**nu_exp &
-            )
-            call gear1(dt, mz_new(i,k,j), mz(i,k,j), &
-               nl_mz(i,k,j) + fmz(i,k,j), &
-               nu*(k2t(i,k,j)/k2_max)**nu_exp &
-            )
+            ! 2nd order 
+            elseif(counter == 2) then
+              ! update rho
+              call gear2(rho_new(i,k,j), rho(i,k,j), rho_old(i,k,j), &
+                 exp_terms    (i,k,j,irho), &
+                 exp_terms_old(i,k,j,irho), &
+                 lmd*(k2t(i,k,j)/k2_max)**lmd_exp &
+              )
 
-            ! update b
-            call gear1(dt, bx_new(i,k,j), bx(i,k,j), &
-               nl_bx(i,k,j), &
-               eta*(k2t(i,k,j)/k2_max)**eta_exp &
-            )
-            call gear1(dt, by_new(i,k,j), by(i,k,j), &
-               nl_by(i,k,j) - q*shear_flg*bx(i,k,j), &
-               eta*(k2t(i,k,j)/k2_max)**eta_exp &
-            )
-            call gear1(dt, bz_new(i,k,j), bz(i,k,j), &
-               nl_bz(i,k,j), &
-               eta*(k2t(i,k,j)/k2_max)**eta_exp &
-            )
+              ! update m
+              call gear2(mx_new(i,k,j), mx(i,k,j), mx_old(i,k,j), &
+                 exp_terms    (i,k,j,imx), &
+                 exp_terms_old(i,k,j,imx), &
+                 nu*(k2t(i,k,j)/k2_max)**nu_exp &
+              )
+              call gear2(my_new(i,k,j), my(i,k,j), my_old(i,k,j), &
+                 exp_terms    (i,k,j,imy), &
+                 exp_terms_old(i,k,j,imy), &
+                 nu*(k2t(i,k,j)/k2_max)**nu_exp &
+              )
+              call gear2(mz_new(i,k,j), mz(i,k,j), mz_old(i,k,j), &
+                 exp_terms    (i,k,j,imz), &
+                 exp_terms_old(i,k,j,imz), &
+                 nu*(k2t(i,k,j)/k2_max)**nu_exp &
+              )
+
+              ! update b
+              call gear2(bx_new(i,k,j), bx(i,k,j), bx_old(i,k,j), &
+                 exp_terms    (i,k,j,ibx), &
+                 exp_terms_old(i,k,j,ibx), &
+                 eta*(k2t(i,k,j)/k2_max)**eta_exp &
+              )
+              call gear2(by_new(i,k,j), by(i,k,j), by_old(i,k,j), &
+                 exp_terms    (i,k,j,iby), &
+                 exp_terms_old(i,k,j,iby), &
+                 eta*(k2t(i,k,j)/k2_max)**eta_exp &
+              )
+              call gear2(bz_new(i,k,j), bz(i,k,j), bz_old(i,k,j), &
+                 exp_terms    (i,k,j,ibz), &
+                 exp_terms_old(i,k,j,ibz), &
+                 eta*(k2t(i,k,j)/k2_max)**eta_exp &
+              )
+
+            ! 3rd order 
+            else
+              ! update rho
+              call gear3(rho_new(i,k,j), rho(i,k,j), rho_old(i,k,j), rho_old2(i,k,j), &
+                 exp_terms     (i,k,j,irho), &
+                 exp_terms_old (i,k,j,irho), &
+                 exp_terms_old2(i,k,j,irho), &
+                 lmd*(k2t(i,k,j)/k2_max)**lmd_exp &
+              )
+
+              ! update m
+              call gear3(mx_new(i,k,j), mx(i,k,j), mx_old(i,k,j), mx_old2(i,k,j), &
+                 exp_terms     (i,k,j,imx), &
+                 exp_terms_old (i,k,j,imx), &
+                 exp_terms_old2(i,k,j,imx), &
+                 nu*(k2t(i,k,j)/k2_max)**nu_exp &
+              )
+              call gear3(my_new(i,k,j), my(i,k,j), my_old(i,k,j), my_old2(i,k,j), &
+                 exp_terms     (i,k,j,imy), &
+                 exp_terms_old (i,k,j,imy), &
+                 exp_terms_old2(i,k,j,imy), &
+                 nu*(k2t(i,k,j)/k2_max)**nu_exp &
+              )
+              call gear3(mz_new(i,k,j), mz(i,k,j), mz_old(i,k,j), mz_old2(i,k,j), &
+                 exp_terms     (i,k,j,imz), &
+                 exp_terms_old (i,k,j,imz), &
+                 exp_terms_old2(i,k,j,imz), &
+                 nu*(k2t(i,k,j)/k2_max)**nu_exp &
+              )
+
+              ! update b
+              call gear3(bx_new(i,k,j), bx(i,k,j), bx_old(i,k,j), bx_old2(i,k,j), &
+                 exp_terms     (i,k,j,ibx), &
+                 exp_terms_old (i,k,j,ibx), &
+                 exp_terms_old2(i,k,j,ibx), &
+                 eta*(k2t(i,k,j)/k2_max)**eta_exp &
+              )
+              call gear3(by_new(i,k,j), by(i,k,j), by_old(i,k,j), by_old2(i,k,j), &
+                 exp_terms     (i,k,j,iby), &
+                 exp_terms_old (i,k,j,iby), &
+                 exp_terms_old2(i,k,j,iby), &
+                 eta*(k2t(i,k,j)/k2_max)**eta_exp &
+              )
+              call gear3(bz_new(i,k,j), bz(i,k,j), bz_old(i,k,j), bz_old2(i,k,j), &
+                 exp_terms     (i,k,j,ibz), &
+                 exp_terms_old (i,k,j,ibz), &
+                 exp_terms_old2(i,k,j,ibz), &
+                 eta*(k2t(i,k,j)/k2_max)**eta_exp &
+              )
+            endif
           enddo
         enddo
       enddo
       !$omp end parallel do
 
-      ! values at the previous steps
+      if(counter <= 2) counter = counter + 1
+
+      ! save fields at the previous steps
       !$omp workshare
-      rho_old1 = rho
-      nl_rho_old1 = nl_rho
+      rho_old2 = rho_old 
+      rho_old  = rho
 
-      mx_old1 = mx
-      nl_mx_old1 = nl_mx
+      mx_old2 = mx_old 
+      mx_old  = mx
 
-      my_old1 = my
-      nl_my_old1 = nl_my
+      my_old2 = my_old 
+      my_old  = my
 
-      mz_old1 = mz
-      nl_mz_old1 = nl_mz
+      mz_old2 = mz_old 
+      mz_old  = mz
 
-      bx_old1 = bx
-      nl_bx_old1 = nl_bx
+      bx_old2 = bx_old 
+      bx_old  = bx
 
-      by_old1 = by
-      nl_by_old1 = nl_by
+      by_old2 = by_old 
+      by_old  = by
 
-      bz_old1 = bz
-      nl_bz_old1 = nl_bz
+      bz_old2 = bz_old 
+      bz_old  = bz
+
+      exp_terms_old2 = exp_terms_old
+      exp_terms_old  = exp_terms
       !$omp end workshare
 
       if (driven) then
         !$omp workshare
-        fmx_old1 = fmx
-        fmy_old1 = fmy
-        fmz_old1 = fmz
+        fmx_old2 = fmx_old 
+        fmx_old  = fmx
+
+        fmy_old2 = fmy_old 
+        fmy_old  = fmy
+
+        fmz_old2 = fmz_old 
+        fmz_old  = fmz
         !$omp end workshare
       endif
 
       if(shear) then
         !$omp workshare
-        kxt_old1 = kxt
-        !$omp end workshare
-      endif
-
-      counter = counter + 1
-    ! 2nd order 
-    elseif(counter == 2) then
-      !$omp parallel do private(i, k) schedule(static)
-      do j = iky_st, iky_en
-        do k = ikz_st, ikz_en
-          do i = ikx_st, ikx_en
-            nl_rho(i,k,j) = -zi*( kxt(i,j)*mx(i,k,j) &
-                                + ky(j)   *my(i,k,j) &
-                                + kz(k)   *mz(i,k,j) )
-
-            ! div {rho*uu - bb + [(cs^2/va^2)*rho + b^2/2]*I}
-            nl_mx(i,k,j)  = -zi*(  kxt(i,j)*flx(i,k,j,iflx_mxx) &
-                                 + ky(j)   *flx(i,k,j,iflx_mxy) &
-                                 + kz(k)   *flx(i,k,j,iflx_mxz) )
-                                                          
-            nl_my(i,k,j)  = -zi*(  kxt(i,j)*flx(i,k,j,iflx_mxy) &
-                                 + ky(j)   *flx(i,k,j,iflx_myy) &
-                                 + kz(k)   *flx(i,k,j,iflx_myz) )
-                                                          
-            nl_mz(i,k,j)  = -zi*(  kxt(i,j)*flx(i,k,j,iflx_mxz) &
-                                 + ky(j)   *flx(i,k,j,iflx_myz) &
-                                 + kz(k)   *flx(i,k,j,iflx_mzz) )
-
-            ! curl (b x u)
-            nl_bx(i,k,j)  = -zi*(  ky(j)   *flx(i,k,j,iflx_bz ) &
-                                 - kz(k)   *flx(i,k,j,iflx_by ) )
-                                                          
-            nl_by(i,k,j)  = -zi*(  kz(k)   *flx(i,k,j,iflx_bx ) &
-                                 - kxt(i,j)*flx(i,k,j,iflx_bz ) )
-                                                          
-            nl_bz(i,k,j)  = -zi*(  kxt(i,j)*flx(i,k,j,iflx_by ) &
-                                 - ky(j)   *flx(i,k,j,iflx_bx ) )
-
-
-            ! update rho
-            call gear2(dt, rho_new(i,k,j), rho(i,k,j), rho_old1(i,k,j), &
-               nl_rho     (i,k,j), &
-               nl_rho_old1(i,k,j), &
-               lmd*(k2t(i,k,j)/k2_max)**lmd_exp &
-            )
-
-            ! update m
-            call gear2(dt, mx_new(i,k,j), mx(i,k,j), mx_old1(i,k,j), &
-               nl_mx     (i,k,j) + fmx     (i,k,j) + 2.d0*shear_flg*my     (i,k,j), &
-               nl_mx_old1(i,k,j) + fmx_old1(i,k,j) + 2.d0*shear_flg*my_old1(i,k,j), &
-               nu*(k2t(i,k,j)/k2_max)**nu_exp &
-            )
-            call gear2(dt, my_new(i,k,j), my(i,k,j), my_old1(i,k,j), &
-               nl_my     (i,k,j) + fmy     (i,k,j) - (2.d0 - q)*shear_flg*mx     (i,k,j), &
-               nl_my_old1(i,k,j) + fmy_old1(i,k,j) - (2.d0 - q)*shear_flg*mx_old1(i,k,j), &
-               nu*(k2t(i,k,j)/k2_max)**nu_exp &
-            )
-            call gear2(dt, mz_new(i,k,j), mz(i,k,j), mz_old1(i,k,j), &
-               nl_mz     (i,k,j) + fmz     (i,k,j), &
-               nl_mz_old1(i,k,j) + fmz_old1(i,k,j), &
-               nu*(k2t(i,k,j)/k2_max)**nu_exp &
-            )
-
-            ! update b
-            call gear2(dt, bx_new(i,k,j), bx(i,k,j), bx_old1(i,k,j), &
-               nl_bx     (i,k,j), &
-               nl_bx_old1(i,k,j), &
-               eta*(k2t(i,k,j)/k2_max)**eta_exp &
-            )
-            call gear2(dt, by_new(i,k,j), by(i,k,j), by_old1(i,k,j), &
-               nl_by     (i,k,j) - q*shear_flg*bx     (i,k,j), &
-               nl_by_old1(i,k,j) - q*shear_flg*bx_old1(i,k,j), &
-               eta*(k2t(i,k,j)/k2_max)**eta_exp &
-            )
-            call gear2(dt, bz_new(i,k,j), bz(i,k,j), bz_old1(i,k,j), &
-               nl_bz     (i,k,j), &
-               nl_bz_old1(i,k,j), &
-               eta*(k2t(i,k,j)/k2_max)**eta_exp &
-            )
-          enddo
-        enddo
-      enddo
-      !$omp end parallel do
-
-      ! values at the previous steps
-      !$omp workshare
-      rho_old2 = rho_old1
-      rho_old1 = rho
-      nl_rho_old2 = nl_rho_old1
-      nl_rho_old1 = nl_rho
-
-      mx_old2 = mx_old1
-      mx_old1 = mx
-      nl_mx_old2 = nl_mx_old1
-      nl_mx_old1 = nl_mx
-
-      my_old2 = my_old1
-      my_old1 = my
-      nl_my_old2 = nl_my_old1
-      nl_my_old1 = nl_my
-
-      mz_old2 = mz_old1
-      mz_old1 = mz
-      nl_mz_old2 = nl_mz_old1
-      nl_mz_old1 = nl_mz
-
-      bx_old2 = bx_old1
-      bx_old1 = bx
-      nl_bx_old2 = nl_bx_old1
-      nl_bx_old1 = nl_bx
-
-      by_old2 = by_old1
-      by_old1 = by
-      nl_by_old2 = nl_by_old1
-      nl_by_old1 = nl_by
-
-      bz_old2 = bz_old1
-      bz_old1 = bz
-      nl_bz_old2 = nl_bz_old1
-      nl_bz_old1 = nl_bz
-      !$omp end workshare
-
-      if (driven) then
-        !$omp workshare
-        fmx_old2 = fmx_old1
-        fmx_old1 = fmx
-
-        fmy_old2 = fmy_old1
-        fmy_old1 = fmy
-
-        fmz_old2 = fmz_old1
-        fmz_old1 = fmz
-        !$omp end workshare
-      endif
-
-      if(shear) then
-        !$omp workshare
-        kxt_old2 = kxt_old1
-        kxt_old1 = kxt
-        !$omp end workshare
-      endif
-
-      counter = counter + 1
-    ! 3rd order 
-    else
-      !$omp parallel do private(i, k) schedule(static)
-      do j = iky_st, iky_en
-        do k = ikz_st, ikz_en
-          do i = ikx_st, ikx_en
-            nl_rho(i,k,j) = -zi*( kxt(i,j)*mx(i,k,j) &
-                                + ky(j)   *my(i,k,j) &
-                                + kz(k)   *mz(i,k,j) )
-
-            ! div {rho*uu - bb + [(cs^2/va^2)*rho + b^2/2]*I}
-            nl_mx(i,k,j)  = -zi*(  kxt(i,j)*flx(i,k,j,iflx_mxx) &
-                                 + ky(j)   *flx(i,k,j,iflx_mxy) &
-                                 + kz(k)   *flx(i,k,j,iflx_mxz) )
-                                                          
-            nl_my(i,k,j)  = -zi*(  kxt(i,j)*flx(i,k,j,iflx_mxy) &
-                                 + ky(j)   *flx(i,k,j,iflx_myy) &
-                                 + kz(k)   *flx(i,k,j,iflx_myz) )
-                                                          
-            nl_mz(i,k,j)  = -zi*(  kxt(i,j)*flx(i,k,j,iflx_mxz) &
-                                 + ky(j)   *flx(i,k,j,iflx_myz) &
-                                 + kz(k)   *flx(i,k,j,iflx_mzz) )
-
-            ! curl (b x u)
-            nl_bx(i,k,j)  = -zi*(  ky(j)   *flx(i,k,j,iflx_bz ) &
-                                 - kz(k)   *flx(i,k,j,iflx_by ) )
-                                                          
-            nl_by(i,k,j)  = -zi*(  kz(k)   *flx(i,k,j,iflx_bx ) &
-                                 - kxt(i,j)*flx(i,k,j,iflx_bz ) )
-                                                          
-            nl_bz(i,k,j)  = -zi*(  kxt(i,j)*flx(i,k,j,iflx_by ) &
-                                 - ky(j)   *flx(i,k,j,iflx_bx ) )
-
-
-            ! update rho
-            call gear3(dt, rho_new(i,k,j), rho(i,k,j), rho_old1(i,k,j), rho_old2(i,k,j), &
-               nl_rho     (i,k,j), &
-               nl_rho_old1(i,k,j), &
-               nl_rho_old2(i,k,j), &
-               lmd*(k2t(i,k,j)/k2_max)**lmd_exp &
-            )
-
-            ! update m
-            call gear3(dt, mx_new(i,k,j), mx(i,k,j), mx_old1(i,k,j), mx_old2(i,k,j), &
-               nl_mx     (i,k,j) + fmx     (i,k,j) + 2.d0*shear_flg*my     (i,k,j), &
-               nl_mx_old1(i,k,j) + fmx_old1(i,k,j) + 2.d0*shear_flg*my_old1(i,k,j), &
-               nl_mx_old2(i,k,j) + fmx_old2(i,k,j) + 2.d0*shear_flg*my_old2(i,k,j), &
-               nu*(k2t(i,k,j)/k2_max)**nu_exp &
-            )
-            call gear3(dt, my_new(i,k,j), my(i,k,j), my_old1(i,k,j), my_old2(i,k,j), &
-               nl_my     (i,k,j) + fmy     (i,k,j) - (2.d0 - q)*shear_flg*mx     (i,k,j), &
-               nl_my_old1(i,k,j) + fmy_old1(i,k,j) - (2.d0 - q)*shear_flg*mx_old1(i,k,j), &
-               nl_my_old2(i,k,j) + fmy_old2(i,k,j) - (2.d0 - q)*shear_flg*mx_old2(i,k,j), &
-               nu*(k2t(i,k,j)/k2_max)**nu_exp &
-            )
-            call gear3(dt, mz_new(i,k,j), mz(i,k,j), mz_old1(i,k,j), mz_old2(i,k,j), &
-               nl_mz     (i,k,j) + fmz     (i,k,j), &
-               nl_mz_old1(i,k,j) + fmz_old1(i,k,j), &
-               nl_mz_old2(i,k,j) + fmz_old2(i,k,j), &
-               nu*(k2t(i,k,j)/k2_max)**nu_exp &
-            )
-
-            ! update b
-            call gear3(dt, bx_new(i,k,j), bx(i,k,j), bx_old1(i,k,j), bx_old2(i,k,j), &
-               nl_bx     (i,k,j), &
-               nl_bx_old1(i,k,j), &
-               nl_bx_old2(i,k,j), &
-               eta*(k2t(i,k,j)/k2_max)**eta_exp &
-            )
-            call gear3(dt, by_new(i,k,j), by(i,k,j), by_old1(i,k,j), by_old2(i,k,j), &
-               nl_by     (i,k,j) - q*shear_flg*bx     (i,k,j), &
-               nl_by_old1(i,k,j) - q*shear_flg*bx_old1(i,k,j), &
-               nl_by_old2(i,k,j) - q*shear_flg*bx_old2(i,k,j), &
-               eta*(k2t(i,k,j)/k2_max)**eta_exp &
-            )
-            call gear3(dt, bz_new(i,k,j), bz(i,k,j), bz_old1(i,k,j), bz_old2(i,k,j), &
-               nl_bz     (i,k,j), &
-               nl_bz_old1(i,k,j), &
-               nl_bz_old2(i,k,j), &
-               eta*(k2t(i,k,j)/k2_max)**eta_exp &
-            )
-
-          enddo
-        enddo
-      enddo
-      !$omp end parallel do
-
-      ! values at the previous steps
-      !$omp workshare
-      rho_old2 = rho_old1
-      rho_old1 = rho
-      nl_rho_old2 = nl_rho_old1
-      nl_rho_old1 = nl_rho
-
-      mx_old2 = mx_old1
-      mx_old1 = mx
-      nl_mx_old2 = nl_mx_old1
-      nl_mx_old1 = nl_mx
-
-      my_old2 = my_old1
-      my_old1 = my
-      nl_my_old2 = nl_my_old1
-      nl_my_old1 = nl_my
-
-      mz_old2 = mz_old1
-      mz_old1 = mz
-      nl_mz_old2 = nl_mz_old1
-      nl_mz_old1 = nl_mz
-
-      bx_old2 = bx_old1
-      bx_old1 = bx
-      nl_bx_old2 = nl_bx_old1
-      nl_bx_old1 = nl_bx
-
-      by_old2 = by_old1
-      by_old1 = by
-      nl_by_old2 = nl_by_old1
-      nl_by_old1 = nl_by
-
-      bz_old2 = bz_old1
-      bz_old1 = bz
-      nl_bz_old2 = nl_bz_old1
-      nl_bz_old1 = nl_bz
-      !$omp end workshare
-
-      if (driven) then
-        !$omp workshare
-        fmx_old2 = fmx_old1
-        fmx_old1 = fmx
-
-        fmy_old2 = fmy_old1
-        fmy_old1 = fmy
-
-        fmz_old2 = fmz_old1
-        fmz_old1 = fmz
-        !$omp end workshare
-      endif
-
-      if(shear) then
-        !$omp workshare
-        kxt_old2 = kxt_old1
-        kxt_old1 = kxt
+        kxt_old2 = kxt_old 
+        kxt_old  = kxt
         !$omp end workshare
       endif
     endif
@@ -593,70 +700,25 @@ contains
     use params, only: q
     use shearing_box, only: shear_flg, tsc, k2t, k2t_inv
     use file, only: open_output_file
+    use params, only: time_step_scheme
     implicit none
     complex(r8), allocatable, dimension(:,:,:) :: src
     integer :: i, j, k
 
     allocate(src(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0,0.d0))
-    allocate(rho_new    , source=src)
-    allocate(rho_old2   , source=src)
 
-    allocate(mx_new     , source=src)
-    allocate(mx_old2    , source=src)
-                                                               
-    allocate(my_new     , source=src)
-    allocate(my_old2    , source=src)
-                                                               
-    allocate(mz_new     , source=src)
-    allocate(mz_old2    , source=src)
-                                                               
-    allocate(bx_new     , source=src)
-    allocate(bx_old2    , source=src)
-                                                               
-    allocate(by_new     , source=src)
-    allocate(by_old2    , source=src)
-                                                               
-    allocate(bz_new     , source=src)
-    allocate(bz_old2    , source=src)
-                                                               
-    allocate(nl_rho     , source=src)
-    allocate(nl_rho_old1, source=src)
-    allocate(nl_rho_old2, source=src)
-                                                               
-    allocate(nl_mx      , source=src)
-    allocate(nl_mx_old1 , source=src)
-    allocate(nl_mx_old2 , source=src)
-                                                               
-    allocate(nl_my      , source=src)
-    allocate(nl_my_old1 , source=src)
-    allocate(nl_my_old2 , source=src)
-                                                               
-    allocate(nl_mz      , source=src)
-    allocate(nl_mz_old1 , source=src)
-    allocate(nl_mz_old2 , source=src)
-                                                               
-    allocate(nl_bx      , source=src)
-    allocate(nl_bx_old1 , source=src)
-    allocate(nl_bx_old2 , source=src)
-                                                               
-    allocate(nl_by      , source=src)
-    allocate(nl_by_old1 , source=src)
-    allocate(nl_by_old2 , source=src)
-                                                               
-    allocate(nl_bz      , source=src)
-    allocate(nl_bz_old1 , source=src)
-    allocate(nl_bz_old2 , source=src)
+    allocate(rho_new, source=src)
+    allocate(mx_new , source=src)
+    allocate(my_new , source=src)
+    allocate(mz_new , source=src)
+    allocate(bx_new , source=src)
+    allocate(by_new , source=src)
+    allocate(bz_new , source=src)
 
-    allocate(fmx_old2   , source=src)
-    allocate(fmy_old2   , source=src)
-    allocate(fmz_old2   , source=src)
-    deallocate(src)
+    allocate(flx      (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nftran )); flx       = 0.d0
+    allocate(exp_terms(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nfields)); exp_terms = 0.d0
 
-    allocate(flx(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nftran)); flx = 0.d0
-
-    allocate(kxt     (ikx_st:ikx_en, iky_st:iky_en))
-    allocate(kxt_old1(ikx_st:ikx_en, iky_st:iky_en))
-    allocate(kxt_old2(ikx_st:ikx_en, iky_st:iky_en))
+    allocate(kxt      (ikx_st:ikx_en, iky_st:iky_en))
 
     !$omp parallel do private(i, k) schedule(static)
     do j = iky_st, iky_en
@@ -674,8 +736,45 @@ contains
     enddo
     !$omp end parallel do
 
-    kxt_old1 = kxt
-    kxt_old2 = kxt
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v                For eSSPIFRK3                v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    if(time_step_scheme == 'eSSPIFRK3') then
+      allocate(rho_tmp, source=src)
+      allocate( mx_tmp, source=src)
+      allocate( my_tmp, source=src)
+      allocate( mz_tmp, source=src)
+      allocate( bx_tmp, source=src)
+      allocate( by_tmp, source=src)
+      allocate( bz_tmp, source=src)
+
+      allocate(exp_terms0(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nfields)); exp_terms0  = 0.d0
+    endif
+
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v                  For Gear3                  v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    if(time_step_scheme == 'gear3') then
+      allocate(rho_old2, source=src)
+      allocate( mx_old2, source=src)
+      allocate( my_old2, source=src)
+      allocate( mz_old2, source=src)
+      allocate( bx_old2, source=src)
+      allocate( by_old2, source=src)
+      allocate( bz_old2, source=src)
+
+      allocate(fmx_old2, source=src)
+      allocate(fmy_old2, source=src)
+      allocate(fmz_old2, source=src)
+
+      allocate(exp_terms_old (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nfields)); exp_terms_old  = 0.d0
+      allocate(exp_terms_old2(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nfields)); exp_terms_old2 = 0.d0
+
+      allocate(kxt_old (ikx_st:ikx_en, iky_st:iky_en)); kxt_old  = kxt
+      allocate(kxt_old2(ikx_st:ikx_en, iky_st:iky_en)); kxt_old2 = kxt
+    endif
+
+    deallocate(src)
 
     call open_output_file (max_vel_unit, 'max_vel.dat')
 
@@ -688,14 +787,11 @@ contains
 !! @brief   Calculate nonlinear terms via
 !!          1. Calculate grad in Fourier space
 !!          2. Inverse FFT
-!!          3. Calculate poisson brackets 
+!!          3. Calculate nonlinear terms 
 !!             in real space
 !!          4. Forward FFT
 !-----------------------------------------------!
-  subroutine get_nonlinear_terms
-    use fields, only: rho
-    use fields, only: mx, my, mz
-    use fields, only: bx, by, bz
+  subroutine get_nonlinear_terms(rho, mx, my, mz, bx, by, bz, dt_reset)
     use grid, only: nlx, nly, nlz
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
@@ -705,6 +801,9 @@ contains
     use time, only: cfl, dt, tt, reset_method, increase_dt
     use time_stamp, only: put_time_stamp, timer_nonlinear_terms, timer_fft
     implicit none
+    complex(r8), dimension (ikx_st:ikx_en, &
+                            ikz_st:ikz_en, &
+                            iky_st:iky_en), intent(in) :: rho, mx, my, mz, bx, by, bz
 
     complex(r8), allocatable, dimension(:,:,:,:) :: wbk
     real   (r8), allocatable, dimension(:,:,:,:) :: wb , wf 
@@ -712,15 +811,16 @@ contains
     real   (r8), allocatable, dimension(:,:,:)   :: cfx2_r, cfy2_r, cfz2_r ! Fast mode phase speed
     real   (r8), allocatable, dimension(:,:,:)   :: src
     real   (r8) :: vax2_r, vay2_r, vaz2_r ! Alfven speed
+    logical, intent(in) :: dt_reset
 
     integer :: i, j, k
     real   (r8) :: max_vel, dt_cfl, dt_digit
 
     if (proc0) call put_time_stamp(timer_nonlinear_terms)
 
-    allocate(wbk(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nbtran), source=(0.d0, 0.d0))
-    allocate(wb (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nbtran), source=0.d0)
-    allocate(wf (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nftran), source=0.d0)
+    allocate(wbk(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nfields), source=(0.d0, 0.d0))
+    allocate(wb (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nfields), source=0.d0)
+    allocate(wf (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nftran ), source=0.d0)
 
     allocate(src(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
     allocate(ux_r  , source=src)
@@ -750,7 +850,7 @@ contains
 
     ! 2. Inverse FFT
     if (proc0) call put_time_stamp(timer_fft)
-    call p3dfft_btran_c2r_many(wbk, nk_local_tot, wb, nl_local_tot, nbtran, 'tff')
+    call p3dfft_btran_c2r_many(wbk, nk_local_tot, wb, nl_local_tot, nfields, 'tff')
     if (proc0) call put_time_stamp(timer_fft)
 
     !$omp workshare
@@ -760,85 +860,87 @@ contains
     !$omp end workshare
 
     ! (get max_vel for dt reset)
-    !$omp parallel do private(j, k) schedule(static)
-    do i = ilx_st, ilx_en
-      do k = ilz_st, ilz_en
-        do j = ily_st, ily_en
-          vax2_r = wb(j,k,i,ibx)**2/wb(j,k,i,irho)
-          vay2_r = wb(j,k,i,iby)**2/wb(j,k,i,irho)
-          vaz2_r = wb(j,k,i,ibz)**2/wb(j,k,i,irho)
+    if(dt_reset) then
+      !$omp parallel do private(j, k) schedule(static)
+      do i = ilx_st, ilx_en
+        do k = ilz_st, ilz_en
+          do j = ily_st, ily_en
+            vax2_r = wb(j,k,i,ibx)**2/wb(j,k,i,irho)
+            vay2_r = wb(j,k,i,iby)**2/wb(j,k,i,irho)
+            vaz2_r = wb(j,k,i,ibz)**2/wb(j,k,i,irho)
 
-          cfx2_r(j,k,i) = 0.5d0*(cs2va2 + vax2_r +  vay2_r + vaz2_r  &
-                          + sqrt( (cs2va2 + vax2_r +  vay2_r + vaz2_r)**2 - 4.d0*cs2va2*vax2_r))
-          cfy2_r(j,k,i) = 0.5d0*(cs2va2 + vax2_r +  vay2_r + vaz2_r  &
-                          + sqrt( (cs2va2 + vax2_r +  vay2_r + vaz2_r)**2 - 4.d0*cs2va2*vay2_r))
-          cfz2_r(j,k,i) = 0.5d0*(cs2va2 + vax2_r +  vay2_r + vaz2_r  &
-                          + sqrt( (cs2va2 + vax2_r +  vay2_r + vaz2_r)**2 - 4.d0*cs2va2*vaz2_r))
+            cfx2_r(j,k,i) = 0.5d0*(cs2va2 + vax2_r +  vay2_r + vaz2_r  &
+                            + sqrt( (cs2va2 + vax2_r +  vay2_r + vaz2_r)**2 - 4.d0*cs2va2*vax2_r))
+            cfy2_r(j,k,i) = 0.5d0*(cs2va2 + vax2_r +  vay2_r + vaz2_r  &
+                            + sqrt( (cs2va2 + vax2_r +  vay2_r + vaz2_r)**2 - 4.d0*cs2va2*vay2_r))
+            cfz2_r(j,k,i) = 0.5d0*(cs2va2 + vax2_r +  vay2_r + vaz2_r  &
+                            + sqrt( (cs2va2 + vax2_r +  vay2_r + vaz2_r)**2 - 4.d0*cs2va2*vaz2_r))
+          enddo
         enddo
       enddo
-    enddo
-    !$omp end parallel do
-    max_vel = max( &
-              maxval(abs(ux_r + sqrt(cfx2_r)))*cflx, &
-              maxval(abs(ux_r - sqrt(cfx2_r)))*cflx, &
-              maxval(abs(uy_r + sqrt(cfy2_r)))*cfly, &
-              maxval(abs(uy_r - sqrt(cfy2_r)))*cfly, &
-              maxval(abs(uz_r + sqrt(cfz2_r)))*cflz, &
-              maxval(abs(uz_r - sqrt(cfz2_r)))*cflz  &
-            )
-    call max_allreduce(max_vel)
-    dt_cfl = 1.d0/max_vel
-    if(proc0) then
-      write (unit=max_vel_unit, fmt="(100es30.21)") tt, max_vel
-      call flush(max_vel_unit) 
-    endif
-
-    if(dt_cfl < dt) then
+      !$omp end parallel do
+      max_vel = max( &
+                maxval(abs(ux_r + sqrt(cfx2_r)))*cflx, &
+                maxval(abs(ux_r - sqrt(cfx2_r)))*cflx, &
+                maxval(abs(uy_r + sqrt(cfy2_r)))*cfly, &
+                maxval(abs(uy_r - sqrt(cfy2_r)))*cfly, &
+                maxval(abs(uz_r + sqrt(cfz2_r)))*cflz, &
+                maxval(abs(uz_r - sqrt(cfz2_r)))*cflz  &
+              )
+      call max_allreduce(max_vel)
+      dt_cfl = 1.d0/max_vel
       if(proc0) then
-        print *
-        write (*, '("dt is decreased from ", es12.4e3)', advance='no') dt
+        write (unit=max_vel_unit, fmt="(100es30.21)") tt, max_vel
+        call flush(max_vel_unit) 
       endif
 
-      dt_digit = (log10(dt_cfl)/abs(log10(dt_cfl)))*ceiling(abs(log10(dt_cfl)))
-      dt = floor(dt_cfl*10.d0**(-dt_digit))*10.d0**dt_digit
+      if(dt_cfl < dt) then
+        if(proc0) then
+          print *
+          write (*, '("dt is decreased from ", es12.4e3)', advance='no') dt
+        endif
 
-      if (reset_method == 'multiply') then
-        dt = 0.5d0*dt
-      elseif (reset_method == 'decrement') then
-        dt_digit = (log10(dt)/abs(log10(dt)))*ceiling(abs(log10(dt)))
+        dt_digit = (log10(dt_cfl)/abs(log10(dt_cfl)))*ceiling(abs(log10(dt_cfl)))
+        ! dt = floor(dt_cfl*10.d0**(-dt_digit))*10.d0**dt_digit
 
-        ! when dt = 0.0**01***
-        if (dt*10.d0**(-dt_digit) - 1.0d0 < 1.0d0) then
-          dt = 0.9d0*10.d0**dt_digit
-        else
-          dt = (dt*10.d0**(-dt_digit) - 1.0d0)*10.d0**dt_digit
+        if (reset_method == 'multiply') then
+          dt = 0.5d0*dt
+        elseif (reset_method == 'decrement') then
+          dt_digit = (log10(dt)/abs(log10(dt)))*ceiling(abs(log10(dt)))
+
+          ! when dt = 0.0**01***
+          if (dt*10.d0**(-dt_digit) - 1.0d0 < 1.0d0) then
+            dt = 0.9d0*10.d0**dt_digit
+          else
+            dt = (dt*10.d0**(-dt_digit) - 1.0d0)*10.d0**dt_digit
+          endif
+        endif
+
+        counter = 1
+
+        if(proc0) then
+          print '("  to ", es12.4e3)', dt
+          print *
         endif
       endif
+      if(dt_cfl > 0.d0 .and. dt_cfl > increase_dt .and. dt < increase_dt) then
+        if(proc0) then
+          print *
+          write (*, '("dt is increased from ", es12.4e3)', advance='no') dt
+        endif
 
-      counter = 1
+        dt = increase_dt
 
-      if(proc0) then
-        print '("  to ", es12.4e3)', dt
-        print *
-      endif
-    endif
-    if(dt_cfl > increase_dt .and. dt < increase_dt) then
-      if(proc0) then
-        print *
-        write (*, '("dt is increased from ", es12.4e3)', advance='no') dt
-      endif
+        counter = 1
 
-      dt = increase_dt
-
-      counter = 1
-
-      if(proc0) then
-        print '("  to ", es12.4e3)', dt
-        print *
+        if(proc0) then
+          print '("  to ", es12.4e3)', dt
+          print *
+        endif
       endif
     endif
 
-    ! 3. Calculate poisson brackets in real space
+    ! 3. Calculate nonlinear terms in real space
     !$omp parallel do private(j, k) schedule(static)
     do i = ilx_st, ilx_en
       do k = ilz_st, ilz_en
@@ -882,6 +984,74 @@ contains
 
     if (proc0) call put_time_stamp(timer_nonlinear_terms)
   end subroutine get_nonlinear_terms
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    4 Apr 2022
+!! @brief   Calculate explicit terms
+!-----------------------------------------------!
+  subroutine get_ext_terms(exp_terms, &
+                           mx, my, mz, bx, by, bz, &
+                           flx, &
+                           fmx, fmy, fmz, &
+                           kxt, ky, kz)
+    use params, only: zi, q
+    use shearing_box, only: shear_flg
+    implicit none
+    complex(r8), intent(out) :: exp_terms(nfields)
+    complex(r8), intent(in ) :: mx, my, mz, bx, by, bz
+    complex(r8), intent(in ) :: flx(nftran)
+    complex(r8), intent(in ) :: fmx, fmy, fmz
+    real(r8)   , intent(in)  :: kxt, ky, kz
+    complex(r8)              :: nl(nfields)
+
+    ! div m
+    nl(irho) = -zi*( kxt*mx + ky*my + kz*mz )
+
+    ! div {rho*uu - bb + [(cs^2/va^2)*rho + b^2/2]*I}
+    nl(imx ) = -zi*( kxt*flx(iflx_mxx) + ky*flx(iflx_mxy) + kz*flx(iflx_mxz) )
+    nl(imy ) = -zi*( kxt*flx(iflx_mxy) + ky*flx(iflx_myy) + kz*flx(iflx_myz) )
+    nl(imz ) = -zi*( kxt*flx(iflx_mxz) + ky*flx(iflx_myz) + kz*flx(iflx_mzz) )
+
+    ! curl (b x u)
+    nl(ibx ) = -zi*( ky *flx(iflx_bz) - kz *flx(iflx_by) )
+    nl(iby ) = -zi*( kz *flx(iflx_bx) - kxt*flx(iflx_bz) )
+    nl(ibz ) = -zi*( kxt*flx(iflx_by) - ky *flx(iflx_bx) )
+
+    exp_terms(irho) = nl(irho)
+
+    exp_terms(imx ) = nl(imx) + fmx + 2.d0*shear_flg*my
+    exp_terms(imy ) = nl(imy) + fmy - (2.d0 - q)*shear_flg*mx
+    exp_terms(imz ) = nl(imz) + fmz
+                  
+    exp_terms(ibx ) = nl(ibx)
+    exp_terms(iby ) = nl(iby) - q*shear_flg*bx
+    exp_terms(ibz ) = nl(ibz)
+
+  end subroutine get_ext_terms
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    4 Apr 2022
+!! @brief   Time integral of hyperdissipation
+!-----------------------------------------------!
+  subroutine get_imp_terms_tintg(imp_terms_tintg, t, kx, ky, kz, coeff, nexp)
+    use grid, only: k2_max
+    use params, only: shear
+    use shearing_box, only: get_imp_terms_tintg_with_shear
+    implicit none
+    real(r8), intent(out) :: imp_terms_tintg
+    real(r8), intent(in) :: t, kx, ky, kz, coeff
+    integer, intent(in) :: nexp
+
+    if(shear) then
+      call get_imp_terms_tintg_with_shear(imp_terms_tintg, t, kx, ky, kz, coeff, nexp )
+    else
+      imp_terms_tintg = -coeff*((kx**2 + ky**2 + kz**2)/k2_max)**nexp*t
+    endif
+  end subroutine get_imp_terms_tintg
 
 
 !-----------------------------------------------!

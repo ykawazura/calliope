@@ -9,13 +9,19 @@ module fields
 
   public :: init_fields, finish_fields
   public :: phi, omg, psi, upa, bpa
-  public :: phi_old1, omg_old1, psi_old1, upa_old1, bpa_old1  
+  public :: phi_old, omg_old, psi_old, upa_old, bpa_old  
+  public :: nfields
+  public :: iomg, ipsi, iupa, ibpa
 
   private
 
   complex(r8), allocatable, dimension(:,:,:) :: phi, omg, psi, upa, bpa
-  complex(r8), allocatable, dimension(:,:,:) :: phi_old1, omg_old1, psi_old1, upa_old1, bpa_old1
+  complex(r8), allocatable, dimension(:,:,:) :: phi_old, omg_old, psi_old, upa_old, bpa_old
   character(100) :: init_type
+
+  ! Field index
+  integer, parameter :: nfields = 4
+  integer, parameter :: iomg = 1, ipsi = 2, iupa = 3, ibpa = 4
 
 contains
 
@@ -32,16 +38,16 @@ contains
     complex(r8), allocatable, dimension(:,:,:) :: src
 
     allocate(src(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
-    allocate(phi     , source=src)
-    allocate(omg     , source=src)
-    allocate(psi     , source=src)
-    allocate(upa     , source=src)
-    allocate(bpa     , source=src)
-    allocate(phi_old1, source=src)
-    allocate(omg_old1, source=src)
-    allocate(psi_old1, source=src)
-    allocate(upa_old1, source=src)
-    allocate(bpa_old1, source=src)
+    allocate(phi    , source=src)
+    allocate(omg    , source=src)
+    allocate(psi    , source=src)
+    allocate(upa    , source=src)
+    allocate(bpa    , source=src)
+    allocate(phi_old, source=src)
+    allocate(omg_old, source=src)
+    allocate(psi_old, source=src)
+    allocate(upa_old, source=src)
+    allocate(bpa_old, source=src)
     deallocate(src)
 
     call read_parameters(inputfile)
@@ -115,14 +121,14 @@ contains
       print *, 'Zero initialization'
     endif
 
-    phi      = 0.d0
-    psi      = 0.d0
-    upa      = 0.d0
-    bpa      = 0.d0
-    phi_old1 = 0.d0
-    psi_old1 = 0.d0
-    upa_old1 = 0.d0
-    bpa_old1 = 0.d0
+    phi     = 0.d0
+    psi     = 0.d0
+    upa     = 0.d0
+    bpa     = 0.d0
+    phi_old = 0.d0
+    psi_old = 0.d0
+    upa_old = 0.d0
+    bpa_old = 0.d0
 
   end subroutine init_zero
 
@@ -166,11 +172,11 @@ contains
       enddo
     enddo
 
-    phi_old1 = phi
-    omg_old1 = omg
-    psi_old1 = psi
-    upa_old1 = upa
-    bpa_old1 = bpa
+    phi_old = phi
+    omg_old = omg
+    psi_old = psi
+    upa_old = upa
+    bpa_old = bpa
 
   end subroutine init_single_mode
 
@@ -261,11 +267,11 @@ contains
       enddo
     enddo
 
-    phi_old1 = phi
-    omg_old1 = omg
-    psi_old1 = psi
-    upa_old1 = upa
-    bpa_old1 = bpa
+    phi_old = phi
+    omg_old = omg
+    psi_old = psi
+    upa_old = upa
+    bpa_old = bpa
 
     deallocate(phi_r)
     deallocate(psi_r)
@@ -326,11 +332,11 @@ contains
       enddo
     enddo
 
-    phi_old1 = phi
-    omg_old1 = omg
-    psi_old1 = psi
-    upa_old1 = upa
-    bpa_old1 = bpa
+    phi_old = phi
+    omg_old = omg
+    psi_old = psi
+    upa_old = upa
+    bpa_old = bpa
 
     deallocate(phi_r)
     deallocate(psi_r)
@@ -393,11 +399,11 @@ contains
       enddo
     enddo
 
-    phi_old1 = phi
-    omg_old1 = omg
-    psi_old1 = psi
-    upa_old1 = upa
-    bpa_old1 = bpa
+    phi_old = phi
+    omg_old = omg
+    psi_old = psi
+    upa_old = upa
+    bpa_old = bpa
 
     deallocate(phi_r)
     deallocate(psi_r)
@@ -457,11 +463,11 @@ contains
     call mpiio_read_one(upa, sizes, subsizes, starts, trim(restart_dir)//'upa.dat')
     call mpiio_read_one(bpa, sizes, subsizes, starts, trim(restart_dir)//'bpa.dat')
 
-    phi_old1 = phi
-    omg_old1 = omg
-    psi_old1 = psi
-    upa_old1 = upa
-    bpa_old1 = bpa
+    phi_old = phi
+    omg_old = omg
+    psi_old = psi
+    upa_old = upa
+    bpa_old = bpa
   end subroutine restart
 
 
@@ -536,11 +542,11 @@ contains
     deallocate(psi)
     deallocate(upa)
     deallocate(bpa)
-    deallocate(phi_old1)
-    deallocate(omg_old1)
-    deallocate(psi_old1)
-    deallocate(upa_old1)
-    deallocate(bpa_old1)
+    deallocate(phi_old)
+    deallocate(omg_old)
+    deallocate(psi_old)
+    deallocate(upa_old)
+    deallocate(bpa_old)
 
   end subroutine finish_fields
 

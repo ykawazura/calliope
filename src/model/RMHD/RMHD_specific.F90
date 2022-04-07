@@ -18,19 +18,19 @@ contains
 !! @brief   Initialize model specific subroutines
 !-----------------------------------------------!
   subroutine init_model_specific
-    use mp, only: proc0
-    use grid, only: kx, ky
+    ! use mp, only: proc0
+    ! use grid, only: kx, ky
     use force, only :init_force, alloc_force
     implicit none
 
-    if(proc0 .and. maxval(kx**2) /= maxval(ky**2)) then
-      print *, '!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!'
-      print *, '!              Error!              !'
-      print *, '!  kx_max must be equal to ky_max  !'
-      print *, '!  i.e., lx/nlx == ly/nly          !'
-      print *, '!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!'
-      stop
-    endif
+    ! if(proc0 .and. maxval(kx**2) /= maxval(ky**2)) then
+      ! print *, '!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!'
+      ! print *, '!              Error!              !'
+      ! print *, '!  kx_max must be equal to ky_max  !'
+      ! print *, '!  i.e., lx/nlx == ly/nly          !'
+      ! print *, '!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!'
+      ! stop
+    ! endif
 
     call init_force
     call alloc_force

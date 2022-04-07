@@ -39,7 +39,7 @@ outdir = './fig_energy/'
 W        = wkin_sum + wmag_sum + wrho_sum
 W_dot    = wkin_dot_sum + wmag_dot_sum + wrho_dot_sum
 D        = wkin_dissip_sum + wmag_dissip_sum + wrho_dissip_sum
-P        = p_u_sum
+P        = p_ext_sum + p_re_sum + p_ma_sum
 
 W_avg        = time_average(tt[avg_start:avg_end], W       [avg_start:avg_end], axis=0)
 W_dot_avg    = time_average(tt[avg_start:avg_end], W_dot   [avg_start:avg_end], axis=0)
@@ -74,13 +74,17 @@ f.close()
 ys = [ 
        wkin_dot_sum + wmag_dot_sum + wrho_dot_sum, 
        wkin_dissip_sum + wmag_dissip_sum + wrho_dissip_sum, 
-       -p_u_sum, 
-			 wkin_dot_sum + wmag_dot_sum + wrho_dot_sum + wkin_dissip_sum + wmag_dissip_sum + wrho_dissip_sum - p_u_sum,
+       -p_ext_sum, 
+       -p_re_sum, 
+       -p_ma_sum, 
+			 wkin_dot_sum + wmag_dot_sum + wrho_dot_sum + wkin_dissip_sum + wmag_dissip_sum + wrho_dissip_sum - p_ext_sum - p_re_sum - p_ma_sum,
        np.full([tt[avg_start:avg_end].size], W_dot_avg),
        np.full([tt[avg_start:avg_end].size], D_avg),
        np.full([tt[avg_start:avg_end].size], -P_avg),
      ]
 xs = [
+       tt,
+       tt,
        tt,
        tt,
        tt,
@@ -93,6 +97,8 @@ ls = [
         '', 
         '', 
         '', 
+        '', 
+        '', 
         'k--', 
         '', 
         '', 
@@ -101,7 +107,9 @@ ls = [
 legends = [ 
        r'$\mathrm{d}W/\mathrm{d} t$', 
        r'$D$', 
-       r'$-P$', 
+       r'$P_\mr{ext}$', 
+       r'$P_\mr{Re}$', 
+       r'$P_\mr{M}$', 
        r'balance', 
        '', 
        '', 

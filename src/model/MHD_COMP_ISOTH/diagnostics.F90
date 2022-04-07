@@ -5,7 +5,7 @@ include "../../diagnostics_common.F90"
 !-----------------------------------------------!
 !> @author  YK
 !! @date    16 Feb 2021
-!! @brief   Diagnostics for MHD_INCOMP
+!! @brief   Diagnostics for MHD_COMP_ISOTH
 !-----------------------------------------------!
 module diagnostics
   use diagnostics_common
@@ -13,7 +13,7 @@ module diagnostics
   implicit none
 
   public :: init_diagnostics, finish_diagnostics
-  public :: loop_diagnostics, loop_diagnostics_fields_secion, loop_diagnostics_kpar, loop_diagnostics_SF2
+  public :: loop_diagnostics, loop_diagnostics_2D, loop_diagnostics_kpar, loop_diagnostics_SF2
 
   private
 contains
@@ -56,35 +56,35 @@ contains
     use fields, only: rho
     use fields, only: mx, my, mz
     use fields, only: bx, by, bz
-    use fields, only: rho_old1
-    use fields, only: mx_old1, my_old1, mz_old1
-    use fields, only: bx_old1, by_old1, bz_old1
+    use fields, only: rho_old
+    use fields, only: mx_old, my_old, mz_old
+    use fields, only: bx_old, by_old, bz_old
     use fields, only: m_to_u
     use mp, only: sum_reduce
     use time, only: dt
-    use time_stamp, only: put_time_stamp, timer_diagnostics
+    use time_stamp, only: put_time_stamp, timer_diagnostics_total
     use params, only: zi, nu, nu_exp, eta, eta_exp, lmd, lmd_exp, cs2va2, shear, q
-    use force, only: fmx, fmy, fmz, fmx_old1, fmy_old1, fmz_old1
+    use force, only: fmx, fmy, fmz, fmx_old, fmy_old, fmz_old
     use shearing_box, only: shear_flg, tsc, nremap, k2t
     implicit none
     integer :: i, j, k
 
 
     real(r8)   , allocatable, dimension(:,:,:) :: wkin, wmag
-    real(r8)   , allocatable, dimension(:,:,:) :: wkin_old1, wmag_old1
+    real(r8)   , allocatable, dimension(:,:,:) :: wkin_old, wmag_old
     real(r8)   , allocatable, dimension(:,:,:) :: wkin_dissip, wmag_dissip, wrho_dissip
     real(r8)   , allocatable, dimension(:,:,:) :: wrho
-    real(r8)   , allocatable, dimension(:,:,:) :: wrho_old1
+    real(r8)   , allocatable, dimension(:,:,:) :: wrho_old
     real(r8)   , allocatable, dimension(:,:,:) :: u2, ux2, uy2, uz2
     real(r8)   , allocatable, dimension(:,:,:) :: b2, bx2, by2, bz2
-    real(r8)   , allocatable, dimension(:,:,:) :: p_u
+    real(r8)   , allocatable, dimension(:,:,:) :: p_ext, p_re, p_ma 
     real(r8)   , allocatable, dimension(:,:,:) :: zp2, zm2
     real(r8)   , allocatable, dimension(:,:,:) :: src_r
 
     complex(r8), allocatable, dimension(:,:,:) :: ux, uy, uz
-    complex(r8), allocatable, dimension(:,:,:) :: ux_old1, uy_old1, uz_old1
-    complex(r8), allocatable, dimension(:,:,:) :: lnrho, lnrho_old1
-    complex(r8), allocatable, dimension(:,:,:) :: u2half, u2half_old1
+    complex(r8), allocatable, dimension(:,:,:) :: ux_old, uy_old, uz_old
+    complex(r8), allocatable, dimension(:,:,:) :: lnrho, lnrho_old
+    complex(r8), allocatable, dimension(:,:,:) :: u2half, u2half_old
     complex(r8), allocatable, dimension(:,:,:) :: f
     complex(r8), allocatable, dimension(:,:,:) :: src_c
 
@@ -95,7 +95,7 @@ contains
     real(r8) :: wkin_dissip_sum, wmag_dissip_sum, wrho_dissip_sum
     real(r8) :: wrho_sum
     real(r8) :: wrho_dot_sum
-    real(r8) :: p_u_sum
+    real(r8) :: p_ext_sum, p_re_sum, p_ma_sum
     real(r8) :: zp2_sum, zm2_sum
 
     real(r8) :: rho_rms, u_rms, b_rms
@@ -115,31 +115,31 @@ contains
     if(nremap > 0 .and. tsc <= 5.*dt) then
       return !skip 5 loops after remapping
     endif
-    if (proc0) call put_time_stamp(timer_diagnostics)
+    if (proc0) call put_time_stamp(timer_diagnostics_total)
 
     allocate(src_c(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0,0.d0))
     allocate(ux         , source=src_c)
     allocate(uy         , source=src_c)
     allocate(uz         , source=src_c)
-    allocate(ux_old1    , source=src_c)
-    allocate(uy_old1    , source=src_c)
-    allocate(uz_old1    , source=src_c)
+    allocate(ux_old     , source=src_c)
+    allocate(uy_old     , source=src_c)
+    allocate(uz_old     , source=src_c)
     allocate(lnrho      , source=src_c)
-    allocate(lnrho_old1 , source=src_c)
+    allocate(lnrho_old  , source=src_c)
     allocate(u2half     , source=src_c)
-    allocate(u2half_old1, source=src_c)
+    allocate(u2half_old , source=src_c)
     allocate(f          , source=src_c)
     deallocate(src_c)
 
     allocate(src_r(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=0.d0)
     allocate(wkin       , source=src_r)
-    allocate(wkin_old1  , source=src_r)
+    allocate(wkin_old   , source=src_r)
     allocate(wkin_dissip, source=src_r)
     allocate(wmag       , source=src_r)
-    allocate(wmag_old1  , source=src_r)
+    allocate(wmag_old   , source=src_r)
     allocate(wmag_dissip, source=src_r)
     allocate(wrho       , source=src_r)
-    allocate(wrho_old1  , source=src_r)
+    allocate(wrho_old   , source=src_r)
     allocate(wrho_dissip, source=src_r)
     allocate(u2         , source=src_r)
     allocate(ux2        , source=src_r)
@@ -149,7 +149,9 @@ contains
     allocate(bx2        , source=src_r)
     allocate(by2        , source=src_r)
     allocate(bz2        , source=src_r)
-    allocate(p_u        , source=src_r)
+    allocate(p_ext      , source=src_r)
+    allocate(p_re       , source=src_r)
+    allocate(p_ma       , source=src_r)
     allocate(zp2        , source=src_r)
     allocate(zm2        , source=src_r)
     deallocate(src_r)
@@ -177,12 +179,12 @@ contains
     allocate( bz_r, source=src_r)
     deallocate(src_r)
 
-    call rho_to_lnrho(rho     , lnrho     )
-    call rho_to_lnrho(rho_old1, lnrho_old1)
-    call m_to_u(rho     , mx     , my     , mz     , ux     , uy     , uz     )
-    call m_to_u(rho_old1, mx_old1, my_old1, mz_old1, ux_old1, uy_old1, uz_old1)
-    call get_u2half(ux     , uy     , uz     , u2half     )
-    call get_u2half(ux_old1, uy_old1, uz_old1, u2half_old1)
+    call rho_to_lnrho(rho    , lnrho    )
+    call rho_to_lnrho(rho_old, lnrho_old)
+    call m_to_u(rho    , mx    , my    , mz    , ux    , uy    , uz    )
+    call m_to_u(rho_old, mx_old, my_old, mz_old, ux_old, uy_old, uz_old)
+    call get_u2half(ux    , uy    , uz    , u2half    )
+    call get_u2half(ux_old, uy_old, uz_old, u2half_old)
 
     do j = iky_st, iky_en
       do k = ikz_st, ikz_en
@@ -192,59 +194,59 @@ contains
             by0 = abs(by(i,k,j))
             bz0 = abs(bz(i,k,j))
           endif
-          wkin     (i, k, j) = 0.25d0*( & 
-                                         mx     (i, k, j)*conjg(ux     (i, k, j)) + ux     (i, k, j)*conjg(mx     (i, k, j)) &
-                                       + my     (i, k, j)*conjg(uy     (i, k, j)) + uy     (i, k, j)*conjg(my     (i, k, j)) &
-                                       + mz     (i, k, j)*conjg(uz     (i, k, j)) + uz     (i, k, j)*conjg(mz     (i, k, j)) &
-                                      )
-          wkin_old1(i, k, j) = 0.25d0*( & 
-                                         mx_old1(i, k, j)*conjg(ux_old1(i, k, j)) + ux_old1(i, k, j)*conjg(mx_old1(i, k, j)) &
-                                       + my_old1(i, k, j)*conjg(uy_old1(i, k, j)) + uy_old1(i, k, j)*conjg(my_old1(i, k, j)) &
-                                       + mz_old1(i, k, j)*conjg(uz_old1(i, k, j)) + uz_old1(i, k, j)*conjg(mz_old1(i, k, j)) &
-                                      )
-          wmag     (i, k, j) = 0.5d0*( & 
-                                         bx     (i, k, j)*conjg(bx     (i, k, j)) &
-                                       + by     (i, k, j)*conjg(by     (i, k, j)) &
-                                       + bz     (i, k, j)*conjg(bz     (i, k, j)) &
-                                      )
-          wmag_old1(i, k, j) = 0.5d0*( & 
-                                         bx_old1(i, k, j)*conjg(bx_old1(i, k, j)) &
-                                       + by_old1(i, k, j)*conjg(by_old1(i, k, j)) &
-                                       + bz_old1(i, k, j)*conjg(bz_old1(i, k, j)) &
-                                      )
-          u2       (i, k, j) = 0.5d0*(abs(ux(i, k, j))**2 + abs(uy(i, k, j))**2 + abs(uz(i, k, j))**2)
-          ux2      (i, k, j) = 0.5d0*(abs(ux(i, k, j))**2)
-          uy2      (i, k, j) = 0.5d0*(abs(uy(i, k, j))**2)
-          uz2      (i, k, j) = 0.5d0*(abs(uz(i, k, j))**2)
-          b2       (i, k, j) = 0.5d0*(abs(bx(i, k, j))**2 + abs(by(i, k, j))**2 + abs(bz(i, k, j))**2)
-          bx2      (i, k, j) = 0.5d0*(abs(bx(i, k, j))**2)
-          by2      (i, k, j) = 0.5d0*(abs(by(i, k, j))**2)
-          bz2      (i, k, j) = 0.5d0*(abs(bz(i, k, j))**2)
+          wkin    (i, k, j) = 0.25d0*( & 
+                                        mx    (i, k, j)*conjg(ux    (i, k, j)) + ux    (i, k, j)*conjg(mx    (i, k, j)) &
+                                      + my    (i, k, j)*conjg(uy    (i, k, j)) + uy    (i, k, j)*conjg(my    (i, k, j)) &
+                                      + mz    (i, k, j)*conjg(uz    (i, k, j)) + uz    (i, k, j)*conjg(mz    (i, k, j)) &
+                                     )
+          wkin_old(i, k, j) = 0.25d0*( & 
+                                        mx_old(i, k, j)*conjg(ux_old(i, k, j)) + ux_old(i, k, j)*conjg(mx_old(i, k, j)) &
+                                      + my_old(i, k, j)*conjg(uy_old(i, k, j)) + uy_old(i, k, j)*conjg(my_old(i, k, j)) &
+                                      + mz_old(i, k, j)*conjg(uz_old(i, k, j)) + uz_old(i, k, j)*conjg(mz_old(i, k, j)) &
+                                     )
+          wmag    (i, k, j) = 0.5d0*( & 
+                                        bx    (i, k, j)*conjg(bx    (i, k, j)) &
+                                      + by    (i, k, j)*conjg(by    (i, k, j)) &
+                                      + bz    (i, k, j)*conjg(bz    (i, k, j)) &
+                                     )
+          wmag_old(i, k, j) = 0.5d0*( & 
+                                        bx_old(i, k, j)*conjg(bx_old(i, k, j)) &
+                                      + by_old(i, k, j)*conjg(by_old(i, k, j)) &
+                                      + bz_old(i, k, j)*conjg(bz_old(i, k, j)) &
+                                     )
+          u2      (i, k, j) = 0.5d0*(abs(ux(i, k, j))**2 + abs(uy(i, k, j))**2 + abs(uz(i, k, j))**2)
+          ux2     (i, k, j) = 0.5d0*(abs(ux(i, k, j))**2)
+          uy2     (i, k, j) = 0.5d0*(abs(uy(i, k, j))**2)
+          uz2     (i, k, j) = 0.5d0*(abs(uz(i, k, j))**2)
+          b2      (i, k, j) = 0.5d0*(abs(bx(i, k, j))**2 + abs(by(i, k, j))**2 + abs(bz(i, k, j))**2)
+          bx2     (i, k, j) = 0.5d0*(abs(bx(i, k, j))**2)
+          by2     (i, k, j) = 0.5d0*(abs(by(i, k, j))**2)
+          bz2     (i, k, j) = 0.5d0*(abs(bz(i, k, j))**2)
 
-          wrho     (i, k, j) = 0.5d0*cs2va2*( & 
-                                    rho     (i, k, j)*conjg(lnrho     (i, k, j)) + lnrho     (i, k, j)*conjg(rho     (i, k, j)) &
-                                  )
-          wrho_old1(i, k, j) = 0.5d0*cs2va2*( & 
-                                    rho_old1(i, k, j)*conjg(lnrho_old1(i, k, j)) + lnrho_old1(i, k, j)*conjg(rho_old1(i, k, j)) &
-                                  )
-          zp2      (i, k, j) = abs(ux(i,k,j) + bx(i,k,j))**2 + abs(uy(i,k,j) + by(i,k,j))**2 + abs(uz(i,k,j) + bz(i,k,j))**2
-          zm2      (i, k, j) = abs(ux(i,k,j) - bx(i,k,j))**2 + abs(uy(i,k,j) - by(i,k,j))**2 + abs(uz(i,k,j) - bz(i,k,j))**2
+          wrho    (i, k, j) = 0.5d0*cs2va2*( & 
+                                   rho    (i, k, j)*conjg(lnrho    (i, k, j)) + lnrho    (i, k, j)*conjg(rho    (i, k, j)) &
+                                 )
+          wrho_old(i, k, j) = 0.5d0*cs2va2*( & 
+                                   rho_old(i, k, j)*conjg(lnrho_old(i, k, j)) + lnrho_old(i, k, j)*conjg(rho_old(i, k, j)) &
+                                 )
+          zp2     (i, k, j) = abs(ux(i,k,j) + bx(i,k,j))**2 + abs(uy(i,k,j) + by(i,k,j))**2 + abs(uz(i,k,j) + bz(i,k,j))**2
+          zm2     (i, k, j) = abs(ux(i,k,j) - bx(i,k,j))**2 + abs(uy(i,k,j) - by(i,k,j))**2 + abs(uz(i,k,j) - bz(i,k,j))**2
 
-           mx_mid    = 0.5d0*( mx   (i, k, j) +  mx_old1   (i, k, j))
-           my_mid    = 0.5d0*( my   (i, k, j) +  my_old1   (i, k, j))
-           mz_mid    = 0.5d0*( mz   (i, k, j) +  mz_old1   (i, k, j))
-           ux_mid    = 0.5d0*( ux   (i, k, j) +  ux_old1   (i, k, j))
-           uy_mid    = 0.5d0*( uy   (i, k, j) +  uy_old1   (i, k, j))
-           uz_mid    = 0.5d0*( uz   (i, k, j) +  uz_old1   (i, k, j))
-           bx_mid    = 0.5d0*( bx   (i, k, j) +  bx_old1   (i, k, j))
-           by_mid    = 0.5d0*( by   (i, k, j) +  by_old1   (i, k, j))
-           bz_mid    = 0.5d0*( bz   (i, k, j) +  bz_old1   (i, k, j))
-          fmx_mid    = 0.5d0*(fmx   (i, k, j) + fmx_old1   (i, k, j))
-          fmy_mid    = 0.5d0*(fmy   (i, k, j) + fmy_old1   (i, k, j))
-          fmz_mid    = 0.5d0*(fmz   (i, k, j) + fmz_old1   (i, k, j))
-          rho_mid    = 0.5d0*(rho   (i, k, j) + rho_old1   (i, k, j))
-          lnrho_mid  = 0.5d0*(lnrho (i, k, j) + lnrho_old1 (i, k, j))
-          u2half_mid = 0.5d0*(u2half(i, k, j) + u2half_old1(i, k, j))
+           mx_mid    = 0.5d0*( mx   (i, k, j) +  mx_old   (i, k, j))
+           my_mid    = 0.5d0*( my   (i, k, j) +  my_old   (i, k, j))
+           mz_mid    = 0.5d0*( mz   (i, k, j) +  mz_old   (i, k, j))
+           ux_mid    = 0.5d0*( ux   (i, k, j) +  ux_old   (i, k, j))
+           uy_mid    = 0.5d0*( uy   (i, k, j) +  uy_old   (i, k, j))
+           uz_mid    = 0.5d0*( uz   (i, k, j) +  uz_old   (i, k, j))
+           bx_mid    = 0.5d0*( bx   (i, k, j) +  bx_old   (i, k, j))
+           by_mid    = 0.5d0*( by   (i, k, j) +  by_old   (i, k, j))
+           bz_mid    = 0.5d0*( bz   (i, k, j) +  bz_old   (i, k, j))
+          fmx_mid    = 0.5d0*(fmx   (i, k, j) + fmx_old   (i, k, j))
+          fmy_mid    = 0.5d0*(fmy   (i, k, j) + fmy_old   (i, k, j))
+          fmz_mid    = 0.5d0*(fmz   (i, k, j) + fmz_old   (i, k, j))
+          rho_mid    = 0.5d0*(rho   (i, k, j) + rho_old   (i, k, j))
+          lnrho_mid  = 0.5d0*(lnrho (i, k, j) + lnrho_old (i, k, j))
+          u2half_mid = 0.5d0*(u2half(i, k, j) + u2half_old(i, k, j))
 
           wkin_dissip(i, k, j) = nu*(k2t(i, k, j)/k2_max)**nu_exp*0.5d0*( &
                                                                       mx_mid*conjg(ux_mid) + ux_mid*conjg(mx_mid) &
@@ -256,14 +258,14 @@ contains
                                                                         (-u2half_mid + cs2va2*lnrho_mid)*conjg(rho_mid) &
                                                                       + rho_mid*conjg(-u2half_mid + cs2va2*lnrho_mid) &
                                                                     )
-          p_u     (i, k, j) = 0.5d0*( &
+          p_ext   (i, k, j) = 0.5d0*( &
                                         (fmx_mid*conjg(ux_mid) + conjg(fmx_mid)*ux_mid) &
                                       + (fmy_mid*conjg(uy_mid) + conjg(fmy_mid)*uy_mid) &
                                       + (fmz_mid*conjg(uz_mid) + conjg(fmz_mid)*uz_mid) &
-                                      + q*shear_flg*(   ux_mid*conjg(my_mid) + conjg(ux_mid)*my_mid &
-                                                      - bx_mid*conjg(by_mid) - conjg(bx_mid)*by_mid &
-                                                    ) &
                                     )
+
+          p_re    (i, k, j) = + 0.5d0*q*shear_flg*(ux_mid*conjg(my_mid) + conjg(ux_mid)*my_mid)
+          p_ma    (i, k, j) = - 0.5d0*q*shear_flg*(bx_mid*conjg(by_mid) + conjg(bx_mid)*by_mid)
 
           ! The reason for the following treatment for kx == 0 mode is the following. Compile it with LaTeX.
           !-----------------------------------------------------------------------------------------------------------------------------------
@@ -275,13 +277,13 @@ contains
           !-----------------------------------------------------------------------------------------------------------------------------------
           if (j /= 1) then
             wkin       (i, k, j) = 2.0d0*wkin       (i, k, j)
-            wkin_old1  (i, k, j) = 2.0d0*wkin_old1  (i, k, j)
+            wkin_old   (i, k, j) = 2.0d0*wkin_old   (i, k, j)
             wkin_dissip(i, k, j) = 2.0d0*wkin_dissip(i, k, j)
             wmag       (i, k, j) = 2.0d0*wmag       (i, k, j)
-            wmag_old1  (i, k, j) = 2.0d0*wmag_old1  (i, k, j)
+            wmag_old   (i, k, j) = 2.0d0*wmag_old   (i, k, j)
             wmag_dissip(i, k, j) = 2.0d0*wmag_dissip(i, k, j)
             wrho       (i, k, j) = 2.0d0*wrho       (i, k, j)
-            wrho_old1  (i, k, j) = 2.0d0*wrho_old1  (i, k, j)
+            wrho_old   (i, k, j) = 2.0d0*wrho_old   (i, k, j)
             wrho_dissip(i, k, j) = 2.0d0*wrho_dissip(i, k, j)
             u2         (i, k, j) = 2.0d0*u2         (i, k, j)
             ux2        (i, k, j) = 2.0d0*ux2        (i, k, j)
@@ -291,7 +293,9 @@ contains
             bx2        (i, k, j) = 2.0d0*bx2        (i, k, j)
             by2        (i, k, j) = 2.0d0*by2        (i, k, j)
             bz2        (i, k, j) = 2.0d0*bz2        (i, k, j)
-            p_u        (i, k, j) = 2.0d0*p_u        (i, k, j)
+            p_ext      (i, k, j) = 2.0d0*p_ext      (i, k, j)
+            p_re       (i, k, j) = 2.0d0*p_re       (i, k, j)
+            p_ma       (i, k, j) = 2.0d0*p_ma       (i, k, j)
             zp2        (i, k, j) = 2.0d0*zp2        (i, k, j)
             zm2        (i, k, j) = 2.0d0*zm2        (i, k, j)
           endif
@@ -305,15 +309,17 @@ contains
     wmag_sum        = sum(wmag); call sum_reduce(wmag_sum, 0)
     wrho_sum        = sum(wrho); call sum_reduce(wrho_sum, 0)
 
-    wkin_dot_sum    = sum((wkin - wkin_old1)/dt); call sum_reduce(wkin_dot_sum, 0)
-    wmag_dot_sum    = sum((wmag - wmag_old1)/dt); call sum_reduce(wmag_dot_sum, 0)
-    wrho_dot_sum    = sum((wrho - wrho_old1)/dt); call sum_reduce(wrho_dot_sum, 0)
+    wkin_dot_sum    = sum((wkin - wkin_old)/dt); call sum_reduce(wkin_dot_sum, 0)
+    wmag_dot_sum    = sum((wmag - wmag_old)/dt); call sum_reduce(wmag_dot_sum, 0)
+    wrho_dot_sum    = sum((wrho - wrho_old)/dt); call sum_reduce(wrho_dot_sum, 0)
 
     wkin_dissip_sum = sum(wkin_dissip); call sum_reduce(wkin_dissip_sum, 0)
     wmag_dissip_sum = sum(wmag_dissip); call sum_reduce(wmag_dissip_sum, 0)
     wrho_dissip_sum = sum(wrho_dissip); call sum_reduce(wrho_dissip_sum, 0)
 
-    p_u_sum         = sum(p_u); call sum_reduce(p_u_sum, 0)
+    p_ext_sum       = sum(p_ext); call sum_reduce(p_ext_sum, 0)
+    p_re_sum        = sum(p_re ); call sum_reduce(p_re_sum , 0)
+    p_ma_sum        = sum(p_ma ); call sum_reduce(p_ma_sum , 0)
 
     zp2_sum         = sum(zp2); call sum_reduce(zp2_sum, 0)
     zm2_sum         = sum(zm2); call sum_reduce(zm2_sum, 0)
@@ -359,11 +365,12 @@ contains
     beta_rms  = 2.d0*cs2va2*rho_rms/b_rms**2
     !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
   
+    if (proc0) call put_time_stamp(timer_diagnostics_total)
     call loop_io( &
                   wkin_sum, wmag_sum, wrho_sum, &
                   wkin_dot_sum, wmag_dot_sum, wrho_dot_sum, &
                   wkin_dissip_sum, wmag_dissip_sum, wrho_dissip_sum, &
-                  p_u_sum, &
+                  p_ext_sum, p_re_sum, p_ma_sum, &
                   smach_rms, amach_rms, beta_rms, &
                   zp2_sum, zm2_sum, &
                   bx0, by0, bz0, &
@@ -376,25 +383,25 @@ contains
                   !
                 )
 
-    deallocate(ux        )
-    deallocate(uy        )
-    deallocate(uz        )
-    deallocate(ux_old1   )
-    deallocate(uy_old1   )
-    deallocate(uz_old1   )
-    deallocate(lnrho     )
-    deallocate(lnrho_old1)
+    deallocate(ux         )
+    deallocate(uy         )
+    deallocate(uz         )
+    deallocate(ux_old     )
+    deallocate(uy_old     )
+    deallocate(uz_old     )
+    deallocate(lnrho      )
+    deallocate(lnrho_old  )
     deallocate(u2half     )
-    deallocate(u2half_old1)
+    deallocate(u2half_old )
 
     deallocate(wkin       )
-    deallocate(wkin_old1  )
+    deallocate(wkin_old   )
     deallocate(wkin_dissip)
     deallocate(wmag       )
-    deallocate(wmag_old1  )
+    deallocate(wmag_old   )
     deallocate(wmag_dissip)
     deallocate(wrho       )
-    deallocate(wrho_old1  )
+    deallocate(wrho_old   )
     deallocate(wrho_dissip)
     deallocate(u2         )
     deallocate(ux2        )
@@ -404,7 +411,9 @@ contains
     deallocate(bx2        )
     deallocate(by2        )
     deallocate(bz2        )
-    deallocate(p_u        )
+    deallocate(p_ext      )
+    deallocate(p_re       )
+    deallocate(p_ma       )
     deallocate(zp2        )
     deallocate(zm2        )
 
@@ -430,8 +439,6 @@ contains
     deallocate( bx_r)
     deallocate( by_r)
     deallocate( bz_r)
-
-    if (proc0) call put_time_stamp(timer_diagnostics)
   end subroutine loop_diagnostics
 
 
@@ -440,8 +447,8 @@ contains
 !! @date    29 Jun 2021
 !! @brief   Diagnostics for cross section of fileds
 !---------------------------------------------------!
-  subroutine loop_diagnostics_fields_secion
-    use io, only: loop_io_fields_section
+  subroutine loop_diagnostics_2D
+    use io, only: loop_io_2D
     use utils, only: curl
     use mp, only: proc0
     use grid, only: nlx, nly, nlz, nkx, nky, nkz
@@ -452,7 +459,7 @@ contains
     use fields, only: bx, by, bz
     use fields, only: m_to_u
     use time, only: dt
-    use time_stamp, only: put_time_stamp, timer_diagnostics
+    use time_stamp, only: put_time_stamp, timer_diagnostics_total
     use params, only: shear
     use shearing_box, only: to_non_shearing_coordinate, tsc, nremap
     implicit none
@@ -488,7 +495,7 @@ contains
     if(nremap > 0 .and. tsc <= 5.*dt) then
       return !skip 5 loops after remapping
     endif
-    if (proc0) call put_time_stamp(timer_diagnostics)
+    if (proc0) call put_time_stamp(timer_diagnostics_total)
 
     allocate(f (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); f   = 0.d0
     allocate(fr(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); fr  = 0.d0
@@ -633,7 +640,8 @@ contains
     call sum_2d_k(     b2 ,  b2_kxy,  b2_kyz,  b2_kxz)
     !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
 
-    call loop_io_fields_section( &
+    if (proc0) call put_time_stamp(timer_diagnostics_total)
+    call loop_io_2D( &
                   rho_r_z0, rho_r_x0, rho_r_y0, &
                   
                   mx_r_z0, mx_r_x0, mx_r_y0, &
@@ -735,9 +743,7 @@ contains
     deallocate( b2_kxy)
     deallocate( b2_kyz)
     deallocate( b2_kxz)
-
-    if (proc0) call put_time_stamp(timer_diagnostics)
-  end subroutine loop_diagnostics_fields_secion
+  end subroutine loop_diagnostics_2D
 
 !-----------------------------------------------!
 !> @author  YK

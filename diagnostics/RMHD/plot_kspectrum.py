@@ -20,7 +20,7 @@ else:
 #--------------------------------------------------------#
 #                      plot 1D spectra                   #
 #--------------------------------------------------------#
-# kperp spectrum
+# kprp spectrum
 ys = [ 
 			 np.sum(upe2_bin   [final_idx, :, 1:kp_end], axis=0), 
 			 np.sum(bpe2_bin   [final_idx, :, 1:kp_end], axis=0), 
@@ -41,7 +41,7 @@ legends = [
 						r'$E_{\delta B_\+}$',
 						r'-5/3',
 					]
-plot_log1d_many(xs, ys, xlab='$k_\+ L_\+$', legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', term=True, save=outdir+'kperp_spectra.pdf')
+plot_log1d_many(xs, ys, xlab='$k_\+ L_\+$', legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', term=True, save=outdir+'kprp_spectra.pdf')
 
 # kz spectrum
 if not is2D:
@@ -75,7 +75,7 @@ if not is2D:
 #------------------#
 #   output ascii   #
 #------------------#
-np.savetxt(outdir + 'Ekperp.txt'  , np.column_stack((kpbin[:kp_end], 
+np.savetxt(outdir + 'Ekprp.txt'  , np.column_stack((kpbin[:kp_end], 
 																											 np.sum(upe2_bin   [final_idx,:kz_end,:kp_end], axis=0),
 																											 np.sum(bpe2_bin   [final_idx,:kz_end,:kp_end], axis=0),
 																										 )), fmt='%E')

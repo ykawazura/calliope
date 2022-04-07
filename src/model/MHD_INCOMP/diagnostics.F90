@@ -13,7 +13,7 @@ module diagnostics
   implicit none
 
   public :: init_diagnostics, finish_diagnostics
-  public :: loop_diagnostics, loop_diagnostics_fields_secion, loop_diagnostics_kpar, loop_diagnostics_SF2
+  public :: loop_diagnostics, loop_diagnostics_2D, loop_diagnostics_kpar, loop_diagnostics_SF2
 
   private
 
@@ -58,29 +58,29 @@ contains
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use fields, only: ux, uy, uz
     use fields, only: bx, by, bz
-    use fields, only: ux_old1, uy_old1, uz_old1
-    use fields, only: bx_old1, by_old1, bz_old1
+    use fields, only: ux_old, uy_old, uz_old
+    use fields, only: bx_old, by_old, bz_old
     use mp, only: sum_reduce
     use time, only: dt
-    use time_stamp, only: put_time_stamp, timer_diagnostics
+    use time_stamp, only: put_time_stamp, timer_diagnostics_total
     use params, only: zi, nu, nu_exp, eta, eta_exp, shear, q
-    use force, only: fux, fuy, fuz, fux_old1, fuy_old1, fuz_old1
+    use force, only: fux, fuy, fuz, fux_old, fuy_old, fuz_old
     use shearing_box, only: shear_flg, tsc, nremap, k2t
     implicit none
     integer :: i, j, k
 
     real(r8), allocatable, dimension(:,:,:) :: u2, ux2, uy2, uz2
     real(r8), allocatable, dimension(:,:,:) :: b2, bx2, by2, bz2
-    real(r8), allocatable, dimension(:,:,:) :: u2old1, b2old1
+    real(r8), allocatable, dimension(:,:,:) :: u2old, b2old
     real(r8), allocatable, dimension(:,:,:) :: u2dissip, b2dissip
-    real(r8), allocatable, dimension(:,:,:) :: p_u
+    real(r8), allocatable, dimension(:,:,:) :: p_ext, p_re, p_ma
     real(r8), allocatable, dimension(:,:,:) :: zp2, zm2
     real(r8), allocatable, dimension(:,:,:) :: src
 
     real(r8) :: u2_sum, b2_sum
     real(r8) :: u2dot_sum, b2dot_sum
     real(r8) :: u2dissip_sum, b2dissip_sum
-    real(r8) :: p_u_sum
+    real(r8) :: p_ext_sum, p_re_sum, p_ma_sum
     real(r8) :: zp2_sum, zm2_sum
     real(r8) :: bx0, by0, bz0 ! mean magnetic field
 
@@ -94,7 +94,7 @@ contains
     if(nremap > 0 .and. tsc <= 5.*dt) then
       return !skip 5 loops after remapping
     endif
-    if (proc0) call put_time_stamp(timer_diagnostics)
+    if (proc0) call put_time_stamp(timer_diagnostics_total)
 
     allocate(src(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=0.d0)
     allocate(u2      , source=src)
@@ -105,11 +105,13 @@ contains
     allocate(bx2     , source=src)
     allocate(by2     , source=src)
     allocate(bz2     , source=src)
-    allocate(u2old1  , source=src)
-    allocate(b2old1  , source=src)
+    allocate(u2old   , source=src)
+    allocate(b2old   , source=src)
     allocate(u2dissip, source=src)
     allocate(b2dissip, source=src)
-    allocate(p_u     , source=src)
+    allocate(p_ext   , source=src)
+    allocate(p_re    , source=src)
+    allocate(p_ma    , source=src)
     allocate(zp2     , source=src)
     allocate(zm2     , source=src)
     deallocate(src)
@@ -133,39 +135,38 @@ contains
             by0 = abs(by(i,k,j))
             bz0 = abs(bz(i,k,j))
           endif
-          u2    (i, k, j) = 0.5d0*(abs(ux     (i, k, j))**2 + abs(uy     (i, k, j))**2 + abs(uz     (i, k, j))**2)
-          ux2   (i, k, j) = 0.5d0*(abs(ux     (i, k, j))**2)
-          uy2   (i, k, j) = 0.5d0*(abs(uy     (i, k, j))**2)
-          uz2   (i, k, j) = 0.5d0*(abs(uz     (i, k, j))**2)
-          b2    (i, k, j) = 0.5d0*(abs(bx     (i, k, j))**2 + abs(by     (i, k, j))**2 + abs(bz     (i, k, j))**2)
-          bx2   (i, k, j) = 0.5d0*(abs(bx     (i, k, j))**2)
-          by2   (i, k, j) = 0.5d0*(abs(by     (i, k, j))**2)
-          bz2   (i, k, j) = 0.5d0*(abs(bz     (i, k, j))**2)
-          u2old1(i, k, j) = 0.5d0*(abs(ux_old1(i, k, j))**2 + abs(uy_old1(i, k, j))**2 + abs(uz_old1(i, k, j))**2)
-          b2old1(i, k, j) = 0.5d0*(abs(bx_old1(i, k, j))**2 + abs(by_old1(i, k, j))**2 + abs(bz_old1(i, k, j))**2)
-          zp2   (i, k, j) = abs(ux(i,k,j) + bx(i,k,j))**2 + abs(uy(i,k,j) + by(i,k,j))**2 + abs(uz(i,k,j) + bz(i,k,j))**2
-          zm2   (i, k, j) = abs(ux(i,k,j) - bx(i,k,j))**2 + abs(uy(i,k,j) - by(i,k,j))**2 + abs(uz(i,k,j) - bz(i,k,j))**2
+          u2   (i, k, j) = 0.5d0*(abs(ux    (i, k, j))**2 + abs(uy    (i, k, j))**2 + abs(uz    (i, k, j))**2)
+          ux2  (i, k, j) = 0.5d0*(abs(ux    (i, k, j))**2)
+          uy2  (i, k, j) = 0.5d0*(abs(uy    (i, k, j))**2)
+          uz2  (i, k, j) = 0.5d0*(abs(uz    (i, k, j))**2)
+          b2   (i, k, j) = 0.5d0*(abs(bx    (i, k, j))**2 + abs(by    (i, k, j))**2 + abs(bz    (i, k, j))**2)
+          bx2  (i, k, j) = 0.5d0*(abs(bx    (i, k, j))**2)
+          by2  (i, k, j) = 0.5d0*(abs(by    (i, k, j))**2)
+          bz2  (i, k, j) = 0.5d0*(abs(bz    (i, k, j))**2)
+          u2old(i, k, j) = 0.5d0*(abs(ux_old(i, k, j))**2 + abs(uy_old(i, k, j))**2 + abs(uz_old(i, k, j))**2)
+          b2old(i, k, j) = 0.5d0*(abs(bx_old(i, k, j))**2 + abs(by_old(i, k, j))**2 + abs(bz_old(i, k, j))**2)
+          zp2  (i, k, j) = abs(ux(i,k,j) + bx(i,k,j))**2 + abs(uy(i,k,j) + by(i,k,j))**2 + abs(uz(i,k,j) + bz(i,k,j))**2
+          zm2  (i, k, j) = abs(ux(i,k,j) - bx(i,k,j))**2 + abs(uy(i,k,j) - by(i,k,j))**2 + abs(uz(i,k,j) - bz(i,k,j))**2
 
-           ux_mid  = 0.5d0*( ux(i, k, j) +  ux_old1(i, k, j))
-           uy_mid  = 0.5d0*( uy(i, k, j) +  uy_old1(i, k, j))
-           uz_mid  = 0.5d0*( uz(i, k, j) +  uz_old1(i, k, j))
-           bx_mid  = 0.5d0*( bx(i, k, j) +  bx_old1(i, k, j))
-           by_mid  = 0.5d0*( by(i, k, j) +  by_old1(i, k, j))
-           bz_mid  = 0.5d0*( bz(i, k, j) +  bz_old1(i, k, j))
-          fux_mid  = 0.5d0*(fux(i, k, j) + fux_old1(i, k, j))
-          fuy_mid  = 0.5d0*(fuy(i, k, j) + fuy_old1(i, k, j))
-          fuz_mid  = 0.5d0*(fuz(i, k, j) + fuz_old1(i, k, j))
+           ux_mid  = 0.5d0*( ux(i, k, j) +  ux_old(i, k, j))
+           uy_mid  = 0.5d0*( uy(i, k, j) +  uy_old(i, k, j))
+           uz_mid  = 0.5d0*( uz(i, k, j) +  uz_old(i, k, j))
+           bx_mid  = 0.5d0*( bx(i, k, j) +  bx_old(i, k, j))
+           by_mid  = 0.5d0*( by(i, k, j) +  by_old(i, k, j))
+           bz_mid  = 0.5d0*( bz(i, k, j) +  bz_old(i, k, j))
+          fux_mid  = 0.5d0*(fux(i, k, j) + fux_old(i, k, j))
+          fuy_mid  = 0.5d0*(fuy(i, k, j) + fuy_old(i, k, j))
+          fuz_mid  = 0.5d0*(fuz(i, k, j) + fuz_old(i, k, j))
 
           u2dissip(i, k, j) = nu *(k2t(i, k, j)/k2_max)**nu_exp *(abs(ux_mid)**2 + abs(uy_mid)**2 + abs(uz_mid)**2)
           b2dissip(i, k, j) = eta*(k2t(i, k, j)/k2_max)**eta_exp*(abs(bx_mid)**2 + abs(by_mid)**2 + abs(bz_mid)**2)
-          p_u     (i, k, j) = 0.5d0*( &
+          p_ext   (i, k, j) = 0.5d0*( &
                                   (fux_mid*conjg(ux_mid) + conjg(fux_mid)*ux_mid) &
                                 + (fuy_mid*conjg(uy_mid) + conjg(fuy_mid)*uy_mid) &
                                 + (fuz_mid*conjg(uz_mid) + conjg(fuz_mid)*uz_mid) &
-                                + q*shear_flg*(   ux_mid*conjg(uy_mid) + conjg(ux_mid)*uy_mid &
-                                                - bx_mid*conjg(by_mid) - conjg(bx_mid)*by_mid &
-                                              ) &
                               )
+          p_re    (i, k, j) = + 0.5d0*q*shear_flg*(ux_mid*conjg(uy_mid) + conjg(ux_mid)*uy_mid)
+          p_ma    (i, k, j) = - 0.5d0*q*shear_flg*(bx_mid*conjg(by_mid) + conjg(bx_mid)*by_mid)
 
           ! The reason for the following treatment for kx == 0 mode is the following. Compile it with LaTeX.
           !-----------------------------------------------------------------------------------------------------------------------------------
@@ -184,11 +185,13 @@ contains
             bx2     (i, k, j) = 2.0d0*bx2     (i, k, j)
             by2     (i, k, j) = 2.0d0*by2     (i, k, j)
             bz2     (i, k, j) = 2.0d0*bz2     (i, k, j)
-            u2old1  (i, k, j) = 2.0d0*u2old1  (i, k, j)
-            b2old1  (i, k, j) = 2.0d0*b2old1  (i, k, j)
+            u2old   (i, k, j) = 2.0d0*u2old   (i, k, j)
+            b2old   (i, k, j) = 2.0d0*b2old   (i, k, j)
             u2dissip(i, k, j) = 2.0d0*u2dissip(i, k, j)
             b2dissip(i, k, j) = 2.0d0*b2dissip(i, k, j)
-            p_u     (i, k, j) = 2.0d0*p_u     (i, k, j)
+            p_ext   (i, k, j) = 2.0d0*p_ext   (i, k, j)
+            p_re    (i, k, j) = 2.0d0*p_re    (i, k, j)
+            p_ma    (i, k, j) = 2.0d0*p_ma    (i, k, j)
             zp2     (i, k, j) = 2.0d0*zp2     (i, k, j)
             zm2     (i, k, j) = 2.0d0*zm2     (i, k, j)
           endif
@@ -201,13 +204,15 @@ contains
     u2_sum = sum(u2); call sum_reduce(u2_sum, 0)
     b2_sum = sum(b2); call sum_reduce(b2_sum, 0)
 
-    u2dot_sum = sum((u2 - u2old1)/dt); call sum_reduce(u2dot_sum, 0)
-    b2dot_sum = sum((b2 - b2old1)/dt); call sum_reduce(b2dot_sum, 0)
+    u2dot_sum = sum((u2 - u2old)/dt); call sum_reduce(u2dot_sum, 0)
+    b2dot_sum = sum((b2 - b2old)/dt); call sum_reduce(b2dot_sum, 0)
 
     u2dissip_sum = sum(u2dissip); call sum_reduce(u2dissip_sum, 0)
     b2dissip_sum = sum(b2dissip); call sum_reduce(b2dissip_sum, 0)
 
-    p_u_sum      = sum(p_u); call sum_reduce(p_u_sum, 0)
+    p_ext_sum    = sum(p_ext); call sum_reduce(p_ext_sum, 0)
+    p_re_sum     = sum(p_re ); call sum_reduce(p_re_sum , 0)
+    p_ma_sum     = sum(p_ma ); call sum_reduce(p_ma_sum , 0)
 
     zp2_sum = sum(zp2); call sum_reduce(zp2_sum, 0)
     zm2_sum = sum(zm2); call sum_reduce(zm2_sum, 0)
@@ -226,11 +231,12 @@ contains
     call get_polar_spectrum_3d(zm2, zm2_bin)
     !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
   
+    if (proc0) call put_time_stamp(timer_diagnostics_total)
     call loop_io( &
                   u2_sum, b2_sum, &
                   u2dot_sum, b2dot_sum, &
                   u2dissip_sum, b2dissip_sum, &
-                  p_u_sum, &
+                  p_ext_sum, p_re_sum, p_ma_sum, &
                   zp2_sum, zm2_sum, &
                   bx0, by0, bz0, &
                   !
@@ -248,11 +254,13 @@ contains
     deallocate(bx2)
     deallocate(by2)
     deallocate(bz2)
-    deallocate(u2old1)
-    deallocate(b2old1)
+    deallocate(u2old)
+    deallocate(b2old)
     deallocate(u2dissip)
     deallocate(b2dissip)
-    deallocate(p_u)
+    deallocate(p_ext)
+    deallocate(p_re)
+    deallocate(p_ma)
     deallocate(zp2)
     deallocate(zm2)
 
@@ -266,8 +274,6 @@ contains
     deallocate(bz2_bin)
     deallocate(zp2_bin)
     deallocate(zm2_bin)
-
-    if (proc0) call put_time_stamp(timer_diagnostics)
   end subroutine loop_diagnostics
 
 
@@ -276,8 +282,8 @@ contains
 !! @date    29 Jun 2021
 !! @brief   Diagnostics for cross section of fileds
 !-----------------------------------------------!
-  subroutine loop_diagnostics_fields_secion
-    use io, only: loop_io_fields_section
+  subroutine loop_diagnostics_2D
+    use io, only: loop_io_2D
     use utils, only: curl
     use mp, only: proc0
     use grid, only: nlx, nly, nlz, nkx, nky, nkz
@@ -286,7 +292,7 @@ contains
     use fields, only: ux, uy, uz
     use fields, only: bx, by, bz
     use time, only: dt
-    use time_stamp, only: put_time_stamp, timer_diagnostics
+    use time_stamp, only: put_time_stamp, timer_diagnostics_total
     use params, only: shear
     use shearing_box, only: to_non_shearing_coordinate, tsc, nremap
     implicit none
@@ -319,7 +325,7 @@ contains
     if(nremap > 0 .and. tsc <= 5.*dt) then
       return !skip 5 loops after remapping
     endif
-    if (proc0) call put_time_stamp(timer_diagnostics)
+    if (proc0) call put_time_stamp(timer_diagnostics_total)
 
     allocate(f (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); f   = 0.d0
     allocate(fr(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); fr  = 0.d0
@@ -450,7 +456,8 @@ contains
     call sum_2d_k(b2, b2_kxy, b2_kyz, b2_kxz)
     !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
 
-    call loop_io_fields_section( &
+    if (proc0) call put_time_stamp(timer_diagnostics_total)
+    call loop_io_2D( &
                   ux_r_z0, ux_r_x0, ux_r_y0, &
                   uy_r_z0, uy_r_x0, uy_r_y0, &
                   uz_r_z0, uz_r_x0, uz_r_y0, &
@@ -538,9 +545,7 @@ contains
     deallocate(b2_kxy)
     deallocate(b2_kyz)
     deallocate(b2_kxz)
-
-    if (proc0) call put_time_stamp(timer_diagnostics)
-  end subroutine loop_diagnostics_fields_secion
+  end subroutine loop_diagnostics_2D
 
 
 !-----------------------------------------------!
@@ -592,7 +597,7 @@ contains
     use params, only: pi
     use utils, only: ranf
     use time, only: microsleep
-    use time_stamp, only: put_time_stamp, timer_diagnostics, timer_diagnostics_SF2
+    use time_stamp, only: put_time_stamp, timer_diagnostics_total, timer_diagnostics_SF2
     implicit none
     include 'mpif.h'
     real(r8) :: ll_x, ll_y, ll_z, theta, phi
@@ -610,7 +615,7 @@ contains
     real(r8), allocatable, dimension(:,:,:) :: bx_r, by_r, bz_r, ux_r, uy_r, uz_r
     real(r8), allocatable, dimension(:,:,:) :: src
 
-    if (proc0) call put_time_stamp(timer_diagnostics)
+    if (proc0) call put_time_stamp(timer_diagnostics_total)
     if (proc0) call put_time_stamp(timer_diagnostics_SF2)
 
     allocate(f   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); f    = 0.d0
@@ -780,6 +785,9 @@ contains
       enddo
     enddo
 
+    if (proc0) call put_time_stamp(timer_diagnostics_total)
+    if (proc0) call put_time_stamp(timer_diagnostics_SF2)
+
     call loop_io_SF2(nl, sf2b, sf2u)
 
     deallocate(f)
@@ -789,9 +797,6 @@ contains
     deallocate(ux_r)
     deallocate(uy_r)
     deallocate(uz_r)
-
-    if (proc0) call put_time_stamp(timer_diagnostics)
-    if (proc0) call put_time_stamp(timer_diagnostics_SF2)
   end subroutine loop_diagnostics_SF2
 
 
@@ -806,13 +811,14 @@ contains
 !-----------------------------------------------!
   subroutine loop_diagnostics_kpar
     use fields, only: bx, by, bz, ux, uy, uz
-    use mp, only: sum_reduce
+    use mp, only: proc0, sum_reduce
     use grid, only: kx, ky, kz, nlx, nly, nlz
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     use params, only: zi
     use shearing_box, only: k2t
     use io, only: loop_io_kpar
+    use time_stamp, only: put_time_stamp, timer_diagnostics_total, timer_diagnostics_kpar
     implicit none
     integer :: ii, i, j, k
 
@@ -842,6 +848,9 @@ contains
 
     complex(r8), allocatable, dimension(:,:,:) :: src_c
     real   (r8), allocatable, dimension(:,:,:) :: src_r
+
+    if (proc0) call put_time_stamp(timer_diagnostics_total)
+    if (proc0) call put_time_stamp(timer_diagnostics_kpar)
 
     allocate(kpar_b   (nkpolar))
     allocate(kpar_u   (nkpolar))
@@ -1033,6 +1042,9 @@ contains
         b1_ovr_b0(ii) = 0.d0
       endif
     enddo
+
+    if (proc0) call put_time_stamp(timer_diagnostics_total)
+    if (proc0) call put_time_stamp(timer_diagnostics_kpar)
 
     call loop_io_kpar(nkpolar, kpar_b, kpar_u, b1_ovr_b0)
 

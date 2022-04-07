@@ -1,7 +1,7 @@
 !-----------------------------------------------!
 !> @author  YK
 !! @date    20 Sep 2019
-!! @brief   IO for RMHD
+!! @brief   IO for MHD_INCOMP
 !-----------------------------------------------!
 module io
   use netcdf
@@ -9,20 +9,20 @@ module io
   use MPI
   implicit none
 
-  public :: init_io, finish_io, loop_io, loop_io_fields_section, loop_io_kpar, &
-            loop_io_SF2, loop_io_fields_3D, save_restart
+  public :: init_io, finish_io, loop_io, loop_io_2D, loop_io_kpar, &
+            loop_io_SF2, loop_io_3D, save_restart
 
   private
 
   ! MPIIO
   integer :: fh_ux, fh_uy, fh_uz, fh_bx, fh_by, fh_bz
   character(len=100) :: filename
-  integer (kind=MPI_OFFSET_KIND) :: filesize_ux, disp_ux
-  integer (kind=MPI_OFFSET_KIND) :: filesize_uy, disp_uy
-  integer (kind=MPI_OFFSET_KIND) :: filesize_uz, disp_uz
-  integer (kind=MPI_OFFSET_KIND) :: filesize_bx, disp_bx
-  integer (kind=MPI_OFFSET_KIND) :: filesize_by, disp_by
-  integer (kind=MPI_OFFSET_KIND) :: filesize_bz, disp_bz
+  integer (kind=MPI_OFFSET_KIND) :: disp_ux
+  integer (kind=MPI_OFFSET_KIND) :: disp_uy
+  integer (kind=MPI_OFFSET_KIND) :: disp_uz
+  integer (kind=MPI_OFFSET_KIND) :: disp_bx
+  integer (kind=MPI_OFFSET_KIND) :: disp_by
+  integer (kind=MPI_OFFSET_KIND) :: disp_bz
   integer :: field_time_unit
 
   ! NETCDF for regular output file
@@ -41,7 +41,7 @@ module io
   integer :: u2_sum_id, b2_sum_id
   integer :: u2dot_sum_id, b2dot_sum_id
   integer :: u2dissip_sum_id, b2dissip_sum_id
-  integer :: p_u_sum_id
+  integer :: p_ext_sum_id, p_re_sum_id, p_ma_sum_id
   integer :: zp2_sum_id, zm2_sum_id
   ! mean magnetic field
   integer :: b0_id
@@ -57,9 +57,9 @@ module io
   integer :: nout
 
   ! NETCDF for cross section output file
-  integer (kind_nf) :: ncid_fld_section
-  integer :: xx_fld_section_id, yy_fld_section_id, zz_fld_section_id, tt_fld_section_id
-  integer :: kx_fld_section_id, ky_fld_section_id, kz_fld_section_id
+  integer (kind_nf) :: ncid_2D
+  integer :: xx_2D_id, yy_2D_id, zz_2D_id, tt_2D_id
+  integer :: kx_2D_id, ky_2D_id, kz_2D_id
 
   integer :: ux_r_z0_id, ux_r_x0_id, ux_r_y0_id
   integer :: uy_r_z0_id, uy_r_x0_id, uy_r_y0_id
@@ -80,12 +80,12 @@ module io
   integer :: u2_kxy_id, u2_kyz_id, u2_kxz_id
   integer :: b2_kxy_id, b2_kyz_id, b2_kxz_id
 
-  integer (kind_nf) :: xx_fld_section_dim, yy_fld_section_dim, zz_fld_section_dim, tt_fld_section_dim
-  integer (kind_nf) :: kx_fld_section_dim, ky_fld_section_dim, kz_fld_section_dim
+  integer (kind_nf) :: xx_2D_dim, yy_2D_dim, zz_2D_dim, tt_2D_dim
+  integer (kind_nf) :: kx_2D_dim, ky_2D_dim, kz_2D_dim
   integer, dimension (3) ::  z0_dim,  x0_dim,  y0_dim
   integer, dimension (3) :: kxy_dim, kyz_dim, kxz_dim
 
-  integer :: nout_fld_section
+  integer :: nout_2D
 
   ! NETCDF for kpar output file
   integer (kind_nf) :: ncid_kpar
@@ -133,49 +133,38 @@ contains
   subroutine init_io_decomp
     use mp, only: proc0
     use file, only: open_output_file
+    use params, only: restart_dir
     implicit none
     integer :: ierr
 
-    ! open file for IO
     filename = 'ux.dat'
     call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, MPI_MODE_CREATE+MPI_MODE_WRONLY, MPI_INFO_NULL, fh_ux, ierr)
-    filesize_ux = 0_MPI_OFFSET_KIND
-    call MPI_FILE_SET_SIZE(fh_ux, filesize_ux, ierr)  ! guarantee overwriting
+    call MPI_FILE_SET_SIZE(fh_ux, 0_MPI_OFFSET_KIND, ierr)  ! guarantee overwriting
     disp_ux = 0_MPI_OFFSET_KIND
 
-    ! open file for IO
     filename = 'uy.dat'
     call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, MPI_MODE_CREATE+MPI_MODE_WRONLY, MPI_INFO_NULL, fh_uy, ierr)
-    filesize_uy = 0_MPI_OFFSET_KIND
-    call MPI_FILE_SET_SIZE(fh_uy, filesize_uy, ierr)  ! guarantee overwriting
+    call MPI_FILE_SET_SIZE(fh_uy, 0_MPI_OFFSET_KIND, ierr)  ! guarantee overwriting
     disp_uy = 0_MPI_OFFSET_KIND
 
-    ! open file for IO
     filename = 'uz.dat'
     call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, MPI_MODE_CREATE+MPI_MODE_WRONLY, MPI_INFO_NULL, fh_uz, ierr)
-    filesize_uz = 0_MPI_OFFSET_KIND
-    call MPI_FILE_SET_SIZE(fh_uz, filesize_uz, ierr)  ! guarantee overwriting
+    call MPI_FILE_SET_SIZE(fh_uz, 0_MPI_OFFSET_KIND, ierr)  ! guarantee overwriting
     disp_uz = 0_MPI_OFFSET_KIND
 
-    ! open file for IO
     filename = 'bx.dat'
     call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, MPI_MODE_CREATE+MPI_MODE_WRONLY, MPI_INFO_NULL, fh_bx, ierr)
-    filesize_bx = 0_MPI_OFFSET_KIND
-    call MPI_FILE_SET_SIZE(fh_bx, filesize_bx, ierr)  ! guarantee overwriting
+    call MPI_FILE_SET_SIZE(fh_bx, 0_MPI_OFFSET_KIND, ierr)  ! guarantee overwriting
     disp_bx = 0_MPI_OFFSET_KIND
 
-    ! open file for IO
     filename = 'by.dat'
     call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, MPI_MODE_CREATE+MPI_MODE_WRONLY, MPI_INFO_NULL, fh_by, ierr)
-    filesize_by = 0_MPI_OFFSET_KIND
-    call MPI_FILE_SET_SIZE(fh_by, filesize_by, ierr)  ! guarantee overwriting
+    call MPI_FILE_SET_SIZE(fh_by, 0_MPI_OFFSET_KIND, ierr)  ! guarantee overwriting
     disp_by = 0_MPI_OFFSET_KIND
 
-    ! open file for IO
     filename = 'bz.dat'
     call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, MPI_MODE_CREATE+MPI_MODE_WRONLY, MPI_INFO_NULL, fh_bz, ierr)
-    filesize_bz = 0_MPI_OFFSET_KIND
-    call MPI_FILE_SET_SIZE(fh_bz, filesize_bz, ierr)  ! guarantee overwriting
+    call MPI_FILE_SET_SIZE(fh_bz, 0_MPI_OFFSET_KIND, ierr)  ! guarantee overwriting
     disp_bz = 0_MPI_OFFSET_KIND
 
     if(proc0) then
@@ -243,7 +232,9 @@ contains
       status = nf90_def_var (ncid, 'b2dot_sum', NF90_DOUBLE, tt_dim, b2dot_sum_id)
       status = nf90_def_var (ncid, 'u2dissip_sum', NF90_DOUBLE, tt_dim, u2dissip_sum_id)
       status = nf90_def_var (ncid, 'b2dissip_sum', NF90_DOUBLE, tt_dim, b2dissip_sum_id)
-      status = nf90_def_var (ncid, 'p_u_sum'     , NF90_DOUBLE, tt_dim, p_u_sum_id   )
+      status = nf90_def_var (ncid, 'p_ext_sum'   , NF90_DOUBLE, tt_dim, p_ext_sum_id  )
+      status = nf90_def_var (ncid, 'p_re_sum'    , NF90_DOUBLE, tt_dim, p_re_sum_id   )
+      status = nf90_def_var (ncid, 'p_ma_sum'    , NF90_DOUBLE, tt_dim, p_ma_sum_id   )
       status = nf90_def_var (ncid, 'zp2_sum', NF90_DOUBLE, tt_dim, zp2_sum_id)
       status = nf90_def_var (ncid, 'zm2_sum', NF90_DOUBLE, tt_dim, zm2_sum_id)
       ! polar spectrum
@@ -286,110 +277,110 @@ contains
       !--------------------------------------------------!
       ! Output for cross sections of fields
       !--------------------------------------------------!
-      filename = trim(runname)//'.out.fields_section.nc' ! File name
-      status = nf90_create (filename, NF90_CLOBBER, ncid_fld_section)
+      filename = trim(runname)//'.out.2D.nc' ! File name
+      status = nf90_create (filename, NF90_CLOBBER, ncid_2D)
 
-      status = nf90_put_att (ncid_fld_section, NF90_GLOBAL, 'title', 'calliope simulation data')
-      status = nf90_def_dim (ncid_fld_section, 'char10', 10, char10_dim)
-      status = nf90_def_var (ncid_fld_section, 'run_info', NF90_CHAR, char10_dim, run_id)
-      status = nf90_put_att (ncid_fld_section, run_id, 'model', _MODEL_)
+      status = nf90_put_att (ncid_2D, NF90_GLOBAL, 'title', 'calliope simulation data')
+      status = nf90_def_dim (ncid_2D, 'char10', 10, char10_dim)
+      status = nf90_def_var (ncid_2D, 'run_info', NF90_CHAR, char10_dim, run_id)
+      status = nf90_put_att (ncid_2D, run_id, 'model', _MODEL_)
 
-      status = nf90_def_dim (ncid_fld_section, 'xx', size(xx), xx_fld_section_dim)
-      status = nf90_def_dim (ncid_fld_section, 'yy', size(yy), yy_fld_section_dim)
-      status = nf90_def_dim (ncid_fld_section, 'zz', size(zz), zz_fld_section_dim)
-      status = nf90_def_dim (ncid_fld_section, 'kx', size(kx), kx_fld_section_dim)
-      status = nf90_def_dim (ncid_fld_section, 'ky', size(ky), ky_fld_section_dim)
-      status = nf90_def_dim (ncid_fld_section, 'kz', size(kz), kz_fld_section_dim)
-      status = nf90_def_dim (ncid_fld_section, 'tt', NF90_UNLIMITED, tt_fld_section_dim)
+      status = nf90_def_dim (ncid_2D, 'xx', size(xx), xx_2D_dim)
+      status = nf90_def_dim (ncid_2D, 'yy', size(yy), yy_2D_dim)
+      status = nf90_def_dim (ncid_2D, 'zz', size(zz), zz_2D_dim)
+      status = nf90_def_dim (ncid_2D, 'kx', size(kx), kx_2D_dim)
+      status = nf90_def_dim (ncid_2D, 'ky', size(ky), ky_2D_dim)
+      status = nf90_def_dim (ncid_2D, 'kz', size(kz), kz_2D_dim)
+      status = nf90_def_dim (ncid_2D, 'tt', NF90_UNLIMITED, tt_2D_dim)
 
-      status = nf90_def_var (ncid_fld_section, 'xx', NF90_DOUBLE, xx_fld_section_dim, xx_fld_section_id)
-      status = nf90_def_var (ncid_fld_section, 'yy', NF90_DOUBLE, yy_fld_section_dim, yy_fld_section_id)
-      status = nf90_def_var (ncid_fld_section, 'zz', NF90_DOUBLE, zz_fld_section_dim, zz_fld_section_id)
-      status = nf90_def_var (ncid_fld_section, 'kx', NF90_DOUBLE, kx_fld_section_dim, kx_fld_section_id)
-      status = nf90_def_var (ncid_fld_section, 'ky', NF90_DOUBLE, ky_fld_section_dim, ky_fld_section_id)
-      status = nf90_def_var (ncid_fld_section, 'kz', NF90_DOUBLE, kz_fld_section_dim, kz_fld_section_id)
-      status = nf90_def_var (ncid_fld_section, 'tt', NF90_DOUBLE, tt_fld_section_dim, tt_fld_section_id)
+      status = nf90_def_var (ncid_2D, 'xx', NF90_DOUBLE, xx_2D_dim, xx_2D_id)
+      status = nf90_def_var (ncid_2D, 'yy', NF90_DOUBLE, yy_2D_dim, yy_2D_id)
+      status = nf90_def_var (ncid_2D, 'zz', NF90_DOUBLE, zz_2D_dim, zz_2D_id)
+      status = nf90_def_var (ncid_2D, 'kx', NF90_DOUBLE, kx_2D_dim, kx_2D_id)
+      status = nf90_def_var (ncid_2D, 'ky', NF90_DOUBLE, ky_2D_dim, ky_2D_id)
+      status = nf90_def_var (ncid_2D, 'kz', NF90_DOUBLE, kz_2D_dim, kz_2D_id)
+      status = nf90_def_var (ncid_2D, 'tt', NF90_DOUBLE, tt_2D_dim, tt_2D_id)
 
-      z0_dim (1) = xx_fld_section_dim
-      z0_dim (2) = yy_fld_section_dim
-      z0_dim (3) = tt_fld_section_dim
+      z0_dim (1) = xx_2D_dim
+      z0_dim (2) = yy_2D_dim
+      z0_dim (3) = tt_2D_dim
 
-      x0_dim (1) = yy_fld_section_dim
-      x0_dim (2) = zz_fld_section_dim
-      x0_dim (3) = tt_fld_section_dim
+      x0_dim (1) = yy_2D_dim
+      x0_dim (2) = zz_2D_dim
+      x0_dim (3) = tt_2D_dim
 
-      y0_dim (1) = xx_fld_section_dim
-      y0_dim (2) = zz_fld_section_dim
-      y0_dim (3) = tt_fld_section_dim
+      y0_dim (1) = xx_2D_dim
+      y0_dim (2) = zz_2D_dim
+      y0_dim (3) = tt_2D_dim
 
-      kxy_dim(1) = kx_fld_section_dim
-      kxy_dim(2) = ky_fld_section_dim
-      kxy_dim(3) = tt_fld_section_dim
+      kxy_dim(1) = kx_2D_dim
+      kxy_dim(2) = ky_2D_dim
+      kxy_dim(3) = tt_2D_dim
 
-      kyz_dim(1) = ky_fld_section_dim
-      kyz_dim(2) = kz_fld_section_dim
-      kyz_dim(3) = tt_fld_section_dim
+      kyz_dim(1) = ky_2D_dim
+      kyz_dim(2) = kz_2D_dim
+      kyz_dim(3) = tt_2D_dim
 
-      kxz_dim(1) = kx_fld_section_dim
-      kxz_dim(2) = kz_fld_section_dim
-      kxz_dim(3) = tt_fld_section_dim
-      status = nf90_def_var (ncid_fld_section, 'ux_r_z0', NF90_DOUBLE, z0_dim, ux_r_z0_id)
-      status = nf90_def_var (ncid_fld_section, 'ux_r_x0', NF90_DOUBLE, x0_dim, ux_r_x0_id)
-      status = nf90_def_var (ncid_fld_section, 'ux_r_y0', NF90_DOUBLE, y0_dim, ux_r_y0_id)
-      status = nf90_def_var (ncid_fld_section, 'uy_r_z0', NF90_DOUBLE, z0_dim, uy_r_z0_id)
-      status = nf90_def_var (ncid_fld_section, 'uy_r_x0', NF90_DOUBLE, x0_dim, uy_r_x0_id)
-      status = nf90_def_var (ncid_fld_section, 'uy_r_y0', NF90_DOUBLE, y0_dim, uy_r_y0_id)
-      status = nf90_def_var (ncid_fld_section, 'uz_r_z0', NF90_DOUBLE, z0_dim, uz_r_z0_id)
-      status = nf90_def_var (ncid_fld_section, 'uz_r_x0', NF90_DOUBLE, x0_dim, uz_r_x0_id)
-      status = nf90_def_var (ncid_fld_section, 'uz_r_y0', NF90_DOUBLE, y0_dim, uz_r_y0_id)
+      kxz_dim(1) = kx_2D_dim
+      kxz_dim(2) = kz_2D_dim
+      kxz_dim(3) = tt_2D_dim
+      status = nf90_def_var (ncid_2D, 'ux_r_z0', NF90_DOUBLE, z0_dim, ux_r_z0_id)
+      status = nf90_def_var (ncid_2D, 'ux_r_x0', NF90_DOUBLE, x0_dim, ux_r_x0_id)
+      status = nf90_def_var (ncid_2D, 'ux_r_y0', NF90_DOUBLE, y0_dim, ux_r_y0_id)
+      status = nf90_def_var (ncid_2D, 'uy_r_z0', NF90_DOUBLE, z0_dim, uy_r_z0_id)
+      status = nf90_def_var (ncid_2D, 'uy_r_x0', NF90_DOUBLE, x0_dim, uy_r_x0_id)
+      status = nf90_def_var (ncid_2D, 'uy_r_y0', NF90_DOUBLE, y0_dim, uy_r_y0_id)
+      status = nf90_def_var (ncid_2D, 'uz_r_z0', NF90_DOUBLE, z0_dim, uz_r_z0_id)
+      status = nf90_def_var (ncid_2D, 'uz_r_x0', NF90_DOUBLE, x0_dim, uz_r_x0_id)
+      status = nf90_def_var (ncid_2D, 'uz_r_y0', NF90_DOUBLE, y0_dim, uz_r_y0_id)
                                              
-      status = nf90_def_var (ncid_fld_section, 'wx_r_z0', NF90_DOUBLE, z0_dim, wx_r_z0_id)
-      status = nf90_def_var (ncid_fld_section, 'wx_r_x0', NF90_DOUBLE, x0_dim, wx_r_x0_id)
-      status = nf90_def_var (ncid_fld_section, 'wx_r_y0', NF90_DOUBLE, y0_dim, wx_r_y0_id)
-      status = nf90_def_var (ncid_fld_section, 'wy_r_z0', NF90_DOUBLE, z0_dim, wy_r_z0_id)
-      status = nf90_def_var (ncid_fld_section, 'wy_r_x0', NF90_DOUBLE, x0_dim, wy_r_x0_id)
-      status = nf90_def_var (ncid_fld_section, 'wy_r_y0', NF90_DOUBLE, y0_dim, wy_r_y0_id)
-      status = nf90_def_var (ncid_fld_section, 'wz_r_z0', NF90_DOUBLE, z0_dim, wz_r_z0_id)
-      status = nf90_def_var (ncid_fld_section, 'wz_r_x0', NF90_DOUBLE, x0_dim, wz_r_x0_id)
-      status = nf90_def_var (ncid_fld_section, 'wz_r_y0', NF90_DOUBLE, y0_dim, wz_r_y0_id)
+      status = nf90_def_var (ncid_2D, 'wx_r_z0', NF90_DOUBLE, z0_dim, wx_r_z0_id)
+      status = nf90_def_var (ncid_2D, 'wx_r_x0', NF90_DOUBLE, x0_dim, wx_r_x0_id)
+      status = nf90_def_var (ncid_2D, 'wx_r_y0', NF90_DOUBLE, y0_dim, wx_r_y0_id)
+      status = nf90_def_var (ncid_2D, 'wy_r_z0', NF90_DOUBLE, z0_dim, wy_r_z0_id)
+      status = nf90_def_var (ncid_2D, 'wy_r_x0', NF90_DOUBLE, x0_dim, wy_r_x0_id)
+      status = nf90_def_var (ncid_2D, 'wy_r_y0', NF90_DOUBLE, y0_dim, wy_r_y0_id)
+      status = nf90_def_var (ncid_2D, 'wz_r_z0', NF90_DOUBLE, z0_dim, wz_r_z0_id)
+      status = nf90_def_var (ncid_2D, 'wz_r_x0', NF90_DOUBLE, x0_dim, wz_r_x0_id)
+      status = nf90_def_var (ncid_2D, 'wz_r_y0', NF90_DOUBLE, y0_dim, wz_r_y0_id)
                                              
-      status = nf90_def_var (ncid_fld_section, 'bx_r_z0', NF90_DOUBLE, z0_dim, bx_r_z0_id)
-      status = nf90_def_var (ncid_fld_section, 'bx_r_x0', NF90_DOUBLE, x0_dim, bx_r_x0_id)
-      status = nf90_def_var (ncid_fld_section, 'bx_r_y0', NF90_DOUBLE, y0_dim, bx_r_y0_id)
-      status = nf90_def_var (ncid_fld_section, 'by_r_z0', NF90_DOUBLE, z0_dim, by_r_z0_id)
-      status = nf90_def_var (ncid_fld_section, 'by_r_x0', NF90_DOUBLE, x0_dim, by_r_x0_id)
-      status = nf90_def_var (ncid_fld_section, 'by_r_y0', NF90_DOUBLE, y0_dim, by_r_y0_id)
-      status = nf90_def_var (ncid_fld_section, 'bz_r_z0', NF90_DOUBLE, z0_dim, bz_r_z0_id)
-      status = nf90_def_var (ncid_fld_section, 'bz_r_x0', NF90_DOUBLE, x0_dim, bz_r_x0_id)
-      status = nf90_def_var (ncid_fld_section, 'bz_r_y0', NF90_DOUBLE, y0_dim, bz_r_y0_id)
+      status = nf90_def_var (ncid_2D, 'bx_r_z0', NF90_DOUBLE, z0_dim, bx_r_z0_id)
+      status = nf90_def_var (ncid_2D, 'bx_r_x0', NF90_DOUBLE, x0_dim, bx_r_x0_id)
+      status = nf90_def_var (ncid_2D, 'bx_r_y0', NF90_DOUBLE, y0_dim, bx_r_y0_id)
+      status = nf90_def_var (ncid_2D, 'by_r_z0', NF90_DOUBLE, z0_dim, by_r_z0_id)
+      status = nf90_def_var (ncid_2D, 'by_r_x0', NF90_DOUBLE, x0_dim, by_r_x0_id)
+      status = nf90_def_var (ncid_2D, 'by_r_y0', NF90_DOUBLE, y0_dim, by_r_y0_id)
+      status = nf90_def_var (ncid_2D, 'bz_r_z0', NF90_DOUBLE, z0_dim, bz_r_z0_id)
+      status = nf90_def_var (ncid_2D, 'bz_r_x0', NF90_DOUBLE, x0_dim, bz_r_x0_id)
+      status = nf90_def_var (ncid_2D, 'bz_r_y0', NF90_DOUBLE, y0_dim, bz_r_y0_id)
                                              
-      status = nf90_def_var (ncid_fld_section, 'jx_r_z0', NF90_DOUBLE, z0_dim, jx_r_z0_id)
-      status = nf90_def_var (ncid_fld_section, 'jx_r_x0', NF90_DOUBLE, x0_dim, jx_r_x0_id)
-      status = nf90_def_var (ncid_fld_section, 'jx_r_y0', NF90_DOUBLE, y0_dim, jx_r_y0_id)
-      status = nf90_def_var (ncid_fld_section, 'jy_r_z0', NF90_DOUBLE, z0_dim, jy_r_z0_id)
-      status = nf90_def_var (ncid_fld_section, 'jy_r_x0', NF90_DOUBLE, x0_dim, jy_r_x0_id)
-      status = nf90_def_var (ncid_fld_section, 'jy_r_y0', NF90_DOUBLE, y0_dim, jy_r_y0_id)
-      status = nf90_def_var (ncid_fld_section, 'jz_r_z0', NF90_DOUBLE, z0_dim, jz_r_z0_id)
-      status = nf90_def_var (ncid_fld_section, 'jz_r_x0', NF90_DOUBLE, x0_dim, jz_r_x0_id)
-      status = nf90_def_var (ncid_fld_section, 'jz_r_y0', NF90_DOUBLE, y0_dim, jz_r_y0_id)
+      status = nf90_def_var (ncid_2D, 'jx_r_z0', NF90_DOUBLE, z0_dim, jx_r_z0_id)
+      status = nf90_def_var (ncid_2D, 'jx_r_x0', NF90_DOUBLE, x0_dim, jx_r_x0_id)
+      status = nf90_def_var (ncid_2D, 'jx_r_y0', NF90_DOUBLE, y0_dim, jx_r_y0_id)
+      status = nf90_def_var (ncid_2D, 'jy_r_z0', NF90_DOUBLE, z0_dim, jy_r_z0_id)
+      status = nf90_def_var (ncid_2D, 'jy_r_x0', NF90_DOUBLE, x0_dim, jy_r_x0_id)
+      status = nf90_def_var (ncid_2D, 'jy_r_y0', NF90_DOUBLE, y0_dim, jy_r_y0_id)
+      status = nf90_def_var (ncid_2D, 'jz_r_z0', NF90_DOUBLE, z0_dim, jz_r_z0_id)
+      status = nf90_def_var (ncid_2D, 'jz_r_x0', NF90_DOUBLE, x0_dim, jz_r_x0_id)
+      status = nf90_def_var (ncid_2D, 'jz_r_y0', NF90_DOUBLE, y0_dim, jz_r_y0_id)
 
-      status = nf90_def_var (ncid_fld_section, 'u2_kxy', NF90_DOUBLE, kxy_dim, u2_kxy_id)
-      status = nf90_def_var (ncid_fld_section, 'u2_kyz', NF90_DOUBLE, kyz_dim, u2_kyz_id)
-      status = nf90_def_var (ncid_fld_section, 'u2_kxz', NF90_DOUBLE, kxz_dim, u2_kxz_id)
-      status = nf90_def_var (ncid_fld_section, 'b2_kxy', NF90_DOUBLE, kxy_dim, b2_kxy_id)
-      status = nf90_def_var (ncid_fld_section, 'b2_kyz', NF90_DOUBLE, kyz_dim, b2_kyz_id)
-      status = nf90_def_var (ncid_fld_section, 'b2_kxz', NF90_DOUBLE, kxz_dim, b2_kxz_id)
+      status = nf90_def_var (ncid_2D, 'u2_kxy', NF90_DOUBLE, kxy_dim, u2_kxy_id)
+      status = nf90_def_var (ncid_2D, 'u2_kyz', NF90_DOUBLE, kyz_dim, u2_kyz_id)
+      status = nf90_def_var (ncid_2D, 'u2_kxz', NF90_DOUBLE, kxz_dim, u2_kxz_id)
+      status = nf90_def_var (ncid_2D, 'b2_kxy', NF90_DOUBLE, kxy_dim, b2_kxy_id)
+      status = nf90_def_var (ncid_2D, 'b2_kyz', NF90_DOUBLE, kyz_dim, b2_kyz_id)
+      status = nf90_def_var (ncid_2D, 'b2_kxz', NF90_DOUBLE, kxz_dim, b2_kxz_id)
 
-      status = nf90_enddef (ncid_fld_section)  ! out of definition mode
+      status = nf90_enddef (ncid_2D)  ! out of definition mode
 
-      status = nf90_put_var (ncid_fld_section, xx_fld_section_id, xx)
-      status = nf90_put_var (ncid_fld_section, yy_fld_section_id, yy)
-      status = nf90_put_var (ncid_fld_section, zz_fld_section_id, zz)
-      status = nf90_put_var (ncid_fld_section, kx_fld_section_id, kx)
-      status = nf90_put_var (ncid_fld_section, ky_fld_section_id, ky)
-      status = nf90_put_var (ncid_fld_section, kz_fld_section_id, kz)
+      status = nf90_put_var (ncid_2D, xx_2D_id, xx)
+      status = nf90_put_var (ncid_2D, yy_2D_id, yy)
+      status = nf90_put_var (ncid_2D, zz_2D_id, zz)
+      status = nf90_put_var (ncid_2D, kx_2D_id, kx)
+      status = nf90_put_var (ncid_2D, ky_2D_id, ky)
+      status = nf90_put_var (ncid_2D, kz_2D_id, kz)
 
-      nout_fld_section = 1
+      nout_2D = 1
 
       !--------------------------------------------------!
       ! Output for kpar
@@ -466,7 +457,7 @@ contains
                       u2_sum, b2_sum, &
                       u2dot_sum, b2dot_sum, &
                       u2dissip_sum, b2dissip_sum, &
-                      p_u_sum, &
+                      p_ext_sum, p_re_sum, p_ma_sum, &
                       zp2_sum, zm2_sum, &
                       bx0, by0, bz0, &
                       !
@@ -478,11 +469,12 @@ contains
     use time, only: tt
     use grid, only: nlx, nly, nlz
     use mp, only: proc0
+    use time_stamp, only: put_time_stamp, timer_io_total, timer_io_2D
     implicit none
     real(r8), intent(in) :: u2_sum, b2_sum
     real(r8), intent(in) :: u2dot_sum, b2dot_sum
     real(r8), intent(in) :: u2dissip_sum, b2dissip_sum
-    real(r8), intent(in) :: p_u_sum
+    real(r8), intent(in) :: p_ext_sum, p_re_sum, p_ma_sum
     real(r8), intent(in) :: zp2_sum, zm2_sum
     real(r8), intent(in) :: bx0, by0, bz0
 
@@ -492,6 +484,8 @@ contains
     real(r8), intent(in) :: zp2_bin(1:nkpolar), zm2_bin(1:nkpolar)
 
     integer, dimension (2) :: start2, count2
+
+    if (proc0) call put_time_stamp(timer_io_total)
 
     ! output via NETCDF
     if(proc0) then
@@ -503,7 +497,9 @@ contains
       status = nf90_put_var (ncid, b2dot_sum_id, b2dot_sum, start=(/nout/))
       status = nf90_put_var (ncid, u2dissip_sum_id, u2dissip_sum, start=(/nout/))
       status = nf90_put_var (ncid, b2dissip_sum_id, b2dissip_sum, start=(/nout/))
-      status = nf90_put_var (ncid, p_u_sum_id, p_u_sum, start=(/nout/))
+      status = nf90_put_var (ncid, p_ext_sum_id, p_ext_sum, start=(/nout/))
+      status = nf90_put_var (ncid, p_re_sum_id , p_re_sum , start=(/nout/))
+      status = nf90_put_var (ncid, p_ma_sum_id , p_ma_sum , start=(/nout/))
       status = nf90_put_var (ncid, zp2_sum_id, zp2_sum, start=(/nout/))
       status = nf90_put_var (ncid, zm2_sum_id, zm2_sum, start=(/nout/))
       ! mean magnetic field
@@ -534,6 +530,8 @@ contains
 
       nout = nout + 1
     endif
+
+    if (proc0) call put_time_stamp(timer_io_total)
   end subroutine loop_io
 
 
@@ -543,7 +541,7 @@ contains
 !! @brief   Append variables to NETCDF
 !           for cross section of fields
 !-----------------------------------------------!
-  subroutine loop_io_fields_section( &
+  subroutine loop_io_2D( &
                       ux_r_z0, ux_r_x0, ux_r_y0, &
                       uy_r_z0, uy_r_x0, uy_r_y0, &
                       uz_r_z0, uz_r_x0, uz_r_y0, &
@@ -566,6 +564,7 @@ contains
     use time, only: tt
     use grid, only: nlx, nly, nlz, nkx, nky, nkz
     use mp, only: proc0
+    use time_stamp, only: put_time_stamp, timer_io_total, timer_io_2D
     implicit none
 
     real(r8), intent(in) :: ux_r_z0(nlx, nly), ux_r_x0(nly, nlz), ux_r_y0(nlx, nlz)
@@ -589,118 +588,124 @@ contains
 
     integer, dimension (3) :: start3, count3
 
+    if (proc0) call put_time_stamp(timer_io_total)
+    if (proc0) call put_time_stamp(timer_io_2D)
+
     ! output via NETCDF
     if(proc0) then
       ! z=0 cut
-      status = nf90_put_var (ncid_fld_section, tt_fld_section_id, tt, start=(/nout_fld_section/))
+      status = nf90_put_var (ncid_2D, tt_2D_id, tt, start=(/nout_2D/))
       start3(1) = 1
       start3(2) = 1
-      start3(3) = nout_fld_section
+      start3(3) = nout_2D
 
       count3(1) = nlx
       count3(2) = nly
       count3(3) = 1
-      status = nf90_put_var (ncid_fld_section, ux_r_z0_id, ux_r_z0, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, uy_r_z0_id, uy_r_z0, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, uz_r_z0_id, uz_r_z0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, ux_r_z0_id, ux_r_z0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, uy_r_z0_id, uy_r_z0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, uz_r_z0_id, uz_r_z0, start=start3, count=count3)
                                              
-      status = nf90_put_var (ncid_fld_section, wx_r_z0_id, wx_r_z0, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, wy_r_z0_id, wy_r_z0, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, wz_r_z0_id, wz_r_z0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, wx_r_z0_id, wx_r_z0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, wy_r_z0_id, wy_r_z0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, wz_r_z0_id, wz_r_z0, start=start3, count=count3)
                                              
-      status = nf90_put_var (ncid_fld_section, bx_r_z0_id, bx_r_z0, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, by_r_z0_id, by_r_z0, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, bz_r_z0_id, bz_r_z0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, bx_r_z0_id, bx_r_z0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, by_r_z0_id, by_r_z0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, bz_r_z0_id, bz_r_z0, start=start3, count=count3)
                                              
-      status = nf90_put_var (ncid_fld_section, jx_r_z0_id, jx_r_z0, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, jy_r_z0_id, jy_r_z0, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, jz_r_z0_id, jz_r_z0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, jx_r_z0_id, jx_r_z0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, jy_r_z0_id, jy_r_z0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, jz_r_z0_id, jz_r_z0, start=start3, count=count3)
       ! x=0 cut
       start3(1) = 1
       start3(2) = 1
-      start3(3) = nout_fld_section
+      start3(3) = nout_2D
 
       count3(1) = nly
       count3(2) = nlz
       count3(3) = 1
-      status = nf90_put_var (ncid_fld_section, ux_r_x0_id, ux_r_x0, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, uy_r_x0_id, uy_r_x0, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, uz_r_x0_id, uz_r_x0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, ux_r_x0_id, ux_r_x0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, uy_r_x0_id, uy_r_x0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, uz_r_x0_id, uz_r_x0, start=start3, count=count3)
                                              
-      status = nf90_put_var (ncid_fld_section, wx_r_x0_id, wx_r_x0, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, wy_r_x0_id, wy_r_x0, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, wz_r_x0_id, wz_r_x0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, wx_r_x0_id, wx_r_x0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, wy_r_x0_id, wy_r_x0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, wz_r_x0_id, wz_r_x0, start=start3, count=count3)
                                              
-      status = nf90_put_var (ncid_fld_section, bx_r_x0_id, bx_r_x0, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, by_r_x0_id, by_r_x0, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, bz_r_x0_id, bz_r_x0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, bx_r_x0_id, bx_r_x0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, by_r_x0_id, by_r_x0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, bz_r_x0_id, bz_r_x0, start=start3, count=count3)
                                              
-      status = nf90_put_var (ncid_fld_section, jx_r_x0_id, jx_r_x0, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, jy_r_x0_id, jy_r_x0, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, jz_r_x0_id, jz_r_x0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, jx_r_x0_id, jx_r_x0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, jy_r_x0_id, jy_r_x0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, jz_r_x0_id, jz_r_x0, start=start3, count=count3)
       ! y=0 cut
       start3(1) = 1
       start3(2) = 1
-      start3(3) = nout_fld_section
+      start3(3) = nout_2D
 
       count3(1) = nlx
       count3(2) = nlz
       count3(3) = 1
-      status = nf90_put_var (ncid_fld_section, ux_r_y0_id, ux_r_y0, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, uy_r_y0_id, uy_r_y0, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, uz_r_y0_id, uz_r_y0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, ux_r_y0_id, ux_r_y0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, uy_r_y0_id, uy_r_y0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, uz_r_y0_id, uz_r_y0, start=start3, count=count3)
                                              
-      status = nf90_put_var (ncid_fld_section, wx_r_y0_id, wx_r_y0, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, wy_r_y0_id, wy_r_y0, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, wz_r_y0_id, wz_r_y0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, wx_r_y0_id, wx_r_y0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, wy_r_y0_id, wy_r_y0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, wz_r_y0_id, wz_r_y0, start=start3, count=count3)
                                              
-      status = nf90_put_var (ncid_fld_section, bx_r_y0_id, bx_r_y0, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, by_r_y0_id, by_r_y0, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, bz_r_y0_id, bz_r_y0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, bx_r_y0_id, bx_r_y0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, by_r_y0_id, by_r_y0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, bz_r_y0_id, bz_r_y0, start=start3, count=count3)
                                              
-      status = nf90_put_var (ncid_fld_section, jx_r_y0_id, jx_r_y0, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, jy_r_y0_id, jy_r_y0, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, jz_r_y0_id, jz_r_y0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, jx_r_y0_id, jx_r_y0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, jy_r_y0_id, jy_r_y0, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, jz_r_y0_id, jz_r_y0, start=start3, count=count3)
 
       ! kz sum
-      status = nf90_put_var (ncid_fld_section, tt_fld_section_id, tt, start=(/nout_fld_section/))
+      status = nf90_put_var (ncid_2D, tt_2D_id, tt, start=(/nout_2D/))
       start3(1) = 1
       start3(2) = 1
-      start3(3) = nout_fld_section
+      start3(3) = nout_2D
 
       count3(1) = nkx
       count3(2) = nky
       count3(3) = 1
-      status = nf90_put_var (ncid_fld_section, u2_kxy_id, u2_kxy, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, b2_kxy_id, b2_kxy, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, u2_kxy_id, u2_kxy, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, b2_kxy_id, b2_kxy, start=start3, count=count3)
       ! kx sum
-      status = nf90_put_var (ncid_fld_section, tt_fld_section_id, tt, start=(/nout_fld_section/))
+      status = nf90_put_var (ncid_2D, tt_2D_id, tt, start=(/nout_2D/))
       start3(1) = 1
       start3(2) = 1
-      start3(3) = nout_fld_section
+      start3(3) = nout_2D
 
       count3(1) = nky
       count3(2) = nkz
       count3(3) = 1
-      status = nf90_put_var (ncid_fld_section, u2_kyz_id, u2_kyz, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, b2_kyz_id, b2_kyz, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, u2_kyz_id, u2_kyz, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, b2_kyz_id, b2_kyz, start=start3, count=count3)
       ! ky sum
-      status = nf90_put_var (ncid_fld_section, tt_fld_section_id, tt, start=(/nout_fld_section/))
+      status = nf90_put_var (ncid_2D, tt_2D_id, tt, start=(/nout_2D/))
       start3(1) = 1
       start3(2) = 1
-      start3(3) = nout_fld_section
+      start3(3) = nout_2D
 
       count3(1) = nkx
       count3(2) = nkz
       count3(3) = 1
-      status = nf90_put_var (ncid_fld_section, u2_kxz_id, u2_kxz, start=start3, count=count3)
-      status = nf90_put_var (ncid_fld_section, b2_kxz_id, b2_kxz, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, u2_kxz_id, u2_kxz, start=start3, count=count3)
+      status = nf90_put_var (ncid_2D, b2_kxz_id, b2_kxz, start=start3, count=count3)
 
-      status = nf90_sync (ncid_fld_section)
+      status = nf90_sync (ncid_2D)
 
-      nout_fld_section = nout_fld_section + 1
+      nout_2D = nout_2D + 1
     endif
-  end subroutine loop_io_fields_section
+
+    if (proc0) call put_time_stamp(timer_io_total)
+    if (proc0) call put_time_stamp(timer_io_2D)
+  end subroutine loop_io_2D
 
 
 !-----------------------------------------------!
@@ -777,7 +782,7 @@ contains
 !! @date    29 Dec 2018
 !! @brief   Append field variables via MPIIO
 !-----------------------------------------------!
-  subroutine loop_io_fields_3D
+  subroutine loop_io_3D
     use fields, only: ux, uy, uz
     use fields, only: bx, by, bz
     use mp, only: proc0
@@ -786,8 +791,12 @@ contains
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use mpiio, only: mpiio_write_var
     use shearing_box, only: tsc
+    use time_stamp, only: put_time_stamp, timer_io_total, timer_io_3D
     implicit none
     integer, dimension(3) :: sizes, subsizes, starts
+
+    if (proc0) call put_time_stamp(timer_io_total)
+    if (proc0) call put_time_stamp(timer_io_3D)
 
     sizes(1) = nkx
     sizes(2) = nkz
@@ -810,7 +819,10 @@ contains
       write (unit=field_time_unit, fmt="(100es30.21)") tt, tsc
       flush (field_time_unit)
     endif
-  end subroutine loop_io_fields_3D
+
+    if (proc0) call put_time_stamp(timer_io_total)
+    if (proc0) call put_time_stamp(timer_io_3D)
+  end subroutine loop_io_3D
 
 
 !-----------------------------------------------!
@@ -819,7 +831,7 @@ contains
 !! @brief   Save restart file via MPIIO
 !-----------------------------------------------!
   subroutine save_restart
-    use fields, only: ux, uy, uz, p
+    use fields, only: ux, uy, uz
     use fields, only: bx, by, bz
     use mp, only: proc0
     use grid, only: nkx, nky, nkz
@@ -829,9 +841,12 @@ contains
     use file, only: open_output_file, close_file
     use mpiio, only: mpiio_write_one
     use shearing_box, only: tsc
+    use time_stamp, only: put_time_stamp, timer_save_restart
     implicit none
     integer :: time_unit
     integer, dimension(3) :: sizes, subsizes, starts
+
+    if (proc0) call put_time_stamp(timer_save_restart)
 
     sizes(1) = nkx
     sizes(2) = nkz
@@ -849,7 +864,6 @@ contains
     call mpiio_write_one(bx, sizes, subsizes, starts, trim(restart_dir)//'bx.dat')
     call mpiio_write_one(by, sizes, subsizes, starts, trim(restart_dir)//'by.dat')
     call mpiio_write_one(bz, sizes, subsizes, starts, trim(restart_dir)//'bz.dat')
-    call mpiio_write_one( p, sizes, subsizes, starts, trim(restart_dir)//'p.dat' )
 
     if(proc0) then
       call open_output_file (time_unit, trim(restart_dir)//'time.dat')
@@ -857,6 +871,8 @@ contains
       write (unit=time_unit, fmt="(100es30.21)") tt, tsc
       call close_file (time_unit)
     endif
+
+    if (proc0) call put_time_stamp(timer_save_restart)
   end subroutine save_restart
 
 

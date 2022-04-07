@@ -24,6 +24,3 @@
 
     ! update displacement for the next write operation
     disp = disp + sizes(1)*sizes(2)*sizes(3)*bytes
-    if (data_type == complex_type) then
-       disp = disp + sizes(1)*sizes(2)*sizes(3)*bytes
-    end if

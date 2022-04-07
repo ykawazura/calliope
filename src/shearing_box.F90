@@ -7,7 +7,7 @@ module shearing_box
   use p3dfft
   implicit none
 
-  public init_shearing_time, remap_fld
+  public init_shearing_time, remap_fld, get_imp_terms_tintg_with_shear
   public tsc ! time in shearing coordinate. must be 0 < tsc < tremap
   public tremap
   public nremap
@@ -121,6 +121,7 @@ contains
     use grid, only: xx, dly, nly
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     use params, only: q
+    implicit none
     real(r8), dimension (ily_st:ily_en, &
                          ilz_st:ilz_en, &
                          ilx_st:ilx_en), intent(inout) :: fld
@@ -143,6 +144,44 @@ contains
 
     deallocate(tmp)
   end subroutine to_non_shearing_coordinate
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    4 Apr 2022
+!! @brief   Time integral of hyperdissipation
+!!          -\int \mathrm{d}t\, q[k_x(t)^2 
+!!                 + k_y^2 + k_z^2]^{2n}
+!-----------------------------------------------!
+  subroutine get_imp_terms_tintg_with_shear(imp_terms_tintg, t, kx, ky, kz, coeff, nexp)
+    use params, only: q
+    use grid, only: k2_max
+    implicit none
+    real(r8), intent(out) :: imp_terms_tintg
+    real(r8), intent(in) :: t, kx, ky, kz, coeff
+    integer, intent(in) :: nexp
+    real(r8) :: kxt, k2yz
+
+    if(ky == 0.d0) then
+      imp_terms_tintg = (kx**2 + ky**2 + kz**2)**nexp*t
+    else
+      kxt  = kx + q*t*ky
+      k2yz = ky**2 + kz**2
+      select case(nexp)
+      case (1) 
+        imp_terms_tintg = (k2yz*kxt + kxt**3/3.d0)/(q*ky)
+      case (2) 
+        imp_terms_tintg = (k2yz**2*kxt + 2.d0/3.d0*k2yz*kxt**3 + kxt**5/5.d0)/(q*ky)
+      case (3) 
+        imp_terms_tintg = (k2yz**3*kxt + k2yz**2*kxt**3 + 3.d0/5.d0*k2yz*kxt**5 & 
+             + kxt**7/7.d0)/(q*ky)
+      case (4) 
+        imp_terms_tintg = (k2yz**4*kxt + 4.d0/3.d0*k2yz**3*kxt**3 + 6.d0/5.d0*k2yz**2*kxt**5 & 
+             + 4.d0/7.d0*k2yz*kxt**7 + kxt**9/9.d0)/(q*ky)
+      end select
+    endif
+    imp_terms_tintg = -coeff*imp_terms_tintg/k2_max**nexp
+  end subroutine get_imp_terms_tintg_with_shear
 
 end module shearing_box
 

@@ -1,7 +1,7 @@
 !-----------------------------------------------!
 !> @author  YK
 !! @date    25 Feb 2021
-!! @brief   Field setting for MHD_INCOMP
+!! @brief   Field setting for MHD_COMP_ISOTH
 !-----------------------------------------------!
 module fields
   use p3dfft
@@ -12,10 +12,14 @@ module fields
   public :: mx, my, mz
   public :: ux, uy, uz
   public :: bx, by, bz
-  public :: rho_old1
-  public :: mx_old1, my_old1, mz_old1
-  public :: bx_old1, by_old1, bz_old1
-  public :: ux_old1, uy_old1, uz_old1
+  public :: rho_old
+  public :: mx_old, my_old, mz_old
+  public :: bx_old, by_old, bz_old
+  public :: ux_old, uy_old, uz_old
+  public :: nfields
+  public :: irho
+  public :: imx, imy, imz
+  public :: ibx, iby, ibz
 
   private
 
@@ -23,12 +27,18 @@ module fields
   complex(r8), allocatable, dimension(:,:,:) :: mx, my, mz
   complex(r8), allocatable, dimension(:,:,:) :: ux, uy, uz
   complex(r8), allocatable, dimension(:,:,:) :: bx, by, bz
-  complex(r8), allocatable, dimension(:,:,:) :: rho_old1
-  complex(r8), allocatable, dimension(:,:,:) :: mx_old1, my_old1, mz_old1
-  complex(r8), allocatable, dimension(:,:,:) :: ux_old1, uy_old1, uz_old1
-  complex(r8), allocatable, dimension(:,:,:) :: bx_old1, by_old1, bz_old1
+  complex(r8), allocatable, dimension(:,:,:) :: rho_old
+  complex(r8), allocatable, dimension(:,:,:) :: mx_old, my_old, mz_old
+  complex(r8), allocatable, dimension(:,:,:) :: ux_old, uy_old, uz_old
+  complex(r8), allocatable, dimension(:,:,:) :: bx_old, by_old, bz_old
   character(100) :: init_type
   real   (r8) :: b0(3)
+
+  ! Field index
+  integer, parameter :: nfields = 7
+  integer, parameter :: irho = 1
+  integer, parameter :: imx  = 2, imy = 3, imz = 4
+  integer, parameter :: ibx  = 5, iby = 6, ibz = 7
 
 contains
 
@@ -45,26 +55,26 @@ contains
     complex(r8), allocatable, dimension(:,:,:) :: src
 
     allocate(src(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
-    allocate(rho     , source=src)
-    allocate(mx      , source=src)
-    allocate(my      , source=src)
-    allocate(mz      , source=src)
-    allocate(ux      , source=src)
-    allocate(uy      , source=src)
-    allocate(uz      , source=src)
-    allocate(bx      , source=src)
-    allocate(by      , source=src)
-    allocate(bz      , source=src)
-    allocate(rho_old1, source=src)
-    allocate(mx_old1 , source=src)
-    allocate(my_old1 , source=src)
-    allocate(mz_old1 , source=src)
-    allocate(ux_old1 , source=src)
-    allocate(uy_old1 , source=src)
-    allocate(uz_old1 , source=src)
-    allocate(bx_old1 , source=src)
-    allocate(by_old1 , source=src)
-    allocate(bz_old1 , source=src)
+    allocate(rho    , source=src)
+    allocate(mx     , source=src)
+    allocate(my     , source=src)
+    allocate(mz     , source=src)
+    allocate(ux     , source=src)
+    allocate(uy     , source=src)
+    allocate(uz     , source=src)
+    allocate(bx     , source=src)
+    allocate(by     , source=src)
+    allocate(bz     , source=src)
+    allocate(rho_old, source=src)
+    allocate(mx_old , source=src)
+    allocate(my_old , source=src)
+    allocate(mz_old , source=src)
+    allocate(ux_old , source=src)
+    allocate(uy_old , source=src)
+    allocate(uz_old , source=src)
+    allocate(bx_old , source=src)
+    allocate(by_old , source=src)
+    allocate(bz_old , source=src)
     deallocate(src)
 
     call read_parameters(inputfile)
@@ -343,13 +353,13 @@ contains
 
     call u_to_m(rho, ux, uy, uz, mx, my, mz)
 
-    rho_old1 = rho
-    mx_old1  = mx
-    my_old1  = my
-    mz_old1  = mz
-    bx_old1  = bx
-    by_old1  = by
-    bz_old1  = bz
+    rho_old = rho
+    mx_old  = mx
+    my_old  = my
+    mz_old  = mz
+    bx_old  = bx
+    by_old  = by
+    bz_old  = bz
 
     deallocate(rho_r)
     deallocate(bx_r)
@@ -650,13 +660,13 @@ contains
     if(proc0) write(*, "('rms of (1) sound mach num = ', es10.3, ',  (2) Alfven mach num = ', es10.3, ',  (3) beta = ', es10.3)") &
                 & smach_rms, amach_rms, beta_rms
 
-    rho_old1 = rho
-    mx_old1  = mx
-    my_old1  = my
-    mz_old1  = mz
-    bx_old1  = bx
-    by_old1  = by
-    bz_old1  = bz
+    rho_old = rho
+    mx_old  = mx
+    my_old  = my
+    mz_old  = mz
+    bx_old  = bx
+    by_old  = by
+    bz_old  = bz
 
     deallocate(phi_r)
     deallocate(phi  )
@@ -732,13 +742,13 @@ contains
     call mpiio_read_one(by , sizes, subsizes, starts, trim(restart_dir)//'by.dat')
     call mpiio_read_one(bz , sizes, subsizes, starts, trim(restart_dir)//'bz.dat')
 
-    rho_old1 = rho
-    mx_old1  = mx
-    my_old1  = my
-    mz_old1  = mz
-    bx_old1  = bx
-    by_old1  = by
-    bz_old1  = bz
+    rho_old = rho
+    mx_old  = mx
+    my_old  = my
+    mz_old  = mz
+    bx_old  = bx
+    by_old  = by
+    bz_old  = bz
   end subroutine restart
 
 
@@ -965,16 +975,16 @@ contains
     deallocate(bx)
     deallocate(by)
     deallocate(bz)
-    deallocate(rho_old1)
-    deallocate(mx_old1)
-    deallocate(my_old1)
-    deallocate(mz_old1)
-    deallocate(ux_old1)
-    deallocate(uy_old1)
-    deallocate(uz_old1)
-    deallocate(bx_old1)
-    deallocate(by_old1)
-    deallocate(bz_old1)
+    deallocate(rho_old)
+    deallocate(mx_old)
+    deallocate(my_old)
+    deallocate(mz_old)
+    deallocate(ux_old)
+    deallocate(uy_old)
+    deallocate(uz_old)
+    deallocate(bx_old)
+    deallocate(by_old)
+    deallocate(bz_old)
 
   end subroutine finish_fields
 

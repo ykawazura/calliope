@@ -169,7 +169,7 @@ bpe2_bin_avg      = time_average(tt[avg_start:avg_end], bpe2_bin     [avg_start:
 kp23i = np.argmin(np.abs(kpbin - kpbin.max()*2./3.))
 kz23i = np.argmin(np.abs(kz[1:int(nkz/2)] - kz[1:int(nkz/2)].max()*2./3.))
 
-# kperp spectrum
+# kprp spectrum
 ys = [ 
        np.sum(upe2_bin_avg   [:, 1:kp23i], axis=0), 
        np.sum(bpe2_bin_avg   [:, 1:kp23i], axis=0), 
@@ -190,7 +190,7 @@ legends = [
             r'$E_{\delta B_{\perp}}$',
             r'-5/3',
           ]
-plot_log1d_many(xs, ys, xlab='$k_\+ L_\+$', legends=legends, ls=ls, legendloc='lower left', ylab='', term=True, save=outdir+'kperp_spectra_avg.pdf')
+plot_log1d_many(xs, ys, xlab='$k_\+ L_\+$', legends=legends, ls=ls, legendloc='lower left', ylab='', term=True, save=outdir+'kprp_spectra_avg.pdf')
 
 # kz spectrum
 ys = [ 
@@ -222,7 +222,7 @@ plot_log2d(bpe2_bin_avg[1:kz23i, 1:kp23i], kpbin[1:kp23i], kz[1:kz23i], xlab='$k
 #------------------#
 #   output ascii   #
 #------------------#
-np.savetxt(outdir + 'Ekperp_avg.txt'  , np.column_stack((kpbin[:kp23i], 
+np.savetxt(outdir + 'Ekprp_avg.txt'  , np.column_stack((kpbin[:kp23i], 
                                                        np.sum(upe2_bin_avg   [:,:kp23i], axis=0),
                                                        np.sum(bpe2_bin_avg   [:,:kp23i], axis=0),
                                                      )), fmt='%E')

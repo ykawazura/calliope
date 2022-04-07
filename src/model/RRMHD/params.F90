@@ -5,7 +5,7 @@ include "../../params_common.F90"
 !-----------------------------------------------!
 !> @author  YK
 !! @date    15 Feb 2021
-!! @brief   Parameter setting specific to RMHD
+!! @brief   Parameter setting specific to RRMHD
 !!          'params_common' is inherited
 !-----------------------------------------------!
 module params

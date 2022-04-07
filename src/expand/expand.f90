@@ -10,17 +10,21 @@ program expand
   character(len=100), dimension(100) :: fldname
 
   ! size of before and after
+  logical :: pruned
   integer :: nlx_in , nly_in , nlz_in
   integer :: nkx_in , nky_in , nkz_in
   integer :: nlx_out, nly_out, nlz_out
   integer :: nkx_out, nky_out, nkz_out
 
-  integer :: ierr, p_row, irank
+  integer :: ierr, p_row
   logical :: rank0
   character(len=100) :: runname = 'expand', arg, inputfile, input_dir, output_dir
   complex(mytype), allocatable, dimension(:,:,:) :: u_in  
   complex(mytype), allocatable, dimension(:,:,:) :: u_out  
-  TYPE(DECOMP_INFO), save :: sp_in, sp_out  ! spectral space
+  TYPE(DECOMP_INFO), save :: sp_in, sp_med, sp_out  ! spectral space;
+                                                    !  sp_in  -> (nlx_in , nlz_in , nly_in )
+                                                    !  sp_med -> (nlx_in , nlz_out, nly_out)
+                                                    !  sp_out -> (nlx_out, nlz_out, nly_out)
   integer :: i
 
   call init
@@ -53,6 +57,9 @@ contains
 
   subroutine init
     implicit none
+    integer  :: nlxc_in , nlyc_in , nlzc_in
+    integer  :: nlxc_out, nlyc_out, nlzc_out
+
     call MPI_INIT(ierr)
 
     ! set runname
@@ -63,16 +70,34 @@ contains
     inputfile = trim(runname)//".in"
     call read_parameters(inputfile)
 
-    nkx_in  = nlx_in/2 + 1
-    nky_in  = nly_in
-    nkz_in  = nlz_in
-    nkx_out = nlx_out/2 + 1
-    nky_out = nly_out
-    nkz_out = nlz_out
+    if(pruned) then
+      nlxc_in  = int(nlx_in *2.d0/3.d0) ! This is for dealiasing with 2/3 pruned FFT
+      nlyc_in  = int(nly_in *2.d0/3.d0) ! This is for dealiasing with 2/3 pruned FFT
+      nlzc_in  = int(nlz_in *2.d0/3.d0) ! This is for dealiasing with 2/3 pruned FFT
+      nlxc_out = int(nlx_out*2.d0/3.d0) ! This is for dealiasing with 2/3 pruned FFT
+      nlyc_out = int(nly_out*2.d0/3.d0) ! This is for dealiasing with 2/3 pruned FFT
+      nlzc_out = int(nlz_out*2.d0/3.d0) ! This is for dealiasing with 2/3 pruned FFT
+    else
+      nlxc_in  = nlx_in 
+      nlyc_in  = nly_in 
+      nlzc_in  = nlz_in 
+      nlxc_out = nlx_out
+      nlyc_out = nly_out
+      nlzc_out = nlz_out
+    endif
 
-    call decomp_2d_init(nlx_in, nly_in, nlz_in, p_row, 1)
-    call decomp_info_init(nkx_in , nky_in , nkz_in , sp_in )
-    call decomp_info_init(nkx_out, nky_out, nkz_out, sp_out)
+    nkx_in  = nlxc_in
+    nky_in  = nlyc_in/2 + 1
+    nkz_in  = nlzc_in
+    nkx_out = nlxc_out
+    nky_out = nlyc_out/2 + 1
+    nkz_out = nlzc_out
+
+
+    call decomp_2d_init(nlx_in, nlz_in, nly_in, p_row, 1)
+    call decomp_info_init(nkx_in , nkz_in , nky_in , sp_in )
+    call decomp_info_init(nkx_in , nkz_out, nky_out, sp_med)
+    call decomp_info_init(nkx_out, nkz_out, nky_out, sp_out)
     rank0 = nrank == 0
 
     call alloc_z(u_in , sp_in , opt_global=.true.); u_in  = 0._mytype
@@ -84,6 +109,7 @@ contains
     do i = 1, nfld
       call broadcast_character(fldname(i))
     end do
+
   end subroutine init
 
 
@@ -119,7 +145,8 @@ contains
     integer  :: unit, ierr
 
     namelist /mpi_parameters/ p_row
-    namelist /parameters/ nlx_in , nly_in , nlz_in , &
+    namelist /parameters/ pruned, &
+                          nlx_in , nly_in , nlz_in , &
                           nlx_out, nly_out, nlz_out, &
                           input_dir, output_dir
     p_row = 0
@@ -195,51 +222,89 @@ contains
     complex(mytype), dimension (sp_out%zst(1):sp_out%zen(1), &
                                 sp_out%zst(2):sp_out%zen(2), &
                                 sp_out%zst(3):sp_out%zen(3)), intent(inout) :: fld_out
-    complex(mytype), allocatable, dimension(:,:,:) :: fld_y_pencil, fld_x_pencil, tmp_x_pencil 
-    integer :: i, j, k, jj, kk
-    integer :: idx, xsize_in, xsize_out
+    complex(mytype), allocatable, dimension(:,:,:) :: fld_med_z_pencil, fld_med_y_pencil, fld_med_x_pencil
+
+    complex(mytype), allocatable, dimension(:,:,:) :: fld_y_pencil, fld_x_pencil
+    integer, allocatable :: ikx_in(:), ikz_in(:), ikx_out(:), ikz_out(:)
+    integer :: i, j, k, ii, kk
+
+    call alloc_z(fld_med_z_pencil, sp_med, opt_global=.true.); fld_med_z_pencil = 0._mytype
+    call alloc_y(fld_med_y_pencil, sp_med, opt_global=.true.); fld_med_y_pencil = 0._mytype
+    call alloc_x(fld_med_x_pencil, sp_med, opt_global=.true.); fld_med_x_pencil = 0._mytype
 
     call alloc_y(fld_y_pencil, sp_out, opt_global=.true.); fld_y_pencil = 0._mytype
     call alloc_x(fld_x_pencil, sp_out, opt_global=.true.); fld_x_pencil = 0._mytype
-    call alloc_x(tmp_x_pencil, sp_out, opt_global=.true.); tmp_x_pencil = 0._mytype
 
-    do k = sp_in%zst(3), sp_in%zen(3)
-      if (k > nkz_in/2 + 1) then
-        kk = nkz_out/2 + k 
+    allocate(ikx_in (nkx_in ))
+    allocate(ikz_in (nkz_in ))
+    allocate(ikx_out(nkx_out))
+    allocate(ikz_out(nkz_out))
+
+    do i = 1, nkx_in
+      if (i <= nkx_in/2 + 1) then
+        ikx_in(i) = i - 1
       else
-        kk = k
+        ikx_in(i) = i - nkx_in - 1
       endif
-      do j = sp_in%zst(2), sp_in%zen(2)
-        if (j > nky_in/2 + 1) then
-          jj = nky_out/2 + j 
-        else
-          jj = j
-        endif
-        idx = sp_out%zst(1)
-        do i = sp_in%zst(1), sp_in%zen(1)
-          fld_out(idx, jj, kk) = fld_in(i, j, k)
-          idx = idx + 1
-        end do
-      end do
-    end do
 
-    call transpose_z_to_y(fld_out, fld_y_pencil, sp_out)
-    call transpose_y_to_x(fld_y_pencil, fld_x_pencil, sp_out)
-
-    idx = 1
-    xsize_in  = sp_in %zsz(1)
-    xsize_out = sp_out%zsz(1)
-    call min_allreduce_integer(xsize_in )
-    call min_allreduce_integer(xsize_out)
-    do irank = 0, p_row - 1
-      do i = 1, xsize_in
-        tmp_x_pencil(idx, :, :) = fld_x_pencil(irank*xsize_out + i, :, :)
-        idx = idx + 1
-      enddo
+    enddo
+    do k = 1, nkz_in
+      if (k <= nkz_in/2 + 1) then
+        ikz_in(k) = k - 1
+      else
+        ikz_in(k) = k - nkz_in - 1
+      endif
     enddo
 
-    call transpose_x_to_y(tmp_x_pencil, fld_y_pencil, sp_out)
+    do i = 1, nkx_out
+      if (i <= nkx_out/2 + 1) then
+        ikx_out(i) = i - 1
+      else
+        ikx_out(i) = i - nkx_out - 1
+      endif
+
+    enddo
+    do k = 1, nkz_out
+      if (k <= nkz_out/2 + 1) then
+        ikz_out(k) = k - 1
+      else
+        ikz_out(k) = k - nkz_out - 1
+      endif
+    enddo
+
+    ! (nkx_in, *nkz_in, *nky_in) -> (nkx_in, *nkz_out, *nky_out) : * means the slot is localized
+    do k = 1, nkz_in
+      kk = minloc(abs(ikz_out - ikz_in(k)), 1)
+      do j = 1, nky_in
+        fld_med_z_pencil(:, kk, j) = fld_in(:, k, j)
+      end do
+    enddo
+
+    ! (nkx_in, *nkz_out, *nky_out) -> (*nkx_in, nkz_out, *nky_out) : * means the slot is localized
+    call transpose_z_to_y(fld_med_z_pencil, fld_med_y_pencil, sp_med)
+    call transpose_y_to_x(fld_med_y_pencil, fld_med_x_pencil, sp_med)
+
+    ! (*nkx_in, nkz_out, *nky_out) -> (*nkx_out, nkz_out, *nky_out) : * means the slot is localized
+    do i = 1, nkx_in
+      ii = minloc(abs(ikx_out - ikx_in(i)), 1)
+      fld_x_pencil(ii, :, :) = fld_med_x_pencil(i, :, :)
+    enddo
+
+    ! (*nkx_out, nkz_out, *nky_out) -> (nkx_out, *nkz_out, *nky_out) : * means the slot is localized
+    call transpose_x_to_y(fld_x_pencil, fld_y_pencil, sp_out)
     call transpose_y_to_z(fld_y_pencil, fld_out     , sp_out)
+
+    deallocate(fld_med_z_pencil)
+    deallocate(fld_med_y_pencil)
+    deallocate(fld_med_x_pencil)
+    deallocate(fld_y_pencil)
+    deallocate(fld_x_pencil)
+    deallocate(ikx_in )
+    deallocate(ikz_in )
+    deallocate(ikx_out)
+    deallocate(ikz_out)
+
+
   end subroutine expand_field
 
 

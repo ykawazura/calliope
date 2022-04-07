@@ -5,7 +5,7 @@ include "../../params_common.F90"
 !-----------------------------------------------!
 !> @author  YK
 !! @date    25 Feb 2021
-!! @brief   Parameter setting specific to MHD_INCOMP
+!! @brief   Parameter setting specific to MHD_COMP_ISOTH
 !!          'params_common' is inherited
 !-----------------------------------------------!
 module params

@@ -8,19 +8,27 @@ module fields
   implicit none
 
   public :: init_fields, finish_fields
-  public :: ux, uy, uz, p
+  public :: ux, uy, uz
   public :: bx, by, bz
-  public :: ux_old1, uy_old1, uz_old1, p_old1
-  public :: bx_old1, by_old1, bz_old1
+  public :: ux_old, uy_old, uz_old
+  public :: bx_old, by_old, bz_old
+  public :: nfields
+  public :: iux, iuy, iuz
+  public :: ibx, iby, ibz
 
   private
 
-  complex(r8), allocatable, dimension(:,:,:) :: ux, uy, uz, p
+  complex(r8), allocatable, dimension(:,:,:) :: ux, uy, uz
   complex(r8), allocatable, dimension(:,:,:) :: bx, by, bz
-  complex(r8), allocatable, dimension(:,:,:) :: ux_old1, uy_old1, uz_old1, p_old1
-  complex(r8), allocatable, dimension(:,:,:) :: bx_old1, by_old1, bz_old1
+  complex(r8), allocatable, dimension(:,:,:) :: ux_old, uy_old, uz_old
+  complex(r8), allocatable, dimension(:,:,:) :: bx_old, by_old, bz_old
   character(100) :: init_type
   real   (r8) :: b0(3)
+
+  ! Field index
+  integer, parameter :: nfields = 6
+  integer, parameter :: iux = 1, iuy = 2, iuz = 3
+  integer, parameter :: ibx = 4, iby = 5, ibz = 6
 
 contains
 
@@ -37,20 +45,18 @@ contains
     complex(r8), allocatable, dimension(:,:,:) :: src
 
     allocate(src(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
-    allocate(ux     , source=src)
-    allocate(uy     , source=src)
-    allocate(uz     , source=src)
-    allocate(bx     , source=src)
-    allocate(by     , source=src)
-    allocate(bz     , source=src)
-    allocate(p      , source=src)
-    allocate(ux_old1, source=src)
-    allocate(uy_old1, source=src)
-    allocate(uz_old1, source=src)
-    allocate(bx_old1, source=src)
-    allocate(by_old1, source=src)
-    allocate(bz_old1, source=src)
-    allocate( p_old1, source=src)
+    allocate(ux    , source=src)
+    allocate(uy    , source=src)
+    allocate(uz    , source=src)
+    allocate(bx    , source=src)
+    allocate(by    , source=src)
+    allocate(bz    , source=src)
+    allocate(ux_old, source=src)
+    allocate(uy_old, source=src)
+    allocate(uz_old, source=src)
+    allocate(bx_old, source=src)
+    allocate(by_old, source=src)
+    allocate(bz_old, source=src)
     deallocate(src)
 
     call read_parameters(inputfile)
@@ -127,7 +133,6 @@ contains
     bx = 0.d0
     by = 0.d0
     bz = 0.d0
-     p = 0.d0
 
   end subroutine init_zero
 
@@ -260,12 +265,12 @@ contains
       end do
     endif
 
-    ux_old1 = ux
-    uy_old1 = uy
-    uz_old1 = uz
-    bx_old1 = bx
-    by_old1 = by
-    bz_old1 = bz
+    ux_old = ux
+    uy_old = uy
+    uz_old = uz
+    bx_old = bx
+    by_old = by
+    bz_old = bz
 
     deallocate(bz_r)
 
@@ -545,12 +550,12 @@ contains
     call p3dfft_ftran_r2c(bx_r, bx, 'fft'); bx = bx/nlx/nly/nlz
     call p3dfft_ftran_r2c(by_r, by, 'fft'); by = by/nlx/nly/nlz
 
-    ux_old1 = ux
-    uy_old1 = uy
-    uz_old1 = uz
-    bx_old1 = bx
-    by_old1 = by
-    bz_old1 = bz
+    ux_old = ux
+    uy_old = uy
+    uz_old = uz
+    bx_old = bx
+    by_old = by
+    bz_old = bz
 
     deallocate(ux_r)
     deallocate(uy_r)
@@ -611,12 +616,12 @@ contains
     call p3dfft_ftran_r2c(bx_r, bx, 'fft'); bx = bx/nlx/nly/nlz
     call p3dfft_ftran_r2c(by_r, by, 'fft'); by = by/nlx/nly/nlz
 
-    ux_old1 = ux
-    uy_old1 = uy
-    uz_old1 = uz
-    bx_old1 = bx
-    by_old1 = by
-    bz_old1 = bz
+    ux_old = ux
+    uy_old = uy
+    uz_old = uz
+    bx_old = bx
+    by_old = by
+    bz_old = bz
 
     deallocate(ux_r)
     deallocate(uy_r)
@@ -682,15 +687,13 @@ contains
     call mpiio_read_one(bx, sizes, subsizes, starts, trim(restart_dir)//'bx.dat')
     call mpiio_read_one(by, sizes, subsizes, starts, trim(restart_dir)//'by.dat')
     call mpiio_read_one(bz, sizes, subsizes, starts, trim(restart_dir)//'bz.dat')
-    call mpiio_read_one(p , sizes, subsizes, starts, trim(restart_dir)//'p.dat' )
 
-    ux_old1 = ux
-    uy_old1 = uy
-    uz_old1 = uz
-    bx_old1 = bx
-    by_old1 = by
-    bz_old1 = bz
-     p_old1 =  p
+    ux_old = ux
+    uy_old = uy
+    uz_old = uz
+    bx_old = bx
+    by_old = by
+    bz_old = bz
   end subroutine restart
 
 
@@ -749,14 +752,12 @@ contains
     deallocate(bx)
     deallocate(by)
     deallocate(bz)
-    deallocate( p)
-    deallocate(ux_old1)
-    deallocate(uy_old1)
-    deallocate(uz_old1)
-    deallocate(bx_old1)
-    deallocate(by_old1)
-    deallocate(bz_old1)
-    deallocate( p_old1)
+    deallocate(ux_old)
+    deallocate(uy_old)
+    deallocate(uz_old)
+    deallocate(bx_old)
+    deallocate(by_old)
+    deallocate(bz_old)
 
   end subroutine finish_fields
 

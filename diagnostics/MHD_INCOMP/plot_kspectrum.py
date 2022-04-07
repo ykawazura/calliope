@@ -133,7 +133,7 @@ ys = [
        zp2_bin[final_idx, 1:kp_end], 
        zm2_bin[final_idx, 1:kp_end], 
        kpbin[1:kp_end]**(-5./3.)/kpbin[1]**(-5./3.)*zp2_bin[final_idx,1:kp_end][0],
-       kpbin[1:kp_end]**(-5./3.)/kpbin[1]**(-5./3.)*zp2_bin[final_idx,1:kp_end][0],
+       kpbin[1:kp_end]**(-3./2.)/kpbin[1]**(-3./2.)*zp2_bin[final_idx,1:kp_end][0],
      ]
 xs = [ 
       kpbin[1:kp_end], 
@@ -158,20 +158,71 @@ if shear_flg == 1: xs, ys, ls, legends = add_vertical_line(xs, ys, ls, legends)
 
 plot_log1d_many(xs, ys, xlab=kplab, legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', term=True, save=outdir+'k_spectra_ELS.pdf')
 
+
+# kpar
+ys = [ 
+       kpar_b[final_kpar_idx, 1:kp_end], 
+       kpar_u[final_kpar_idx, 1:kp_end], 
+       kpbin[1:kp_end]**(2./3.)/kpbin[1]**(2./3.)*kpar_b[final_kpar_idx,1:kp_end][0],
+     ]
+xs = [ 
+      kpbin[1:kp_end], 
+      kpbin[1:kp_end], 
+      kpbin[1:kp_end], 
+     ]
+ls = [ 
+        '', 
+        '', 
+        'k--', 
+     ]
+legends = [ 
+            r'$k_\|^b$', 
+            r'$k_\|^u$', 
+            r'2/3',
+          ]
+
+if shear_flg == 1: xs, ys, ls, legends = add_vertical_line(xs, ys, ls, legends)
+
+plot_log1d_many(xs, ys, xlab=kplab, legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt_kpar[final_kpar_idx], ylab='', term=True, save=outdir+'kpar.pdf')
+
+
+# delta b/b0
+ys = [ 
+       b1_ovr_b0[final_kpar_idx, 1:kp_end], 
+     ]
+xs = [ 
+      kpbin[1:kp_end], 
+     ]
+ls = [ 
+        '', 
+     ]
+legends = [ 
+            r'$\delta b/b_0$', 
+          ]
+
+if shear_flg == 1: xs, ys, ls, legends = add_vertical_line(xs, ys, ls, legends)
+
+plot_log1d_many(xs, ys, xlab=kplab, legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt_kpar[final_kpar_idx], ylab='', term=True, save=outdir+'b1_ovr_b0.pdf')
+
 #------------------#
 #   output ascii   #
 #------------------#
-np.savetxt(outdir + 'Ek.txt'  , np.column_stack((kpbin[:kp_end], 
-                                                  u2_bin[final_idx,:kp_end],
-                                                 ux2_bin[final_idx,:kp_end],
-                                                 uy2_bin[final_idx,:kp_end],
-                                                 uz2_bin[final_idx,:kp_end],
-                                                  b2_bin[final_idx,:kp_end],
-                                                 bx2_bin[final_idx,:kp_end],
-                                                 by2_bin[final_idx,:kp_end],
-                                                 bz2_bin[final_idx,:kp_end],
-                                                 zp2_bin[final_idx,:kp_end],
-                                                 zm2_bin[final_idx,:kp_end],
+np.savetxt(outdir + 'Ek.txt'  , np.column_stack((kpbin    [:kp_end], 
+                                                  u2_bin  [final_idx,:kp_end],
+                                                 ux2_bin  [final_idx,:kp_end],
+                                                 uy2_bin  [final_idx,:kp_end],
+                                                 uz2_bin  [final_idx,:kp_end],
+                                                  b2_bin  [final_idx,:kp_end],
+                                                 bx2_bin  [final_idx,:kp_end],
+                                                 by2_bin  [final_idx,:kp_end],
+                                                 bz2_bin  [final_idx,:kp_end],
+                                                 zp2_bin  [final_idx,:kp_end],
+                                                 zm2_bin  [final_idx,:kp_end],
+                                                 )), fmt='%E')
+np.savetxt(outdir + 'kpar.txt'  , np.column_stack((kpbin  [:kp_end], 
+                                                 kpar_b   [final_kpar_idx,:kp_end],
+                                                 kpar_u   [final_kpar_idx,:kp_end],
+                                                 b1_ovr_b0[final_kpar_idx,:kp_end],
                                                  )), fmt='%E')
 
 #--------------------------------------------------------#
@@ -236,7 +287,7 @@ if ismovie:
 #--------------------------------------------------------#
 #                       2D spectra                       #
 #--------------------------------------------------------#
-ncfile = netcdf.netcdf_file(input_dir+runname+'.out.fields_section.nc'+restart_num, 'r')   
+ncfile = netcdf.netcdf_file(input_dir+runname+'.out.2D.nc'+restart_num, 'r')   
 
 tt_fld  = np.copy(ncfile.variables['tt' ][:]); tt_fld  = np.delete(tt_fld , ignored_points_fld, axis = 0)
 kx_fld  = np.copy(ncfile.variables['kx' ][:])

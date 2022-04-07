@@ -9,13 +9,19 @@ module fields
 
   public :: init_fields, finish_fields
   public :: phi, omg, psi
-  public :: phi_old1, omg_old1, psi_old1
+  public :: phi_old, omg_old, psi_old
+  public :: nfields
+  public :: iomg, ipsi
 
   private
 
   complex(r8), allocatable, dimension(:,:,:) :: phi, omg, psi
-  complex(r8), allocatable, dimension(:,:,:) :: phi_old1, omg_old1, psi_old1
+  complex(r8), allocatable, dimension(:,:,:) :: phi_old, omg_old, psi_old
   character(100) :: init_type
+
+  ! Field index
+  integer, parameter :: nfields = 2
+  integer, parameter :: iomg = 1, ipsi = 2
 
 contains
 
@@ -32,12 +38,12 @@ contains
     complex(r8), allocatable, dimension(:,:,:) :: src
 
     allocate(src(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
-    allocate(phi     , source=src)
-    allocate(omg     , source=src)
-    allocate(psi     , source=src)
-    allocate(phi_old1, source=src)
-    allocate(omg_old1, source=src)
-    allocate(psi_old1, source=src)
+    allocate(phi    , source=src)
+    allocate(omg    , source=src)
+    allocate(psi    , source=src)
+    allocate(phi_old, source=src)
+    allocate(omg_old, source=src)
+    allocate(psi_old, source=src)
     deallocate(src)
 
     call read_parameters(inputfile)
@@ -111,10 +117,10 @@ contains
       print *, 'Zero initialization'
     endif
 
-    phi      = 0.d0
-    psi      = 0.d0
-    phi_old1 = 0.d0
-    psi_old1 = 0.d0
+    phi     = 0.d0
+    psi     = 0.d0
+    phi_old = 0.d0
+    psi_old = 0.d0
 
   end subroutine init_zero
 
@@ -156,9 +162,9 @@ contains
       enddo
     enddo
 
-    phi_old1 = phi
-    omg_old1 = omg
-    psi_old1 = psi
+    phi_old = phi
+    omg_old = omg
+    psi_old = psi
 
   end subroutine init_single_mode
 
@@ -239,9 +245,9 @@ contains
       enddo
     enddo
 
-    phi_old1 = phi
-    omg_old1 = omg
-    psi_old1 = psi
+    phi_old = phi
+    omg_old = omg
+    psi_old = psi
 
     deallocate(phi_r)
     deallocate(psi_r)
@@ -296,9 +302,9 @@ contains
       enddo
     enddo
 
-    phi_old1 = phi
-    omg_old1 = omg
-    psi_old1 = psi
+    phi_old = phi
+    omg_old = omg
+    psi_old = psi
 
     deallocate(phi_r)
     deallocate(psi_r)
@@ -355,9 +361,9 @@ contains
       enddo
     enddo
 
-    phi_old1 = phi
-    omg_old1 = omg
-    psi_old1 = psi
+    phi_old = phi
+    omg_old = omg
+    psi_old = psi
 
     deallocate(phi_r)
     deallocate(psi_r)
@@ -413,9 +419,9 @@ contains
     call mpiio_read_one(omg, sizes, subsizes, starts, trim(restart_dir)//'omg.dat')
     call mpiio_read_one(psi, sizes, subsizes, starts, trim(restart_dir)//'psi.dat')
 
-    phi_old1 = phi
-    omg_old1 = omg
-    psi_old1 = psi
+    phi_old = phi
+    omg_old = omg
+    psi_old = psi
   end subroutine restart
 
 
@@ -488,9 +494,9 @@ contains
     deallocate(phi)
     deallocate(omg)
     deallocate(psi)
-    deallocate(phi_old1)
-    deallocate(omg_old1)
-    deallocate(psi_old1)
+    deallocate(phi_old)
+    deallocate(omg_old)
+    deallocate(psi_old)
 
   end subroutine finish_fields
 

@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-import numpy as np
-from mayavi import mlab
-from tvtk.pyface.light_manager import CameraLight
+# import numpy as np
+# from mayavi import mlab
+# from tvtk.pyface.light_manager import CameraLight
 from parula import parula_map
 
 from load import *
@@ -26,11 +26,38 @@ elongation = 1
 
 ####### load 2decomp file #########
 # Load field in spectral coordinate
-tt_f = np.transpose(np.loadtxt(input_dir+'field_time.dat'+restart_num)) 
+tt_f = np.transpose(np.loadtxt(input_dir+'field_time.dat'+restart_num))[1]
 nt_f = tt_f.size
 
-phi = np.transpose(np.fromfile(input_dir+'phi.dat'+restart_num).reshape(nt_f, nkz, nky, nkx, 2))
-phi = phi[0, :, :, :, final_idx] + 1j*phi[1, :, :, :, final_idx]
+ux = np.transpose(np.fromfile(input_dir+'ux.dat'+restart_num).reshape(nt_f, nky, nkz, nkx, 2))
+ux = ux[0, :, :, :, final_idx] + 1j*ux[1, :, :, :, final_idx]
+uy = np.transpose(np.fromfile(input_dir+'uy.dat'+restart_num).reshape(nt_f, nky, nkz, nkx, 2))
+uy = uy[0, :, :, :, final_idx] + 1j*uy[1, :, :, :, final_idx]
+uz = np.transpose(np.fromfile(input_dir+'uz.dat'+restart_num).reshape(nt_f, nky, nkz, nkx, 2))
+uz = uz[0, :, :, :, final_idx] + 1j*uz[1, :, :, :, final_idx]
+
+bx = np.transpose(np.fromfile(input_dir+'bx.dat'+restart_num).reshape(nt_f, nky, nkz, nkx, 2))
+bx = bx[0, :, :, :, final_idx] + 1j*bx[1, :, :, :, final_idx]
+by = np.transpose(np.fromfile(input_dir+'by.dat'+restart_num).reshape(nt_f, nky, nkz, nkx, 2))
+by = by[0, :, :, :, final_idx] + 1j*by[1, :, :, :, final_idx]
+bz = np.transpose(np.fromfile(input_dir+'bz.dat'+restart_num).reshape(nt_f, nky, nkz, nkx, 2))
+bz = bz[0, :, :, :, final_idx] + 1j*bz[1, :, :, :, final_idx]
+print (bx[1, 1, 0])
+
+####### Inverse FFT #########
+print (nlx, nlz, nly)
+
+f = np.zeros([nlx, nlz, int(nly/2 + 1)])
+f[1:nkx, 1:nkz, 1:nky] = ux[1:nkx, 1:nkz, 1:nky]
+
+print (np.fft.irfftn(f).shape)
+# print (np.irfftn())
+
+
+# print (np.transpose(ux, axes=(0, 2, 1)).shape)
+# print (np.fft.irfftn(np.transpose(ux, axes=(0, 2, 1))).shape)
+
+quit()
 
 psi = np.transpose(np.fromfile(input_dir+'psi.dat'+restart_num).reshape(nt_f, nkz, nky, nkx, 2))
 psi = psi[0, :, :, :, final_idx] + 1j*psi[1, :, :, :, final_idx]
