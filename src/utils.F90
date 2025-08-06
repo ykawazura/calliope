@@ -7,14 +7,60 @@ module utils
   use p3dfft
   implicit none
 
+  public :: cabs2
   public :: ranf
   public :: curl
   public :: check_floor
 
   private
 
+  interface cabs2
+    module procedure cabs2_scaler
+    module procedure cabs2_array1
+    module procedure cabs2_array2
+    module procedure cabs2_array3
+  end interface cabs2
+
 
 contains
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    39 Nov 2024
+!! @brief   Get square of complex
+!!          At Fugaku, sometimes abs(z) gives NaN,
+!!          but z*conjg(z) is OK
+!-----------------------------------------------!
+  function cabs2_scaler(z) result(r)
+    implicit none
+    complex(8), intent(in) :: z
+    real(8) :: r
+
+    r = dble(z*conjg(z))
+
+  end function cabs2_scaler
+
+  function cabs2_array1(z) result(r)
+    complex(8), intent(in) :: z(:)
+    real(8) :: r(size(z))
+
+    r = dble(z*conjg(z))
+  end function cabs2_array1
+
+  function cabs2_array2(z) result(r)
+    complex(8), intent(in) :: z(:, :)
+    real(8) :: r(size(z, 1), size(z, 2))
+
+    r = dble(z*conjg(z))
+  end function cabs2_array2
+
+  function cabs2_array3(z) result(r)
+    complex(8), intent(in) :: z(:, :, :)
+    real(8) :: r(size(z, 1), size(z, 2), size(z, 3))
+
+    r = dble(z*conjg(z))
+  end function cabs2_array3
 
 
 !-----------------------------------------------!

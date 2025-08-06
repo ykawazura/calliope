@@ -6,7 +6,7 @@
 !-----------------------------------------------!
 module file
 
-  public open_input_file, open_output_file
+  public open_input_file, open_output_file, open_output_file_binary
   public close_file
   public get_indexed_namelist_unit
 
@@ -39,6 +39,20 @@ contains
     call get_unused_unit (unit)
     open (unit=unit, file=trim(fn), status="replace", action="write")
   end subroutine open_output_file
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    28 Jul 2022
+!! @brief   Open a binary file for writing and return 
+!!          its unit number in UNIT
+!-----------------------------------------------!
+  subroutine open_output_file_binary (unit, fn)
+    implicit none
+    integer, intent (out) :: unit
+    character (*), intent (in) :: fn
+    call get_unused_unit (unit)
+    open (unit=unit, file=trim(fn), form="unformatted", status="replace", access='stream')
+  end subroutine open_output_file_binary
 
 !-----------------------------------------------!
 !> @author  YK

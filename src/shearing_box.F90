@@ -85,20 +85,19 @@ contains
   subroutine remap_fld(fld)
     use params, only: pi, q
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
-    use grid, only: ky, dkx, ikx
+    use grid, only: ikx, iky
     implicit none
     complex(r8), dimension (ikx_st:ikx_en, &
                             ikz_st:ikz_en, &
                             iky_st:iky_en), intent(inout) :: fld
     complex(r8), allocatable, dimension(:,:,:) :: tmp
-    integer :: i, j, inew, ikxnew, dikx
+    integer :: i, j, inew, ikxnew
 
     allocate(tmp(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
 
-    do j = iky_st, iky_en
-      dikx = floor(q*shear_flg*tremap*ky(j)/dkx)
-        do i = ikx_st, ikx_en
-        ikxnew = ikx(i) + dikx
+    do i = ikx_st, ikx_en
+      do j = iky_st, iky_en
+        ikxnew = ikx(i) + iky(j)
         if(ikxnew <= maxval(ikx) .and. ikxnew >= minval(ikx)) then
           inew = minloc(abs(ikx - ikxnew), 1)
           tmp(inew, :, j) = fld(i, :, j)
@@ -153,34 +152,38 @@ contains
 !!          -\int \mathrm{d}t\, q[k_x(t)^2 
 !!                 + k_y^2 + k_z^2]^{2n}
 !-----------------------------------------------!
-  subroutine get_imp_terms_tintg_with_shear(imp_terms_tintg, t, kx, ky, kz, coeff, nexp)
+  subroutine get_imp_terms_tintg_with_shear(imp_terms_tintg, t, kx, ky, kz, coeff, coeff_h, nexp)
     use params, only: q
     use grid, only: k2_max
     implicit none
     real(r8), intent(out) :: imp_terms_tintg
-    real(r8), intent(in) :: t, kx, ky, kz, coeff
+    real(r8), intent(in) :: t, kx, ky, kz, coeff, coeff_h
     integer, intent(in) :: nexp
+    real(r8) :: regular, hyper
     real(r8) :: kxt, k2yz
 
     if(ky == 0.d0) then
-      imp_terms_tintg = (kx**2 + ky**2 + kz**2)**nexp*t
+      regular = (kx**2 + ky**2 + kz**2)*t
+      hyper   = (kx**2 + ky**2 + kz**2)**nexp*t
     else
       kxt  = kx + q*t*ky
       k2yz = ky**2 + kz**2
+
+      regular = (k2yz*kxt + kxt**3/3.d0)/(q*ky)
       select case(nexp)
       case (1) 
-        imp_terms_tintg = (k2yz*kxt + kxt**3/3.d0)/(q*ky)
+        hyper = (k2yz*kxt + kxt**3/3.d0)/(q*ky)
       case (2) 
-        imp_terms_tintg = (k2yz**2*kxt + 2.d0/3.d0*k2yz*kxt**3 + kxt**5/5.d0)/(q*ky)
+        hyper = (k2yz**2*kxt + 2.d0/3.d0*k2yz*kxt**3 + kxt**5/5.d0)/(q*ky)
       case (3) 
-        imp_terms_tintg = (k2yz**3*kxt + k2yz**2*kxt**3 + 3.d0/5.d0*k2yz*kxt**5 & 
+        hyper = (k2yz**3*kxt + k2yz**2*kxt**3 + 3.d0/5.d0*k2yz*kxt**5 & 
              + kxt**7/7.d0)/(q*ky)
       case (4) 
-        imp_terms_tintg = (k2yz**4*kxt + 4.d0/3.d0*k2yz**3*kxt**3 + 6.d0/5.d0*k2yz**2*kxt**5 & 
+        hyper = (k2yz**4*kxt + 4.d0/3.d0*k2yz**3*kxt**3 + 6.d0/5.d0*k2yz**2*kxt**5 & 
              + 4.d0/7.d0*k2yz*kxt**7 + kxt**9/9.d0)/(q*ky)
       end select
     endif
-    imp_terms_tintg = -coeff*imp_terms_tintg/k2_max**nexp
+    imp_terms_tintg = -coeff*regular/k2_max - coeff_h*hyper/k2_max**nexp
   end subroutine get_imp_terms_tintg_with_shear
 
 end module shearing_box

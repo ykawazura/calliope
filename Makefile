@@ -6,6 +6,6 @@ clean:
 expand:
 	cd src/expand; make expand
 distclean:
-	rm calliope expand *.nc *.dat *.tmp restart/*; make clean
+	rm calliope expand *.nc *.dat *.tmp *.out restart/* out2d/* out3d/*; make clean
 print:
 	cd src; make print

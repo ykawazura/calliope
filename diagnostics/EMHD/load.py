@@ -2,6 +2,7 @@
 import warnings
 warnings.filterwarnings('ignore')
 
+import os.path
 import numpy as np
 from scipy.io import netcdf
 
@@ -23,7 +24,7 @@ ismovie = False
 ####### ignore these points #########
 ignored_points      = [0]
 ignored_points_fld  = [ ]
-ignored_points_kpar = [ ]
+ignored_points_kpar = [0]
 ignored_points_SF2  = [ ]
 
 
@@ -75,30 +76,21 @@ bz2_bin       = np.copy(ncfile.variables['bz2_bin'      ][:]); bz2_bin       = n
 ncfile.close()
 
 # Load kpar
-ncfile = netcdf.netcdf_file(input_dir+runname+'.out.kpar.nc'+restart_num, 'r')   
-try:
-  tt_kpar   = np.copy(ncfile.variables['tt'       ][:]); tt_kpar   = np.delete(tt_kpar  , ignored_points_kpar, axis = 0)
-  kpar_b    = np.copy(ncfile.variables['kpar_b'   ][:]); kpar_b    = np.delete(kpar_b   , ignored_points_kpar, axis = 0)
-  kpar_u    = np.copy(ncfile.variables['kpar_u'   ][:]); kpar_u    = np.delete(kpar_u   , ignored_points_kpar, axis = 0)
-  b1_ovr_b0 = np.copy(ncfile.variables['b1_ovr_b0'][:]); b1_ovr_b0 = np.delete(b1_ovr_b0, ignored_points_kpar, axis = 0)
-except KeyError:
-  pass
-ncfile.close()
-
-# Load SF2
-ncfile = netcdf.netcdf_file(input_dir+runname+'.out.SF2.nc'+restart_num, 'r')   
-try:
-  tt_SF2 = np.copy(ncfile.variables['tt'  ][:]); tt_SF2  = np.delete(tt_SF2 , ignored_points_SF2, axis = 0)
-  lpar   = np.copy(ncfile.variables['lpar'][:])
-  lper   = np.copy(ncfile.variables['lper'][:])
-  nl     = lpar.size
-  SF2b   = np.copy(ncfile.variables['SF2b'][:]);  SF2b = np.delete(SF2b, ignored_points_SF2, axis = 0)
-  SF2u   = np.copy(ncfile.variables['SF2u'][:]);  SF2u = np.delete(SF2u, ignored_points_SF2, axis = 0)
-except KeyError:
-  pass
-
-
-ncfile.close()
+filename = input_dir+runname+'.out.kpar.nc'+restart_num
+if os.path.exists(filename):
+  ncfile = netcdf.netcdf_file(filename, 'r')   
+  try:
+    tt_kpar   = np.copy(ncfile.variables['tt'       ][:]); tt_kpar   = np.delete(tt_kpar  , ignored_points_kpar, axis = 0)
+    kpbin_log = np.copy(ncfile.variables['kpbin_log'][:]); kpbin_log = np.delete(kpbin_log, ignored_points_kpar, axis = 0)
+    kpar_b    = np.copy(ncfile.variables['kpar_b'   ][:]); kpar_b    = np.delete(kpar_b   , ignored_points_kpar, axis = 0)
+    b1_ovr_b0 = np.copy(ncfile.variables['b1_ovr_b0'][:]); b1_ovr_b0 = np.delete(b1_ovr_b0, ignored_points_kpar, axis = 0)
+    b1par2    = np.copy(ncfile.variables['b1par2'   ][:]); b1par2    = np.delete(b1par2   , ignored_points_kpar, axis = 0)
+    b1prp2    = np.copy(ncfile.variables['b1prp2'   ][:]); b1prp2    = np.delete(b1prp2   , ignored_points_kpar, axis = 0)
+  except KeyError:
+    pass
+  ncfile.close()
+else:
+  print ('no kpar data file')
 
 tlab  = r'$\Omega_\rmi t$'
 xlab  = r'$x/d_\rmi$'
@@ -109,37 +101,37 @@ kylab = r'$k_y d_\rmi$'
 kzlab = r'$k_z d_\rmi$'
 kplab = r'$k_\+ d_\rmi$'
 
-# # Load series modes
-# import os
+# Load series modes
+import os
 
-# label_series = {'bx': r'$B_x$', 'by': r'$B_y$', 'bz': r'$B_z$'}
+label_series = {'bx': r'$B_x$', 'by': r'$B_y$', 'bz': r'$B_z$'}
 
-# filename = input_dir+runname+'.modes.out'+restart_num
-# if os.path.isfile(filename):
-  # data = np.loadtxt(filename, usecols=[0,2,3,4,5,6])
-  # name = np.loadtxt(filename, usecols=[1], dtype = "unicode")
+filename = input_dir+runname+'.modes.out'+restart_num
+if os.path.isfile(filename):
+  data = np.loadtxt(filename, usecols=[0,2,3,4,5,6])
+  name = np.loadtxt(filename, usecols=[1], dtype = "unicode")
 
-  # fldnames_unique = np.unique(name)
-  # nfld = fldnames_unique.size
+  fldnames_unique = np.unique(name)
+  nfld = fldnames_unique.size
 
-  # tt_unique = np.unique(data.T[0])
-  # ntt = tt_unique.size
+  tt_unique = np.unique(data.T[0])
+  ntt = tt_unique.size
 
-  # modes_unique = np.unique((data.T[1:4]).T, axis=0)
-  # nmodes = modes_unique.shape[0]
+  modes_unique = np.unique((data.T[1:4]).T, axis=0)
+  nmodes = modes_unique.shape[0]
 
-  # tt_ = {}
-  # f_  = {}
-  # for n in fldnames_unique:
-    # tt_[n] = np.zeros([ntt, nmodes])
-    # f_ [n] = np.zeros([ntt, nmodes], dtype=complex)
+  tt_ = {}
+  f_  = {}
+  for n in fldnames_unique:
+    tt_[n] = np.zeros([ntt, nmodes])
+    f_ [n] = np.zeros([ntt, nmodes], dtype=complex)
 
-  # for n, d in zip(name, data):
-    # time = d[0]
-    # mode = d[1:4]
-    # time_idx = np.argwhere(tt_unique == time)[0][0]
-    # mode_idx = np.argwhere([np.array_equal(x, mode) for x in modes_unique])[0][0]
+  for n, d in zip(name, data):
+    time = d[0]
+    mode = d[1:4]
+    time_idx = np.argwhere(tt_unique == time)[0][0]
+    mode_idx = np.argwhere([np.array_equal(x, mode) for x in modes_unique])[0][0]
 
-    # tt_[n][time_idx, mode_idx] = time
-    # f_ [n][time_idx, mode_idx] = d[4] + 1j*d[5]
+    tt_[n][time_idx, mode_idx] = time
+    f_ [n][time_idx, mode_idx] = d[4] + 1j*d[5]
 

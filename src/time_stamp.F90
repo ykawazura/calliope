@@ -9,26 +9,28 @@ module time_stamp
 
   public  put_time_stamp
   public  timer_total, timer_init
-  public  timer_diagnostics_total, timer_diagnostics_SF2, timer_diagnostics_kpar
-  public  timer_advance, timer_nonlinear_terms 
-  public  timer_fft
+  public  timer_diagnostics_total, timer_diagnostics_SF2, timer_diagnostics_kpar, timer_diagnostics_nltrans
+  public  timer_advance, timer_nonlinear_terms
+  public  timer_fft, timer_force
   public  timer_io_total
   public  timer_io_2D
   public  timer_io_3D
   public  microsleep
 
-  real(r8) :: timer_total            (2) = 0.d0
-  real(r8) :: timer_init             (2) = 0.d0
-  real(r8) :: timer_diagnostics_total(2) = 0.d0
-  real(r8) :: timer_diagnostics_SF2  (2) = 0.d0
-  real(r8) :: timer_diagnostics_kpar (2) = 0.d0
-  real(r8) :: timer_advance          (2) = 0.d0
-  real(r8) :: timer_nonlinear_terms  (2) = 0.d0
-  real(r8) :: timer_fft              (2) = 0.d0
-  real(r8) :: timer_io_total         (2) = 0.d0
-  real(r8) :: timer_io_2D            (2) = 0.d0
-  real(r8) :: timer_io_3D            (2) = 0.d0
-  real(r8) :: timer_save_restart     (2) = 0.d0
+  real(r8) :: timer_total              (2) = 0.d0
+  real(r8) :: timer_init               (2) = 0.d0
+  real(r8) :: timer_diagnostics_total  (2) = 0.d0
+  real(r8) :: timer_diagnostics_SF2    (2) = 0.d0
+  real(r8) :: timer_diagnostics_kpar   (2) = 0.d0
+  real(r8) :: timer_diagnostics_nltrans(2) = 0.d0
+  real(r8) :: timer_advance            (2) = 0.d0
+  real(r8) :: timer_nonlinear_terms    (2) = 0.d0
+  real(r8) :: timer_fft                (2) = 0.d0
+  real(r8) :: timer_force              (2) = 0.d0
+  real(r8) :: timer_io_total           (2) = 0.d0
+  real(r8) :: timer_io_2D              (2) = 0.d0
+  real(r8) :: timer_io_3D              (2) = 0.d0
+  real(r8) :: timer_save_restart       (2) = 0.d0
 
 
   interface

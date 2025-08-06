@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from load import *
 from fft import *
+import sys
+sys.path.append('../')
 from plots import *
 
 print('\nplotting kspectrum\n')
@@ -10,9 +12,10 @@ if nlz == nkz:
   kp_end = np.argmin(np.abs(kpbin - kpbin.max()*2./3.))
 else:
   kp_end = kpbin.size - 1
+kp_log_kpar_end = kpbin_log_kpar.size - 1
 
 # If shear is on, add a vertical line indicating the fastest-MRI mode
-if shear_flg == 1:
+if shear_flg == 1 and np.max(b0[0]) > 1e-10:
   b00 = np.max(b0[0])
   k_mri = np.sqrt(15.)/4./b00
 
@@ -21,9 +24,13 @@ def add_vertical_line(xs, ys, ls, legends):
   ys.append([np.min([u2_bin[final_idx, 1:kp_end].min(), b2_bin[final_idx, 1:kp_end].min()]), 
              np.max([u2_bin[final_idx, 1:kp_end].max(), b2_bin[final_idx, 1:kp_end].max()])])
   ls.append('k:')
-  legends.append(r'$k = k_\mr{MRI} = (\sqrt{15}/4)\varpi_0/v_\rmA$')
+  legends.append(r'$k = k_\mr{MRI} = (\sqrt{15}/4)\Omega/v_\mathrm{A}$')
 
   return xs, ys, ls, legends
+
+def fold_in_kz(u):
+  unew = [(u[:, i, :] + u[:, -i, :])/2 for i in np.arange(0, int(nkz/2)+1)]
+  return np.transpose(np.asarray(unew), axes=[1,0,2])
 
 #--------------------------------------------------------#
 #                      plot 1D spectra                   #
@@ -53,10 +60,9 @@ legends = [
             r'-3/2',
           ]
 
-if shear_flg == 1: xs, ys, ls, legends = add_vertical_line(xs, ys, ls, legends)
+if shear_flg == 1 and np.max(b0[0]) > 1e-10: xs, ys, ls, legends = add_vertical_line(xs, ys, ls, legends)
 
 plot_log1d_many(xs, ys, xlab=kplab, legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', term=True, save=outdir+'k_spectra.pdf')
-
 
 # u by components
 ys = [ 
@@ -88,7 +94,7 @@ legends = [
             r'-3/2',
           ]
 
-if shear_flg == 1: xs, ys, ls, legends = add_vertical_line(xs, ys, ls, legends)
+if shear_flg == 1 and np.max(b0[0]) > 1e-10: xs, ys, ls, legends = add_vertical_line(xs, ys, ls, legends)
 
 plot_log1d_many(xs, ys, xlab=kplab, legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', term=True, save=outdir+'k_spectra_u.pdf')
 
@@ -123,7 +129,7 @@ legends = [
             r'-3/2',
           ]
 
-if shear_flg == 1: xs, ys, ls, legends = add_vertical_line(xs, ys, ls, legends)
+if shear_flg == 1 and np.max(b0[0]) > 1e-10: xs, ys, ls, legends = add_vertical_line(xs, ys, ls, legends)
 
 plot_log1d_many(xs, ys, xlab=kplab, legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', term=True, save=outdir+'k_spectra_b.pdf')
 
@@ -154,76 +160,179 @@ legends = [
             r'-3/2',
           ]
 
-if shear_flg == 1: xs, ys, ls, legends = add_vertical_line(xs, ys, ls, legends)
+if shear_flg == 1 and np.max(b0[0]) > 1e-10: xs, ys, ls, legends = add_vertical_line(xs, ys, ls, legends)
 
 plot_log1d_many(xs, ys, xlab=kplab, legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', term=True, save=outdir+'k_spectra_ELS.pdf')
 
 
-# kpar
+# Dissipation
 ys = [ 
-       kpar_b[final_kpar_idx, 1:kp_end], 
-       kpar_u[final_kpar_idx, 1:kp_end], 
-       kpbin[1:kp_end]**(2./3.)/kpbin[1]**(2./3.)*kpar_b[final_kpar_idx,1:kp_end][0],
+       u2dissip_bin[final_idx, 1:kp_end], 
+       b2dissip_bin[final_idx, 1:kp_end], 
      ]
 xs = [ 
-      kpbin[1:kp_end], 
       kpbin[1:kp_end], 
       kpbin[1:kp_end], 
      ]
 ls = [ 
         '', 
         '', 
-        'k--', 
      ]
 legends = [ 
-            r'$k_\|^b$', 
-            r'$k_\|^u$', 
-            r'2/3',
+            r'$D_\mr{u}$', 
+            r'$D_\mr{B}$',
           ]
 
-if shear_flg == 1: xs, ys, ls, legends = add_vertical_line(xs, ys, ls, legends)
+if shear_flg == 1 and np.max(b0[0]) > 1e-10: xs, ys, ls, legends = add_vertical_line(xs, ys, ls, legends)
 
-plot_log1d_many(xs, ys, xlab=kplab, legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt_kpar[final_kpar_idx], ylab='', term=True, save=outdir+'kpar.pdf')
+plot_log1d_many(xs, ys, xlab=kplab, legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', term=True, save=outdir+'k_dissip.pdf')
 
 
-# delta b/b0
+# MRI Injection
 ys = [ 
-       b1_ovr_b0[final_kpar_idx, 1:kp_end], 
+       p_re_bin[final_idx, 1:kp_end], 
+       p_ma_bin[final_idx, 1:kp_end], 
      ]
 xs = [ 
+      kpbin[1:kp_end], 
       kpbin[1:kp_end], 
      ]
 ls = [ 
         '', 
+        '', 
      ]
 legends = [ 
-            r'$\delta b/b_0$', 
+            r'$P_\mr{Re}$', 
+            r'$P_\mr{M}$',
           ]
 
-if shear_flg == 1: xs, ys, ls, legends = add_vertical_line(xs, ys, ls, legends)
+if shear_flg == 1 and np.max(b0[0]) > 1e-10: xs, ys, ls, legends = add_vertical_line(xs, ys, ls, legends)
 
-plot_log1d_many(xs, ys, xlab=kplab, legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt_kpar[final_kpar_idx], ylab='', term=True, save=outdir+'b1_ovr_b0.pdf')
+plot_log1d_many(xs, ys, xlab=kplab, legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', term=True, save=outdir+'k_MRI.pdf')
 
 #------------------#
 #   output ascii   #
 #------------------#
-np.savetxt(outdir + 'Ek.txt'  , np.column_stack((kpbin    [:kp_end], 
-                                                  u2_bin  [final_idx,:kp_end],
-                                                 ux2_bin  [final_idx,:kp_end],
-                                                 uy2_bin  [final_idx,:kp_end],
-                                                 uz2_bin  [final_idx,:kp_end],
-                                                  b2_bin  [final_idx,:kp_end],
-                                                 bx2_bin  [final_idx,:kp_end],
-                                                 by2_bin  [final_idx,:kp_end],
-                                                 bz2_bin  [final_idx,:kp_end],
-                                                 zp2_bin  [final_idx,:kp_end],
-                                                 zm2_bin  [final_idx,:kp_end],
+np.savetxt(outdir + 'Ek.txt'  , np.column_stack((kpbin       [:kp_end], 
+                                                  u2_bin     [final_idx,:kp_end],
+                                                 ux2_bin     [final_idx,:kp_end],
+                                                 uy2_bin     [final_idx,:kp_end],
+                                                 uz2_bin     [final_idx,:kp_end],
+                                                  b2_bin     [final_idx,:kp_end],
+                                                 bx2_bin     [final_idx,:kp_end],
+                                                 by2_bin     [final_idx,:kp_end],
+                                                 bz2_bin     [final_idx,:kp_end],
+                                                 zp2_bin     [final_idx,:kp_end],
+                                                 zm2_bin     [final_idx,:kp_end],
+                                                 u2dissip_bin[final_idx,:kp_end],
+                                                 b2dissip_bin[final_idx,:kp_end],
+                                                 p_re_bin    [final_idx,:kp_end],
+                                                 p_ma_bin    [final_idx,:kp_end],
                                                  )), fmt='%E')
-np.savetxt(outdir + 'kpar.txt'  , np.column_stack((kpbin  [:kp_end], 
-                                                 kpar_b   [final_kpar_idx,:kp_end],
-                                                 kpar_u   [final_kpar_idx,:kp_end],
-                                                 b1_ovr_b0[final_kpar_idx,:kp_end],
-                                                 )), fmt='%E')
+
+# kpar
+try:
+  ys = [ 
+         kpar_b[final_kpar_idx, 1:kp_log_kpar_end], 
+         kpar_u[final_kpar_idx, 1:kp_log_kpar_end], 
+         kpbin_log_kpar[1:kp_log_kpar_end]**(2./3.)/kpbin_log_kpar[1]**(2./3.)*kpar_b[final_kpar_idx,1:kp_log_kpar_end][0],
+       ]
+  xs = [ 
+        kpbin_log_kpar[1:kp_log_kpar_end], 
+        kpbin_log_kpar[1:kp_log_kpar_end], 
+        kpbin_log_kpar[1:kp_log_kpar_end], 
+       ]
+  ls = [ 
+          '', 
+          '', 
+          'k--', 
+       ]
+  legends = [ 
+              r'$k_\|^b$', 
+              r'$k_\|^u$', 
+              r'2/3',
+            ]
+
+  if shear_flg == 1 and np.max(b0[0]) > 1e-10: xs, ys, ls, legends = add_vertical_line(xs, ys, ls, legends)
+
+  plot_log1d_many(xs, ys, xlab=kplab, legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt_kpar[final_kpar_idx], ylab='', term=True, save=outdir+'kpar.pdf')
+
+
+  # delta b/b0
+  ys = [ 
+         b1_ovr_b0[final_kpar_idx, 1:kp_log_kpar_end], 
+       ]
+  xs = [ 
+        kpbin_log_kpar[1:kp_log_kpar_end], 
+       ]
+  ls = [ 
+          '', 
+       ]
+  legends = [ 
+              r'$\delta b/b_0$', 
+            ]
+
+  if shear_flg == 1 and np.max(b0[0]) > 1e-10: xs, ys, ls, legends = add_vertical_line(xs, ys, ls, legends)
+
+  plot_log1d_many(xs, ys, xlab=kplab, legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt_kpar[final_kpar_idx], ylab='', term=True, save=outdir+'b1_ovr_b0.pdf')
+
+
+  # shear AWs vs pseudo AWs
+  ys = [ 
+         b1par2[final_kpar_idx, 1:kp_log_kpar_end], 
+         b1prp2[final_kpar_idx, 1:kp_log_kpar_end], 
+         (b1par2/b1prp2)[final_kpar_idx, 1:kp_log_kpar_end], 
+         u1par2[final_kpar_idx, 1:kp_log_kpar_end], 
+         u1prp2[final_kpar_idx, 1:kp_log_kpar_end], 
+         (u1par2/u1prp2)[final_kpar_idx, 1:kp_log_kpar_end], 
+       ]
+  xs = [ 
+        kpbin_log_kpar[1:kp_log_kpar_end], 
+        kpbin_log_kpar[1:kp_log_kpar_end], 
+        kpbin_log_kpar[1:kp_log_kpar_end], 
+        kpbin_log_kpar[1:kp_log_kpar_end], 
+        kpbin_log_kpar[1:kp_log_kpar_end], 
+        kpbin_log_kpar[1:kp_log_kpar_end], 
+       ]
+  ls = [ 
+          'r-', 
+          'r--', 
+          'r:', 
+          'b-', 
+          'b--', 
+          'b:', 
+       ]
+  legends = [ 
+              r'$\delta B_\|^2$', 
+              r'$\delta B_\+^2$', 
+              r'$\delta B_\|^2/\delta B_\+^2$', 
+              r'$u_\|^2$', 
+              r'$u_\+^2$', 
+              r'$u_\|^2/u_\+^2$', 
+            ]
+
+  if shear_flg == 1 and np.max(b0[0]) > 1e-10: xs, ys, ls, legends = add_vertical_line(xs, ys, ls, legends)
+
+  plot_log1d_many(xs, ys, xlab=kplab, legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt_kpar[final_kpar_idx], ylab='', term=True, save=outdir+'shearAW_vs_pseudoAW.pdf')
+
+  #------------------#
+  #   output ascii   #
+  #------------------#
+  np.savetxt(outdir + 'tt_kpar.txt'  , tt_kpar, fmt='%E')
+  np.savetxt(outdir + 'kpar.txt'  , np.column_stack((kpbin_log_kpar[:kp_log_kpar_end], 
+                                                   kpar_b      [final_kpar_idx,:kp_log_kpar_end],
+                                                   kpar_u      [final_kpar_idx,:kp_log_kpar_end],
+                                                   b1_ovr_b0   [final_kpar_idx,:kp_log_kpar_end],
+                                                   )), fmt='%E')
+
+  np.savetxt(outdir + 'shearAW_vs_pseudoAW.txt'  , np.column_stack((kpbin_log_kpar[:kp_log_kpar_end], 
+                                                   b1par2[final_kpar_idx,:kp_log_kpar_end],
+                                                   b1prp2[final_kpar_idx,:kp_log_kpar_end],
+                                                   u1par2[final_kpar_idx,:kp_log_kpar_end],
+                                                   u1prp2[final_kpar_idx,:kp_log_kpar_end],
+                                                   )), fmt='%E')
+except:
+  pass
 
 #--------------------------------------------------------#
 #                       plot movie                       #
@@ -287,28 +396,91 @@ if ismovie:
 #--------------------------------------------------------#
 #                       2D spectra                       #
 #--------------------------------------------------------#
-ncfile = netcdf.netcdf_file(input_dir+runname+'.out.2D.nc'+restart_num, 'r')   
+# summed over kx or ky or kz
+tt_2d = np.transpose(np.loadtxt(input_dir+'out2d'+restart_num+'/time.dat'))[0]
+nt_2d = tt_2d.size
+if nt_2d == 1 : tt_2d = [tt_2d]
 
-tt_fld  = np.copy(ncfile.variables['tt' ][:]); tt_fld  = np.delete(tt_fld , ignored_points_fld, axis = 0)
-kx_fld  = np.copy(ncfile.variables['kx' ][:])
-ky_fld  = np.copy(ncfile.variables['ky' ][:])
-kz_fld  = np.copy(ncfile.variables['kz' ][:])
+nkx_mid = np.where(np.sign(kx) == -1)[0][0]
+nkz_mid = np.where(np.sign(kz) == -1)[0][0]
+kx_ = np.concatenate([kx[nkx_mid:], kx[0:nkx_mid]])
+kz_ = np.concatenate([kz[nkz_mid:], kz[0:nkz_mid]])
 
-nkx_mid = np.where(np.sign(kx_fld) == -1)[0][0]
-nkz_mid = np.where(np.sign(kz_fld) == -1)[0][0]
-kx_fld_ = np.concatenate([kx_fld[nkx_mid:], kx_fld[0:nkx_mid]])
-kz_fld_ = np.concatenate([kz_fld[nkz_mid:], kz_fld[0:nkz_mid]])
+u2_kxy_sum_kz = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/u2_kxy_sum_kz.dat').reshape(nt_2d, nky, nkx)); u2_kxy_sum_kz = np.transpose(u2_kxy_sum_kz, axes=(2, 1, 0));  u2_kxy_sum_kz = np.delete(u2_kxy_sum_kz, ignored_points_2d, axis = 0); u2_kxy_sum_kz = np.concatenate([u2_kxy_sum_kz[:, :, nkx_mid:], u2_kxy_sum_kz[:, :, 0:nkx_mid]], axis=2)
+u2_kyz_sum_kx = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/u2_kyz_sum_kx.dat').reshape(nt_2d, nkz, nky)); u2_kyz_sum_kx = np.transpose(u2_kyz_sum_kx, axes=(2, 1, 0));  u2_kyz_sum_kx = np.delete(u2_kyz_sum_kx, ignored_points_2d, axis = 0); u2_kyz_sum_kx = np.concatenate([u2_kyz_sum_kx[:, nkz_mid:, :], u2_kyz_sum_kx[:, 0:nkz_mid, :]], axis=1)
+u2_kxz_sum_ky = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/u2_kxz_sum_ky.dat').reshape(nt_2d, nkz, nkx)); u2_kxz_sum_ky = np.transpose(u2_kxz_sum_ky, axes=(2, 1, 0));  u2_kxz_sum_ky = np.delete(u2_kxz_sum_ky, ignored_points_2d, axis = 0); u2_kxz_sum_ky = np.concatenate([u2_kxz_sum_ky[:, nkz_mid:, :], u2_kxz_sum_ky[:, 0:nkz_mid, :]], axis=1); u2_kxz_sum_ky = np.concatenate([u2_kxz_sum_ky[:, :, nkx_mid:], u2_kxz_sum_ky[:, :, 0:nkx_mid]], axis=2)
+b2_kxy_sum_kz = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/b2_kxy_sum_kz.dat').reshape(nt_2d, nky, nkx)); b2_kxy_sum_kz = np.transpose(b2_kxy_sum_kz, axes=(2, 1, 0));  b2_kxy_sum_kz = np.delete(b2_kxy_sum_kz, ignored_points_2d, axis = 0); b2_kxy_sum_kz = np.concatenate([b2_kxy_sum_kz[:, :, nkx_mid:], b2_kxy_sum_kz[:, :, 0:nkx_mid]], axis=2)
+b2_kyz_sum_kx = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/b2_kyz_sum_kx.dat').reshape(nt_2d, nkz, nky)); b2_kyz_sum_kx = np.transpose(b2_kyz_sum_kx, axes=(2, 1, 0));  b2_kyz_sum_kx = np.delete(b2_kyz_sum_kx, ignored_points_2d, axis = 0); b2_kyz_sum_kx = np.concatenate([b2_kyz_sum_kx[:, nkz_mid:, :], b2_kyz_sum_kx[:, 0:nkz_mid, :]], axis=1)
+b2_kxz_sum_ky = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/b2_kxz_sum_ky.dat').reshape(nt_2d, nkz, nkx)); b2_kxz_sum_ky = np.transpose(b2_kxz_sum_ky, axes=(2, 1, 0));  b2_kxz_sum_ky = np.delete(b2_kxz_sum_ky, ignored_points_2d, axis = 0); b2_kxz_sum_ky = np.concatenate([b2_kxz_sum_ky[:, nkz_mid:, :], b2_kxz_sum_ky[:, 0:nkz_mid, :]], axis=1); b2_kxz_sum_ky = np.concatenate([b2_kxz_sum_ky[:, :, nkx_mid:], b2_kxz_sum_ky[:, :, 0:nkx_mid]], axis=2)
 
-u2_kxy = np.copy(ncfile.variables['u2_kxy'][:]);  u2_kxy = np.delete(u2_kxy, ignored_points_fld, axis = 0); u2_kxy = np.concatenate([u2_kxy[:, :, nkx_mid:], u2_kxy[:, :, 0:nkx_mid]], axis=2)
-u2_kyz = np.copy(ncfile.variables['u2_kyz'][:]);  u2_kyz = np.delete(u2_kyz, ignored_points_fld, axis = 0); u2_kyz = np.concatenate([u2_kyz[:, nkz_mid:, :], u2_kyz[:, 0:nkz_mid, :]], axis=1)
-u2_kxz = np.copy(ncfile.variables['u2_kxz'][:]);  u2_kxz = np.delete(u2_kxz, ignored_points_fld, axis = 0); u2_kxz = np.concatenate([u2_kxz[:, nkz_mid:, :], u2_kxz[:, 0:nkz_mid, :]], axis=1); u2_kxz = np.concatenate([u2_kxz[:, :, nkx_mid:], u2_kxz[:, :, 0:nkx_mid]], axis=2)
-b2_kxy = np.copy(ncfile.variables['b2_kxy'][:]);  b2_kxy = np.delete(b2_kxy, ignored_points_fld, axis = 0); b2_kxy = np.concatenate([b2_kxy[:, :, nkx_mid:], b2_kxy[:, :, 0:nkx_mid]], axis=2)
-b2_kyz = np.copy(ncfile.variables['b2_kyz'][:]);  b2_kyz = np.delete(b2_kyz, ignored_points_fld, axis = 0); b2_kyz = np.concatenate([b2_kyz[:, nkz_mid:, :], b2_kyz[:, 0:nkz_mid, :]], axis=1)
-b2_kxz = np.copy(ncfile.variables['b2_kxz'][:]);  b2_kxz = np.delete(b2_kxz, ignored_points_fld, axis = 0); b2_kxz = np.concatenate([b2_kxz[:, nkz_mid:, :], b2_kxz[:, 0:nkz_mid, :]], axis=1); b2_kxz = np.concatenate([b2_kxz[:, :, nkx_mid:], b2_kxz[:, :, 0:nkx_mid]], axis=2)
+plot_2d(np.log10(u2_kxy_sum_kz[final_idx,1:-1,1:-1]), kx_[1:-1], ky [1:-1], xlab=r'$k_x$', ylab=r'$k_y$', title=r'$E_u (t = %.2E) $' % tt_2d[final_2d_idx], contour=True, aspect='auto', save=outdir+'u2_kxy.pdf')
+plot_2d(np.log10(u2_kyz_sum_kx[final_idx,1:-1,1:-1]), ky [1:-1], kz_[1:-1], xlab=r'$k_y$', ylab=r'$k_z$', title=r'$E_u (t = %.2E) $' % tt_2d[final_2d_idx], contour=True, aspect='auto', save=outdir+'u2_kyz.pdf')
+plot_2d(np.log10(u2_kxz_sum_ky[final_idx,1:-1,1:-1]), kx_[1:-1], kz_[1:-1], xlab=r'$k_x$', ylab=r'$k_z$', title=r'$E_u (t = %.2E) $' % tt_2d[final_2d_idx], contour=True, aspect='auto', save=outdir+'u2_kxz.pdf')
+plot_2d(np.log10(b2_kxy_sum_kz[final_idx,1:-1,1:-1]), kx_[1:-1], ky [1:-1] , xlab=r'$k_x$', ylab=r'$k_y$', title=r'$E_B (t = %.2E) $' % tt_2d[final_2d_idx], contour=True, aspect='auto', save=outdir+'b2_kxy.pdf')
+plot_2d(np.log10(b2_kyz_sum_kx[final_idx,1:-1,1:-1]), ky [1:-1], kz_[1:-1], xlab=r'$k_y$', ylab=r'$k_z$', title=r'$E_B (t = %.2E) $' % tt_2d[final_2d_idx], contour=True, aspect='auto', save=outdir+'b2_kyz.pdf')
+plot_2d(np.log10(b2_kxz_sum_ky[final_idx,1:-1,1:-1]), kx_[1:-1], kz_[1:-1], xlab=r'$k_x$', ylab=r'$k_z$', title=r'$E_B (t = %.2E) $' % tt_2d[final_2d_idx], contour=True, aspect='auto', save=outdir+'b2_kxz.pdf')
 
-plot_2d(np.log10(u2_kxy[final_idx,:,:]), kx_fld_, ky_fld , xlab=r'$k_x$', ylab=r'$k_y$', title=r'$E_{u} (t = %.2E) $' % tt[final_idx], save=outdir+'u2_kxy.pdf')
-plot_2d(np.log10(u2_kyz[final_idx,:,:]), ky_fld , kz_fld_, xlab=r'$k_y$', ylab=r'$k_z$', title=r'$E_{u} (t = %.2E) $' % tt[final_idx], save=outdir+'u2_kyz.pdf')
-plot_2d(np.log10(u2_kxz[final_idx,:,:]), kx_fld_, kz_fld_, xlab=r'$k_x$', ylab=r'$k_z$', title=r'$E_{u} (t = %.2E) $' % tt[final_idx], save=outdir+'u2_kxz.pdf')
-plot_2d(np.log10(b2_kxy[final_idx,:,:]), kx_fld_, ky_fld , xlab=r'$k_x$', ylab=r'$k_y$', title=r'$E_{b} (t = %.2E) $' % tt[final_idx], save=outdir+'b2_kxy.pdf')
-plot_2d(np.log10(b2_kyz[final_idx,:,:]), ky_fld , kz_fld_, xlab=r'$k_y$', ylab=r'$k_z$', title=r'$E_{b} (t = %.2E) $' % tt[final_idx], save=outdir+'b2_kyz.pdf')
-plot_2d(np.log10(b2_kxz[final_idx,:,:]), kx_fld_, kz_fld_, xlab=r'$k_x$', ylab=r'$k_z$', title=r'$E_{b} (t = %.2E) $' % tt[final_idx], save=outdir+'b2_kxz.pdf')
+
+# bin over (kx, ky) leaving kz or (kx, kz) leaving ky
+u2_kxy_vs_kz = np.fromfile(input_dir+'out2d'+restart_num+'/u2_kxy_vs_kz.dat').reshape(nt_2d, nkz, nkpolar); u2_kxy_vs_kz = fold_in_kz(u2_kxy_vs_kz)
+u2_kxz_vs_ky = np.fromfile(input_dir+'out2d'+restart_num+'/u2_kxz_vs_ky.dat').reshape(nt_2d, nky, nkpolar)
+b2_kxy_vs_kz = np.fromfile(input_dir+'out2d'+restart_num+'/b2_kxy_vs_kz.dat').reshape(nt_2d, nkz, nkpolar); b2_kxy_vs_kz = fold_in_kz(b2_kxy_vs_kz)
+b2_kxz_vs_ky = np.fromfile(input_dir+'out2d'+restart_num+'/b2_kxz_vs_ky.dat').reshape(nt_2d, nky, nkpolar)
+
+plot_log2d(u2_kxy_vs_kz[final_idx,1:int(nkz/2),1:kp_end], kpbin[1:kp_end], kz[1:int(nkz/2)] , xlab=r'$k_\+$', ylab=r'$k_z$', title=r'$E_u (t = %.2E) $' % tt_2d[final_2d_idx], contour=True, save=outdir+'u2_kxy_vs_kz.pdf')
+plot_log2d(b2_kxy_vs_kz[final_idx,1:int(nkz/2),1:kp_end], kpbin[1:kp_end], kz[1:int(nkz/2)] , xlab=r'$k_\+$', ylab=r'$k_z$', title=r'$E_u (t = %.2E) $' % tt_2d[final_2d_idx], contour=True, save=outdir+'b2_kxy_vs_kz.pdf')
+
+plot_log2d(u2_kxz_vs_ky[final_idx,1:nky - 1   ,1:kp_end], kpbin[1:kp_end], ky[1:nky - 1   ] , xlab=r'$k_\+$', ylab=r'$k_y$', title=r'$E_B (t = %.2E) $' % tt_2d[final_2d_idx], contour=True, save=outdir+'u2_kxz_vs_ky.pdf')
+plot_log2d(b2_kxz_vs_ky[final_idx,1:nky - 1   ,1:kp_end], kpbin[1:kp_end], ky[1:nky - 1   ] , xlab=r'$k_\+$', ylab=r'$k_y$', title=r'$E_B (t = %.2E) $' % tt_2d[final_2d_idx], contour=True, save=outdir+'b2_kxz_vs_ky.pdf')
+
+
+ys = [ 
+       u2_bin[final_idx, 1:kp_end], 
+       np.sum(u2_kxy_vs_kz[final_idx,:,1:kp_end], axis=0), 
+       np.sum(u2_kxz_vs_ky[final_idx,:,1:kp_end], axis=0), 
+       b2_bin[final_idx, 1:kp_end], 
+       np.sum(b2_kxy_vs_kz[final_idx,:,1:kp_end], axis=0), 
+       np.sum(b2_kxz_vs_ky[final_idx,:,1:kp_end], axis=0), 
+     ]
+xs = [ 
+      kpbin[1:kp_end], 
+      kpbin[1:kp_end], 
+      kpbin[1:kp_end], 
+      kpbin[1:kp_end], 
+      kpbin[1:kp_end], 
+      kpbin[1:kp_end], 
+     ]
+ls = [ 
+        'r-', 
+        'r--', 
+        'r.', 
+        'b-', 
+        'b--', 
+        'b.', 
+     ]
+legends = [ 
+            r'$E_u$', 
+            r'$\sum_{k_z}E_u(k_z, \sqrt{k_x^2 + k_y^2})$',
+            r'$\sum_{k_y}E_u(k_y, \sqrt{k_x^2 + k_z^2})$',
+            r'$E_B$', 
+            r'$\sum_{k_z}E_B(k_z, \sqrt{k_x^2 + k_y^2})$',
+            r'$\sum_{k_y}E_B(k_y, \sqrt{k_x^2 + k_z^2})$',
+          ]
+
+if shear_flg == 1 and np.max(b0[0]) > 1e-10: xs, ys, ls, legends = add_vertical_line(xs, ys, ls, legends)
+
+plot_log1d_many(xs, ys, xlab=kplab, legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt_2d[final_2d_idx], ylab='', term=True, save=outdir+'2d_3d_bin_check.pdf')
+
+#------------------#
+#   output data    #
+#------------------#
+from scipy.io import savemat
+
+savemat(outdir + '2d_bin_in_3d_grid' , {'kpbin':kpbin, 'ky':ky, 'kz':kz[:int(nkz/2)+1]})
+savemat(outdir + '2d_bin_in_3d' , {
+                            'tt'           :tt_2d[final_2d_idx],
+                            'u2_kxy_vs_kz' :u2_kxy_vs_kz[final_2d_idx,:,:],
+                            'u2_kxz_vs_ky' :u2_kxz_vs_ky[final_2d_idx,:,:],
+                            'b2_kxy_vs_kz' :b2_kxy_vs_kz[final_2d_idx,:,:],
+                            'b2_kxz_vs_ky' :b2_kxz_vs_ky[final_2d_idx,:,:],
+                          })

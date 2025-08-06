@@ -6,6 +6,8 @@ from parula import parula_map
 
 from load import *
 from fft import *
+import sys
+sys.path.append('../')
 from plots import *
 
 #-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-#
@@ -26,21 +28,21 @@ elongation = 1
 
 ####### load 2decomp file #########
 # Load field in spectral coordinate
-tt_f = np.transpose(np.loadtxt(input_dir+'field_time.dat'+restart_num))[1]
+tt_f = np.transpose(np.loadtxt(input_dir+'out2d/time.dat'+restart_num))[1]
 nt_f = tt_f.size
 
-ux = np.transpose(np.fromfile(input_dir+'ux.dat'+restart_num).reshape(nt_f, nky, nkz, nkx, 2))
+ux = np.transpose(np.fromfile(input_dir+'out2d/ux.dat'+restart_num).reshape(nt_f, nky, nkz, nkx, 2))
 ux = ux[0, :, :, :, final_idx] + 1j*ux[1, :, :, :, final_idx]
-uy = np.transpose(np.fromfile(input_dir+'uy.dat'+restart_num).reshape(nt_f, nky, nkz, nkx, 2))
+uy = np.transpose(np.fromfile(input_dir+'out2d/uy.dat'+restart_num).reshape(nt_f, nky, nkz, nkx, 2))
 uy = uy[0, :, :, :, final_idx] + 1j*uy[1, :, :, :, final_idx]
-uz = np.transpose(np.fromfile(input_dir+'uz.dat'+restart_num).reshape(nt_f, nky, nkz, nkx, 2))
+uz = np.transpose(np.fromfile(input_dir+'out2d/uz.dat'+restart_num).reshape(nt_f, nky, nkz, nkx, 2))
 uz = uz[0, :, :, :, final_idx] + 1j*uz[1, :, :, :, final_idx]
 
-bx = np.transpose(np.fromfile(input_dir+'bx.dat'+restart_num).reshape(nt_f, nky, nkz, nkx, 2))
+bx = np.transpose(np.fromfile(input_dir+'out2d/bx.dat'+restart_num).reshape(nt_f, nky, nkz, nkx, 2))
 bx = bx[0, :, :, :, final_idx] + 1j*bx[1, :, :, :, final_idx]
-by = np.transpose(np.fromfile(input_dir+'by.dat'+restart_num).reshape(nt_f, nky, nkz, nkx, 2))
+by = np.transpose(np.fromfile(input_dir+'out2d/by.dat'+restart_num).reshape(nt_f, nky, nkz, nkx, 2))
 by = by[0, :, :, :, final_idx] + 1j*by[1, :, :, :, final_idx]
-bz = np.transpose(np.fromfile(input_dir+'bz.dat'+restart_num).reshape(nt_f, nky, nkz, nkx, 2))
+bz = np.transpose(np.fromfile(input_dir+'out2d/bz.dat'+restart_num).reshape(nt_f, nky, nkz, nkx, 2))
 bz = bz[0, :, :, :, final_idx] + 1j*bz[1, :, :, :, final_idx]
 print (bx[1, 1, 0])
 

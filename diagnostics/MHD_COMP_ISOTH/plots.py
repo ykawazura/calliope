@@ -17,10 +17,24 @@ default_colormap     = parula_map # or parula_map or 'viridis' for sequential co
 default_colormap_log = 'inferno' # or parula_map or 'viridis'
 
 # setup some plot defaults
+linewidth = 2
 plt.rc('text', usetex=True)
 plt.rc('font', family='serif')
 plt.rc('font', serif='Times')
 plt.rc('font', size=30)
+plt.rc('axes', linewidth=linewidth)
+plt.rc('xtick', top=True)
+plt.rc('xtick.major', width=linewidth)
+plt.rc('xtick.major', size=15)
+plt.rc('xtick.minor', width=linewidth)
+plt.rc('xtick.minor', size=8)
+plt.rc('ytick', right=True)
+plt.rc('ytick.major', width=linewidth)
+plt.rc('ytick.major', size=10)
+plt.rc('ytick.minor', width=linewidth)
+plt.rc('ytick.minor', size=5)
+plt.rc('xtick', direction='in')
+plt.rc('ytick', direction='in')
 rcParams.update({'figure.autolayout': True})
 from latex_preamble import preamble
 rcParams['text.latex.preamble'] = preamble  
@@ -234,10 +248,10 @@ def plot_2d(u, xin, yin, umin=None, umax=None, xlab='', ylab='', title='', cmp=d
   im = ax.imshow(u, cmap=cmp, vmin=umin, vmax=umax,
              extent=[x.min(), x.max(), y.min(), y.max()],
              interpolation=interpolation, origin='lower', aspect='equal')
-  # try:
-    # plt.contour(x, y, u, linewidths=2)
-  # except:
-    # pass
+  try:
+    plt.contour(x, y, u, linewidths=2)
+  except:
+    pass
   plt.axis([x.min(), x.max(), y.min(), y.max()])
   plt.xlabel(xlab)
   plt.ylabel(ylab)

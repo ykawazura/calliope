@@ -1,0 +1,10 @@
+FC = mpiifort
+
+NETCDF_LIB=-lnetcdf -lnetcdff -lhdf5_hl -lhdf5 -lz
+NETCDF_LIB+=-lp3dfft -lfftw3
+
+LAPACK_LIB=/lib64/liblapack.so.3 /lib64/libblas.so.3
+
+F90FLAGS = -DINTEL -O3
+MPI_LIB = -lm -lmpi -lmpifort
+LIB_OPENMP = -fopenmp # used only when USE_OPENMP=yes in ../Makefile.in

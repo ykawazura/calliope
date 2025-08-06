@@ -55,61 +55,44 @@ else:
 # Load total energies
 upe2_sum        = np.copy(ncfile.variables['upe2_sum'       ][:]); upe2_sum        = np.delete(upe2_sum       , ignored_points, axis = 0)
 bpe2_sum        = np.copy(ncfile.variables['bpe2_sum'       ][:]); bpe2_sum        = np.delete(bpe2_sum       , ignored_points, axis = 0)
+zppe2_sum       = np.copy(ncfile.variables['zppe2_sum'      ][:]); zppe2_sum       = np.delete(zppe2_sum      , ignored_points, axis = 0)
+zmpe2_sum       = np.copy(ncfile.variables['zmpe2_sum'      ][:]); zmpe2_sum       = np.delete(zmpe2_sum      , ignored_points, axis = 0)
 upe2dot_sum     = np.copy(ncfile.variables['upe2dot_sum'    ][:]); upe2dot_sum     = np.delete(upe2dot_sum    , ignored_points, axis = 0)
 bpe2dot_sum     = np.copy(ncfile.variables['bpe2dot_sum'    ][:]); bpe2dot_sum     = np.delete(bpe2dot_sum    , ignored_points, axis = 0)
 upe2dissip_sum  = np.copy(ncfile.variables['upe2dissip_sum' ][:]); upe2dissip_sum  = np.delete(upe2dissip_sum , ignored_points, axis = 0)
 bpe2dissip_sum  = np.copy(ncfile.variables['bpe2dissip_sum' ][:]); bpe2dissip_sum  = np.delete(bpe2dissip_sum , ignored_points, axis = 0)
-p_omg_sum       = np.copy(ncfile.variables['p_omg_sum'      ][:]); p_omg_sum       = np.delete(p_omg_sum      , ignored_points, axis = 0)
+p_phi_sum       = np.copy(ncfile.variables['p_phi_sum'      ][:]); p_phi_sum       = np.delete(p_phi_sum      , ignored_points, axis = 0)
 p_psi_sum       = np.copy(ncfile.variables['p_psi_sum'      ][:]); p_psi_sum       = np.delete(p_psi_sum      , ignored_points, axis = 0)
+p_xhl_sum       = np.copy(ncfile.variables['p_xhl_sum'      ][:]); p_xhl_sum       = np.delete(p_xhl_sum      , ignored_points, axis = 0)
 
 # Load binned spectra
 upe2_bin        = np.copy(ncfile.variables['upe2_bin'       ][:]); upe2_bin        = np.delete(upe2_bin       , ignored_points, axis = 0)
 bpe2_bin        = np.copy(ncfile.variables['bpe2_bin'       ][:]); bpe2_bin        = np.delete(bpe2_bin       , ignored_points, axis = 0)
+zppe2_bin       = np.copy(ncfile.variables['zppe2_bin'      ][:]); zppe2_bin       = np.delete(zppe2_bin      , ignored_points, axis = 0)
+zmpe2_bin       = np.copy(ncfile.variables['zmpe2_bin'      ][:]); zmpe2_bin       = np.delete(zmpe2_bin      , ignored_points, axis = 0)
+hp_bin          = np.copy(ncfile.variables['hp_bin'         ][:]); hp_bin          = np.delete(hp_bin         , ignored_points, axis = 0)
+hm_bin          = np.copy(ncfile.variables['hm_bin'         ][:]); hm_bin          = np.delete(hm_bin         , ignored_points, axis = 0)
 
 ncfile.close()
 
-# Load 2D cut
-ncfile = netcdf.netcdf_file(input_dir+runname+'.out.2D.nc'+restart_num, 'r')   
+tlab  = r'$(v_\mathrm{A}/L_\|)t$'
+zlab  = r'$z/L_\|$'
+kzlab = r'$L_\| k_z$'
 
-tt_fld  = np.copy(ncfile.variables['tt' ][:]); tt_fld  = np.delete(tt_fld , ignored_points_fld, axis = 0)
-xx_fld  = np.copy(ncfile.variables['xx' ][:])
-yy_fld  = np.copy(ncfile.variables['yy' ][:])
-zz_fld  = np.copy(ncfile.variables['zz' ][:])
+# Load rms
+import os
+filename = input_dir+'rms.dat'+restart_num
+if os.path.isfile(filename):
+  data = np.loadtxt(filename).T
 
-phi_r_z0        = np.copy(ncfile.variables['phi_r_z0'       ][:]); phi_r_z0        = np.delete(phi_r_z0       , ignored_points_fld, axis = 0)
-phi_r_x0        = np.copy(ncfile.variables['phi_r_x0'       ][:]); phi_r_x0        = np.delete(phi_r_x0       , ignored_points_fld, axis = 0)
-phi_r_y0        = np.copy(ncfile.variables['phi_r_y0'       ][:]); phi_r_y0        = np.delete(phi_r_y0       , ignored_points_fld, axis = 0)
+  # Reduce multiple points at the same time because of multistep update (RK or Gear)
+  _, indices = np.unique(data[0], return_index=True)
+  data = np.asarray([data.T[i] for i in indices]).T
+  tt_rms, ux_rms, uy_rms, bx_rms, by_rms = data
 
-psi_r_z0        = np.copy(ncfile.variables['psi_r_z0'       ][:]); psi_r_z0        = np.delete(psi_r_z0       , ignored_points_fld, axis = 0)
-psi_r_x0        = np.copy(ncfile.variables['psi_r_x0'       ][:]); psi_r_x0        = np.delete(psi_r_x0       , ignored_points_fld, axis = 0)
-psi_r_y0        = np.copy(ncfile.variables['psi_r_y0'       ][:]); psi_r_y0        = np.delete(psi_r_y0       , ignored_points_fld, axis = 0)
+  # Pick up where tt_rms = tt
+  indices = [np.abs(tt_rms - t).argmin() for t in tt]
+  tt_rms, ux_rms, uy_rms, bx_rms, by_rms = np.asarray([data.T[i] for i in indices]).T
+else:
+  tt_rms, ux_rms, uy_rms, bx_rms, by_rms = [np.array([0])] * 5
 
-omg_r_z0        = np.copy(ncfile.variables['omg_r_z0'       ][:]); omg_r_z0        = np.delete(omg_r_z0       , ignored_points_fld, axis = 0)
-omg_r_x0        = np.copy(ncfile.variables['omg_r_x0'       ][:]); omg_r_x0        = np.delete(omg_r_x0       , ignored_points_fld, axis = 0)
-omg_r_y0        = np.copy(ncfile.variables['omg_r_y0'       ][:]); omg_r_y0        = np.delete(omg_r_y0       , ignored_points_fld, axis = 0)
-
-jpa_r_z0        = np.copy(ncfile.variables['jpa_r_z0'       ][:]); jpa_r_z0        = np.delete(jpa_r_z0       , ignored_points_fld, axis = 0)
-jpa_r_x0        = np.copy(ncfile.variables['jpa_r_x0'       ][:]); jpa_r_x0        = np.delete(jpa_r_x0       , ignored_points_fld, axis = 0)
-jpa_r_y0        = np.copy(ncfile.variables['jpa_r_y0'       ][:]); jpa_r_y0        = np.delete(jpa_r_y0       , ignored_points_fld, axis = 0)
-
-ux_r_z0         = np.copy(ncfile.variables[ 'ux_r_z0'       ][:]);  ux_r_z0        = np.delete( ux_r_z0       , ignored_points_fld, axis = 0)
-ux_r_x0         = np.copy(ncfile.variables[ 'ux_r_x0'       ][:]);  ux_r_x0        = np.delete( ux_r_x0       , ignored_points_fld, axis = 0)
-ux_r_y0         = np.copy(ncfile.variables[ 'ux_r_y0'       ][:]);  ux_r_y0        = np.delete( ux_r_y0       , ignored_points_fld, axis = 0)
-
-uy_r_z0         = np.copy(ncfile.variables[ 'uy_r_z0'       ][:]);  uy_r_z0        = np.delete( uy_r_z0       , ignored_points_fld, axis = 0)
-uy_r_x0         = np.copy(ncfile.variables[ 'uy_r_x0'       ][:]);  uy_r_x0        = np.delete( uy_r_x0       , ignored_points_fld, axis = 0)
-uy_r_y0         = np.copy(ncfile.variables[ 'uy_r_y0'       ][:]);  uy_r_y0        = np.delete( uy_r_y0       , ignored_points_fld, axis = 0)
-
-bx_r_z0         = np.copy(ncfile.variables[ 'bx_r_z0'       ][:]);  bx_r_z0        = np.delete( bx_r_z0       , ignored_points_fld, axis = 0)
-bx_r_x0         = np.copy(ncfile.variables[ 'bx_r_x0'       ][:]);  bx_r_x0        = np.delete( bx_r_x0       , ignored_points_fld, axis = 0)
-bx_r_y0         = np.copy(ncfile.variables[ 'bx_r_y0'       ][:]);  bx_r_y0        = np.delete( bx_r_y0       , ignored_points_fld, axis = 0)
-
-by_r_z0         = np.copy(ncfile.variables[ 'by_r_z0'       ][:]);  by_r_z0        = np.delete( by_r_z0       , ignored_points_fld, axis = 0)
-by_r_x0         = np.copy(ncfile.variables[ 'by_r_x0'       ][:]);  by_r_x0        = np.delete( by_r_x0       , ignored_points_fld, axis = 0)
-by_r_y0         = np.copy(ncfile.variables[ 'by_r_y0'       ][:]);  by_r_y0        = np.delete( by_r_y0       , ignored_points_fld, axis = 0)
-
-ncfile.close()
-
-tlab  = r'(v_\rmA/L_\|)t'
-zlab  = r'z/L_\|'
-kzlab = r'L_\| k_z'

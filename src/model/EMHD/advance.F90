@@ -1,4 +1,4 @@
-!*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*!
+!*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*!;vs
 include "../../advance_common.F90"
 !*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*~*!
 
@@ -13,14 +13,17 @@ module advance
   use fields, only: ibx, iby, ibz
   implicit none
 
-  public solve
+  public solve, is_allocated, allocate_advance, deallocate_advance
+
+  logical :: is_allocated = .false.
 
   integer :: counter = 0
   complex(r8), allocatable, dimension(:,:,:)   :: bx_new
   complex(r8), allocatable, dimension(:,:,:)   :: by_new
   complex(r8), allocatable, dimension(:,:,:)   :: bz_new
+  complex(r8), allocatable, dimension(:,:,:,:) :: w
+  real   (r8), allocatable, dimension(:,:,:,:) :: w_r, flx_r 
   complex(r8), allocatable, dimension(:,:,:,:) :: flx, exp_terms
-  complex(r8), allocatable, dimension(:,:,:)   :: nbl2inv_div_b ! nabla^-2 (div b)
   real   (r8), allocatable, dimension(:,:,:)   :: de2k2_plus_1
 
   !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
@@ -40,8 +43,7 @@ module advance
   complex(r8), allocatable, dimension(:,:,:)   :: fbx_old2, fby_old2, fbz_old2
   complex(r8), allocatable, dimension(:,:,:,:) :: exp_terms_old, exp_terms_old2
 
-  real   (r8) :: cflx, cfly, cflz
-  integer :: max_vel_unit
+  integer :: cfl_unit
 
   ! Backward FFT variables
   integer, parameter :: nbtran = 6
@@ -64,16 +66,15 @@ contains
     use grid, only: k2_max
     use grid, only: kx, ky, kz, k2, k2inv
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
-    use time, only: dt, cfl, tt
+    use time, only: dt, tt
     use time_stamp, only: put_time_stamp, timer_advance
     use mp, only: proc0
     use params, only: eta, eta_exp, zi, nonlinear
-    use params, only: dealias_scheme => dealias
     use dealias, only: filter
     use force, only: fbx, fbz, fby, fbx_old, fby_old, fbz_old, driven, update_force, get_force
     use advance_common, only: eSSPIFRK1, eSSPIFRK2, eSSPIFRK3
     use advance_common, only: gear1, gear2, gear3
-    use params, only: series_output
+    use diagnostics_common, only: series_output
     use params, only: time_step_scheme
     implicit none
     real(r8) :: imp_terms_tintg0(nfields), imp_terms_tintg1(nfields)
@@ -84,12 +85,7 @@ contains
 
     ! initialize tmp fields
     if(counter == 0) then
-      call init_multistep_fields
-
-      cflx = maxval(abs(kx))/cfl
-      cfly = maxval(abs(ky))/cfl
-      cflz = maxval(abs(kz))/cfl
-
+      call init_work_fields
       counter = 1
     endif
 
@@ -103,13 +99,14 @@ contains
         call get_force('bx', fbx)
         call get_force('by', fby)
         call get_force('bz', fbz)
+        call div_free(fbx, fby, fbz)
       endif
 
       !---------------  RK 1st step  ---------------
       ! Calcualte nonlinear terms
       if(nonlinear) call get_nonlinear_terms(bx, by, bz, .true.)
 
-      !$omp parallel do private(i, k) schedule(static)
+      !$omp parallel do private(j, k, i, imp_terms_tintg0, imp_terms_tintg1)
       do j = iky_st, iky_en
         do k = ikz_st, ikz_en
           do i = ikx_st, ikx_en
@@ -123,11 +120,11 @@ contains
 
             ! Calculate time integral of explicit terms
             call get_imp_terms_tintg(imp_terms_tintg0(ibx),         0.d0, k2(i,k,j), de2k2_plus_1(i,k,j), eta, eta_exp)
-            call get_imp_terms_tintg(imp_terms_tintg2(ibx), 2.d0/3.d0*dt, k2(i,k,j), de2k2_plus_1(i,k,j), eta, eta_exp)
+            call get_imp_terms_tintg(imp_terms_tintg1(ibx), 2.d0/3.d0*dt, k2(i,k,j), de2k2_plus_1(i,k,j), eta, eta_exp)
             call get_imp_terms_tintg(imp_terms_tintg0(iby),         0.d0, k2(i,k,j), de2k2_plus_1(i,k,j), eta, eta_exp)
-            call get_imp_terms_tintg(imp_terms_tintg2(iby), 2.d0/3.d0*dt, k2(i,k,j), de2k2_plus_1(i,k,j), eta, eta_exp)
+            call get_imp_terms_tintg(imp_terms_tintg1(iby), 2.d0/3.d0*dt, k2(i,k,j), de2k2_plus_1(i,k,j), eta, eta_exp)
             call get_imp_terms_tintg(imp_terms_tintg0(ibz),         0.d0, k2(i,k,j), de2k2_plus_1(i,k,j), eta, eta_exp)
-            call get_imp_terms_tintg(imp_terms_tintg2(ibz), 2.d0/3.d0*dt, k2(i,k,j), de2k2_plus_1(i,k,j), eta, eta_exp)
+            call get_imp_terms_tintg(imp_terms_tintg1(ibz), 2.d0/3.d0*dt, k2(i,k,j), de2k2_plus_1(i,k,j), eta, eta_exp)
 
             ! update b
             call eSSPIFRK1(bx_tmp(i,k,j), bx(i,k,j), &
@@ -153,6 +150,19 @@ contains
       exp_terms0 = exp_terms
       !$omp end workshare
 
+      ! Dealiasing
+      !$omp parallel do private(j, k, i)
+      do k = ikz_st, ikz_en
+        do j = iky_st, iky_en
+          do i = ikx_st, ikx_en
+            bx_tmp(i,k,j) = bx_tmp(i,k,j)*filter(i,k,j)
+            by_tmp(i,k,j) = by_tmp(i,k,j)*filter(i,k,j)
+            bz_tmp(i,k,j) = bz_tmp(i,k,j)*filter(i,k,j)
+          enddo
+        enddo
+      enddo
+      !$omp end parallel do
+
       !---------------  RK 2nd step  ---------------
       ! Calcualte force terms
       if (driven) then
@@ -161,6 +171,7 @@ contains
         call get_force('bx', fbx)
         call get_force('by', fby)
         call get_force('bz', fbz)
+        call div_free(fbx, fby, fbz)
 
         ! go to n + 1
         call update_force(1.d0/3.d0*dt)
@@ -169,7 +180,7 @@ contains
       ! Calcualte nonlinear terms
       if(nonlinear) call get_nonlinear_terms(bx_tmp, by_tmp, bz_tmp, .false.)
 
-      !$omp parallel do private(i, k) schedule(static)
+      !$omp parallel do private(j, k, i, imp_terms_tintg0, imp_terms_tintg2)
       do j = iky_st, iky_en
         do k = ikz_st, ikz_en
           do i = ikx_st, ikx_en
@@ -207,11 +218,24 @@ contains
       enddo
       !$omp end parallel do
 
+      ! Dealiasing
+      !$omp parallel do private(j, k, i)
+      do k = ikz_st, ikz_en
+        do j = iky_st, iky_en
+          do i = ikx_st, ikx_en
+            bx_tmp(i,k,j) = bx_tmp(i,k,j)*filter(i,k,j)
+            by_tmp(i,k,j) = by_tmp(i,k,j)*filter(i,k,j)
+            bz_tmp(i,k,j) = bz_tmp(i,k,j)*filter(i,k,j)
+          enddo
+        enddo
+      enddo
+      !$omp end parallel do
+
       !---------------  RK 3rd step  ---------------
       ! Calcualte nonlinear terms
       if(nonlinear) call get_nonlinear_terms(bx_tmp, by_tmp, bz_tmp, .false.)
 
-      !$omp parallel do private(i, k) schedule(static)
+      !$omp parallel do private(j, k, i, imp_terms_tintg0, imp_terms_tintg2, imp_terms_tintg3)
       do j = iky_st, iky_en
         do k = ikz_st, ikz_en
           do i = ikx_st, ikx_en
@@ -266,6 +290,19 @@ contains
         fbz_old = fbz
         !$omp end workshare
       endif
+
+      ! Dealiasing
+      !$omp parallel do private(j, k, i)
+      do k = ikz_st, ikz_en
+        do j = iky_st, iky_en
+          do i = ikx_st, ikx_en
+            bx_new(i,k,j) = bx_new(i,k,j)*filter(i,k,j)
+            by_new(i,k,j) = by_new(i,k,j)*filter(i,k,j)
+            bz_new(i,k,j) = bz_new(i,k,j)*filter(i,k,j)
+          enddo
+        enddo
+      enddo
+      !$omp end parallel do
     endif
 
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
@@ -278,12 +315,13 @@ contains
         call get_force('bx', fbx)
         call get_force('by', fby)
         call get_force('bz', fbz)
+        call div_free(fbx, fby, fbz)
       endif
 
       ! Calcualte nonlinear terms
       if(nonlinear) call get_nonlinear_terms(bx, by, bz, .true.)
 
-      !$omp parallel do private(i, k) schedule(static)
+      !$omp parallel do private(j, k, i)
       do j = iky_st, iky_en
         do k = ikz_st, ikz_en
           do i = ikx_st, ikx_en
@@ -386,6 +424,19 @@ contains
         fbz_old  = fbz
         !$omp end workshare
       endif
+
+      ! Dealiasing
+      !$omp parallel do private(j, k, i)
+      do k = ikz_st, ikz_en
+        do j = iky_st, iky_en
+          do i = ikx_st, ikx_en
+            bx_new(i,k,j) = bx_new(i,k,j)*filter(i,k,j)
+            by_new(i,k,j) = by_new(i,k,j)*filter(i,k,j)
+            bz_new(i,k,j) = bz_new(i,k,j)*filter(i,k,j)
+          enddo
+        enddo
+      enddo
+      !$omp end parallel do
     endif
 
     !$omp workshare
@@ -394,39 +445,10 @@ contains
     bz = bz_new
     !$omp end workshare
 
-    ! Dealiasing
-    if(trim(dealias_scheme) /= '2/3') then
-      do k = ikz_st, ikz_en
-        do j = iky_st, iky_en
-          do i = ikx_st, ikx_en
-            bx(i,k,j) = bx_new(i,k,j)*filter(i,k,j)
-            by(i,k,j) = by_new(i,k,j)*filter(i,k,j)
-            bz(i,k,j) = bz_new(i,k,j)*filter(i,k,j)
-          enddo
-        enddo
-      enddo
-    endif
-
     tt  = tt  + dt
 
     ! Div b cleaing
-    allocate(nbl2inv_div_b(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
-    !$omp parallel do private(i, k) schedule(static)
-    do j = iky_st, iky_en
-      do k = ikz_st, ikz_en
-        do i = ikx_st, ikx_en
-          nbl2inv_div_b(i,k,j) = -zi*(   kx(i)*bx(i,k,j) &
-                                       + ky(j)*by(i,k,j) &
-                                       + kz(k)*bz(i,k,j) )*k2inv(i,k,j)
-
-          bx(i,k,j) = bx(i,k,j) - zi*kx(i)*nbl2inv_div_b(i,k,j)
-          by(i,k,j) = by(i,k,j) - zi*ky(j)*nbl2inv_div_b(i,k,j)
-          bz(i,k,j) = bz(i,k,j) - zi*kz(k)*nbl2inv_div_b(i,k,j)
-        enddo
-      enddo
-    enddo
-    !$omp end parallel do
-    deallocate(nbl2inv_div_b)
+    call div_free(bx, by, bz)
 
     if(series_output) call output_series_modes
 
@@ -437,29 +459,20 @@ contains
 !-----------------------------------------------!
 !> @author  YK
 !! @date    29 Dec 2018
-!! @brief   Allocate tmp fields for a multi 
-!!          timestep method
+!! @brief   Allocate fields used only here
 !-----------------------------------------------!
-  subroutine init_multistep_fields
+  subroutine init_work_fields
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en, k2
     use file, only: open_output_file
     use params, only: time_step_scheme
     use params, only: de2
+    use mp, only: proc0
     implicit none
     complex(r8), allocatable, dimension(:,:,:) :: src
     integer :: i, j, k
 
-    allocate(src(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0,0.d0))
-
-    allocate(bx_new, source=src)
-    allocate(by_new, source=src)
-    allocate(bz_new, source=src)
-
-    allocate(flx      (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nftran )); flx       = 0.d0
-    allocate(exp_terms(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nfields)); exp_terms = 0.d0
-
     allocate(de2k2_plus_1(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); de2k2_plus_1 = 0.d0
-
+    
     !$omp parallel do private(i, k) schedule(static)
     do j = iky_st, iky_en
       do i = ikx_st, ikx_en
@@ -470,21 +483,14 @@ contains
     enddo
     !$omp end parallel do
 
-    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
-    !v                For eSSPIFRK3                v!
-    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
-    if(time_step_scheme == 'eSSPIFRK3') then
-      allocate(bx_tmp, source=src)
-      allocate(by_tmp, source=src)
-      allocate(bz_tmp, source=src)
-
-      allocate(exp_terms0(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nfields )); exp_terms0  = 0.d0
-    endif
+    call allocate_advance
 
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
     !v                  For Gear3                  v!
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
     if(time_step_scheme == 'gear3') then
+      allocate(src(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0,0.d0))
+
       allocate( bx_old2, source=src)
       allocate( by_old2, source=src)
       allocate( bz_old2, source=src)
@@ -495,13 +501,13 @@ contains
 
       allocate(exp_terms_old (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nfields)); exp_terms_old  = 0.d0
       allocate(exp_terms_old2(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nfields)); exp_terms_old2 = 0.d0
+
+      deallocate(src)
     endif
 
-    deallocate(src)
+    if(proc0) call open_output_file (cfl_unit, 'cfl.dat')
 
-    call open_output_file (max_vel_unit, 'max_vel.dat')
-
-  end subroutine init_multistep_fields
+  end subroutine init_work_fields
 
 
 !-----------------------------------------------!
@@ -515,6 +521,7 @@ contains
 !!          4. Forward FFT
 !-----------------------------------------------!
   subroutine get_nonlinear_terms(bx, by, bz, dt_reset)
+    use grid, only: dlx, dly, dlz
     use grid, only: nlx, nly, nlz
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
@@ -524,23 +531,18 @@ contains
     use mp, only: proc0, max_allreduce
     use time, only: cfl, dt, tt, reset_method, increase_dt
     use time_stamp, only: put_time_stamp, timer_nonlinear_terms, timer_fft
+    use advance_common, only: dt_adjust_while_running 
     implicit none
     complex(r8), dimension (ikx_st:ikx_en, &
                             ikz_st:ikz_en, &
                             iky_st:iky_en), intent(in) :: bx, by, bz
 
-    complex(r8), allocatable, dimension(:,:,:,:) :: wbk
-    real   (r8), allocatable, dimension(:,:,:,:) :: wb , wf 
     logical, intent(in) :: dt_reset
 
     integer :: i, j, k
-    real   (r8) :: max_vel, dt_cfl, dt_digit
+    real   (r8) :: max_vel_x, max_vel_y, max_vel_z , dt_cfl, dt_digit
 
     if (proc0) call put_time_stamp(timer_nonlinear_terms)
-
-    allocate(wbk(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nbtran), source=(0.d0, 0.d0))
-    allocate(wb (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nbtran), source=0.d0)
-    allocate(wf (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nftran), source=0.d0)
 
     ! 1. Calculate grad in Fourier space
     !$omp parallel do private(i, k) schedule(static)
@@ -548,19 +550,19 @@ contains
       do k = ikz_st, ikz_en
         do i = ikx_st, ikx_en
           ! b^* = (1 + de^2 nabla*2)b
-          wbk(i,k,j,ibx) = bx(i,k,j)*de2k2_plus_1(i, k, j)
-          wbk(i,k,j,iby) = by(i,k,j)*de2k2_plus_1(i, k, j)
-          wbk(i,k,j,ibz) = bz(i,k,j)*de2k2_plus_1(i, k, j)
+          w(i,k,j,ibx) = bx(i,k,j)*de2k2_plus_1(i, k, j)
+          w(i,k,j,iby) = by(i,k,j)*de2k2_plus_1(i, k, j)
+          w(i,k,j,ibz) = bz(i,k,j)*de2k2_plus_1(i, k, j)
 
           ! u = -curl b : electron velocity
-          wbk(i,k,j,iux) = -zi*(  ky(j)*bz(i,k,j) &
-                                - kz(k)*by(i,k,j) )
-                                                      
-          wbk(i,k,j,iuy) = -zi*(  kz(k)*bx(i,k,j) &
-                                - kx(i)*bz(i,k,j) )
-                                                      
-          wbk(i,k,j,iuz) = -zi*(  kx(i)*by(i,k,j) &
-                                - ky(j)*bx(i,k,j) )
+          w(i,k,j,iux) = -zi*(  ky(j)*bz(i,k,j) &
+                              - kz(k)*by(i,k,j) )
+                                                    
+          w(i,k,j,iuy) = -zi*(  kz(k)*bx(i,k,j) &
+                              - kx(i)*bz(i,k,j) )
+                                                    
+          w(i,k,j,iuz) = -zi*(  kx(i)*by(i,k,j) &
+                              - ky(j)*bx(i,k,j) )
         enddo
       enddo
     enddo
@@ -568,19 +570,26 @@ contains
 
     ! 2. Inverse FFT
     if (proc0) call put_time_stamp(timer_fft)
-    call p3dfft_btran_c2r_many(wbk, nk_local_tot, wb, nl_local_tot, nbtran, 'tff')
+    ! for some reason c2r_many doesn't work at Fugaku
+    !call p3dfft_btran_c2r_many(w, nk_local_tot, w_r, nl_local_tot, nbtran, 'tff')
+    do i = 1, nbtran
+      call p3dfft_btran_c2r(w(:,:,:,i), w_r(:,:,:,i), 'tff')
+    enddo
     if (proc0) call put_time_stamp(timer_fft)
 
     ! (get max_vel for dt reset)
     if(dt_reset) then
-      max_vel = max( &
-                maxval(abs(wb(:,:,:,iux)))*cflx, maxval(abs(wb(:,:,:,iuy)))*cfly, maxval(abs(wb(:,:,:,iuz)))*cflz &
-              )
-      call max_allreduce(max_vel)
-      dt_cfl = 1.d0/max_vel
+      max_vel_x = maxval(abs(w_r(:,:,:,iux)))
+      max_vel_y = maxval(abs(w_r(:,:,:,iuy)))
+      max_vel_z = maxval(abs(w_r(:,:,:,iuz)))
+      call max_allreduce(max_vel_x)
+      call max_allreduce(max_vel_y)
+      call max_allreduce(max_vel_z)
+      dt_cfl = cfl*min(dlx/max_vel_x, dly/max_vel_y, dlz/max_vel_z)
+
       if(proc0) then
-        write (unit=max_vel_unit, fmt="(100es30.21)") tt, max_vel
-        call flush(max_vel_unit) 
+        write (unit=cfl_unit, fmt="(100es30.21)") tt, dt_cfl, max_vel_x, max_vel_y, max_vel_z
+        call flush(cfl_unit) 
       endif
 
       if(dt_cfl < dt) then
@@ -629,14 +638,18 @@ contains
       endif
     endif
 
+    ! When the file 'dt_adjust' including a float number is created,
+    ! dt will be manually adjusted to that value while running.
+    call dt_adjust_while_running() 
+
     ! 3. Calculate nonlinear terms in real space
     !$omp parallel do private(j, k) schedule(static)
     do i = ilx_st, ilx_en
       do k = ilz_st, ilz_en
         do j = ily_st, ily_en
-          wf(j,k,i,iflx_bx) = wb(j,k,i,iby)*wb(j,k,i,iuz) - wb(j,k,i,ibz)*wb(j,k,i,iuy)
-          wf(j,k,i,iflx_by) = wb(j,k,i,ibz)*wb(j,k,i,iux) - wb(j,k,i,ibx)*wb(j,k,i,iuz)
-          wf(j,k,i,iflx_bz) = wb(j,k,i,ibx)*wb(j,k,i,iuy) - wb(j,k,i,iby)*wb(j,k,i,iux)
+          flx_r(j,k,i,iflx_bx) = w_r(j,k,i,iby)*w_r(j,k,i,iuz) - w_r(j,k,i,ibz)*w_r(j,k,i,iuy)
+          flx_r(j,k,i,iflx_by) = w_r(j,k,i,ibz)*w_r(j,k,i,iux) - w_r(j,k,i,ibx)*w_r(j,k,i,iuz)
+          flx_r(j,k,i,iflx_bz) = w_r(j,k,i,ibx)*w_r(j,k,i,iuy) - w_r(j,k,i,iby)*w_r(j,k,i,iux)
         enddo
       enddo
     enddo
@@ -644,15 +657,15 @@ contains
 
     ! 4. Forward FFT
     if (proc0) call put_time_stamp(timer_fft)
-    call p3dfft_ftran_r2c_many(wf, nl_local_tot, flx, nk_local_tot, nftran, 'fft')
+    ! for some reason r2c_many doesn't work at Fugaku
+    !call p3dfft_ftran_r2c_many(flx_r, nl_local_tot, flx, nk_local_tot, nftran, 'fft')
+    do i = 1, nftran
+      call p3dfft_ftran_r2c(flx_r(:,:,:,i), flx(:,:,:,i), 'fft')
+    enddo
     if (proc0) call put_time_stamp(timer_fft)
     !$omp workshare
     flx = flx/nlx/nly/nlz
     !$omp end workshare
-
-    deallocate(wbk)
-    deallocate(wb )
-    deallocate(wf )
 
     if (proc0) call put_time_stamp(timer_nonlinear_terms)
   end subroutine get_nonlinear_terms
@@ -712,11 +725,11 @@ contains
 !-----------------------------------------------!
   subroutine output_series_modes
     use fields, only: bx, by, bz
-    use params, only: n_series_modes, series_modes
     use grid, only: kx, ky, kz
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use mp, only: proc0, sum_reduce
     use time, only: tt
+    use diagnostics_common, only: n_series_modes, series_modes
     use diagnostics_common, only: series_modes_unit
     implicit none
     complex(r8), dimension(n_series_modes) :: bx_modes, by_modes, bz_modes
@@ -762,6 +775,130 @@ contains
     enddo
 
   end subroutine output_series_modes
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    18 May 2022
+!! @brief   Enforce div free for (wx, wy, wz)
+!-----------------------------------------------!
+  subroutine div_free(wx, wy, wz)
+    use grid, only: kx, ky, kz, k2inv
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use params, only: zi
+    implicit none
+    complex(r8), dimension (ikx_st:ikx_en, &
+                            ikz_st:ikz_en, &
+                            iky_st:iky_en), intent(inout) :: wx, wy, wz
+    complex(r8), allocatable, dimension(:,:,:)   :: nbl2inv_div_w ! nabla^-2 (div w)
+    integer :: i, j, k
+
+    allocate(nbl2inv_div_w(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0,0.d0))
+
+    !$omp parallel do private(i, k) schedule(static)
+    do j = iky_st, iky_en
+      do k = ikz_st, ikz_en
+        do i = ikx_st, ikx_en
+          nbl2inv_div_w(i,k,j) = -zi*(   kx(i)*wx(i,k,j) &
+                                       + ky(j)*wy(i,k,j) &
+                                       + kz(k)*wz(i,k,j) )*k2inv(i,k,j)
+
+          wx(i,k,j) = wx(i,k,j) - zi*kx(i)*nbl2inv_div_w(i,k,j)
+          wy(i,k,j) = wy(i,k,j) - zi*ky(j)*nbl2inv_div_w(i,k,j)
+          wz(i,k,j) = wz(i,k,j) - zi*kz(k)*nbl2inv_div_w(i,k,j)
+        enddo
+      enddo
+    enddo
+    !$omp end parallel do
+
+    deallocate(nbl2inv_div_w)
+
+  end subroutine div_free
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    18 May 2022
+!! @brief   Allocates arrays for this module
+!-----------------------------------------------!
+  subroutine allocate_advance
+    use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use params, only: time_step_scheme
+    implicit none
+    complex(r8), allocatable, dimension(:,:,:) :: src
+
+    if (is_allocated) then
+      return
+    else
+      is_allocated = .true.
+    endif
+
+    allocate(src(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0,0.d0))
+
+    allocate(bx_new, source=src)
+    allocate(by_new, source=src)
+    allocate(bz_new, source=src)
+
+    allocate(w        (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nbtran ), source=(0.d0, 0.d0))
+    allocate(flx      (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nftran ), source=(0.d0, 0.d0))
+    allocate(w_r      (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nbtran ), source=0.d0)
+    allocate(flx_r    (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nftran ), source=0.d0)
+    allocate(exp_terms(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nfields), source=(0.d0, 0.d0))
+
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v                For eSSPIFRK3                v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    if(time_step_scheme == 'eSSPIFRK3') then
+      allocate(bx_tmp, source=src)
+      allocate(by_tmp, source=src)
+      allocate(bz_tmp, source=src)
+
+      allocate(exp_terms0(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nfields)); exp_terms0  = 0.d0
+    endif
+
+    deallocate(src)
+
+  end subroutine allocate_advance
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    18 May 2022
+!! @brief   Deallocates arrays for this module
+!-----------------------------------------------!
+  subroutine deallocate_advance
+    use params, only: time_step_scheme
+    implicit none
+
+    if (is_allocated) then
+      is_allocated = .false.
+    else
+      return
+    endif
+
+    deallocate(bx_new)
+    deallocate(by_new)
+    deallocate(bz_new)
+
+    deallocate(w        )
+    deallocate(flx      )
+    deallocate(w_r      )
+    deallocate(flx_r    )
+    deallocate(exp_terms)
+
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v                For eSSPIFRK3                v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    if(time_step_scheme == 'eSSPIFRK3') then
+      deallocate(bx_tmp)
+      deallocate(by_tmp)
+      deallocate(bz_tmp)
+
+      deallocate(exp_terms0)
+    endif
+
+  end subroutine deallocate_advance
 
 end module advance
 

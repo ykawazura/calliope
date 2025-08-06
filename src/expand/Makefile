@@ -7,7 +7,7 @@ include ../../arch/$(arch).in
 
 MODEL_DIR = model/$(MODEL)
 
-F90FLAGS = -cpp
+# F90FLAGS = -cpp
 
 #vvvvvvv  2decomp option setting  vvvvvvv#
 DECOMP_DIR = ./2decomp

@@ -1,5 +1,7 @@
 # -*- coding: utf-8 -*-
 from load import *
+import sys
+sys.path.append('../')
 from plots import *
 
 print('\nplotting series modes\n')

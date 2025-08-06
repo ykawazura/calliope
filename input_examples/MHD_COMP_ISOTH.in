@@ -3,6 +3,9 @@
 !--------------------------------------------------!
 &mpi_settings
   dim_decomp = 2
+  !dim1 = 4 ! decomp will be (dim1, nproc/dim1)
+           ! if this is empty, decomp will be (dim1, dim2)
+           ! such that dim1 ~= dim2.
 /
 
 !==============================================================================
@@ -11,9 +14,11 @@
   ly = 1.0 ! to be multiplied by 2pi
   lz = 1.0 ! to be multiplied by 2pi
 
-  nlx = 32
-  nly = 32
-  nlz = 32
+  nlx = 64
+  nly = 64
+  nlz = 64
+
+  pruned = .true.
 /
 
 !==============================================================================
@@ -25,6 +30,9 @@
                              !'decrement' => decrement the top integer of dt
   increase_dt = 1e+0         !When max dt computed from the cfl condition is 
                              ! larger than this value, set dt = increase_dt.
+
+                             ! When the file 'dt_adjust' including a float number is created,
+                             ! dt will be manually adjusted to that value while running.
 /
 
 !==============================================================================
@@ -38,24 +46,22 @@
 /
 
 !==============================================================================
-&dealias_parameters
-  dealias = '2/3' !: 2/3 or 3/2
-/
-
-!==============================================================================
 &physical_parameters
-  ! hyper dissipation ~ nu*k^(2*nuexp)
-  nu      = 1d+4  ! viscosity
-  nu_exp  = 4
-  ! hyper resistivity ~ eta*k^(2*etaexp)
-  eta     = 1d+4  ! resistivity
-  eta_exp = 4
+  ! regular and hyper viscosity ~ nu*k^2 + nu_h*k^(2*nu_h_exp)
+  nu        = 1d+0  ! regular viscosity
+  nu_h      = 1d+3  ! hyper viscosity
+  nu_h_exp  = 4
+  ! regular and hyper resistivity ~ eta*k^2 + eta_h*k^(2*eta_h_exp)
+  eta       = 1d+0  ! regular resistivity
+  eta_h     = 1d+3  ! hyper resistivity
+  eta_h_exp = 4
 
-  ! hyper diffusion ~ lmd*k^(2*lmdexp)
-  lmd     = 1d+6  ! diffusion
-  lmd_exp = 4
+  ! regular and hyper diffusion ~ lmd*k^2 + lmd_h*k^(2*lmd_h_exp)
+  lmd       = 1d+0  ! regular diffusion
+  lmd_h     = 1d+4  ! hyper diffusion
+  lmd_h_exp = 4
 
-  beta0  = 1.d+1
+  beta0  = 1.d+2
 
   ! shear parameters
   shear  = .false.
@@ -210,7 +216,10 @@
 !  write_intvl_kpar = 0.2d0  ! output every this value.
 !  write_intvl_SF2  = 0.2d0  ! output every this value.
   SF2_nsample = 100000 ! number of sample points for each separation
+/
 
+!==============================================================================
+&restart_parameters
   save_restart_intvl = 1.0d0      ! save every this value.
   restart_dir = './restart/'
 /

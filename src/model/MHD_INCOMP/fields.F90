@@ -73,11 +73,17 @@ contains
     if(init_type == 'OT3') then
       call init_OT3
     endif
+    if(init_type == 'KH') then
+      call init_KH
+    endif
     if(init_type == 'random') then
       call init_random
     endif
     if(init_type == 'restart') then
       call restart
+    endif
+    if(init_type == 'convert_restartfiles_to_real') then
+      call convert_restartfiles_to_real
     endif
 
   end subroutine init_fields
@@ -285,6 +291,7 @@ contains
   subroutine init_random
     use p3dfft
     use grid, only: kx, ky, kz, nlx, nly, nlz, nkx, nky, nkz
+    use grid, only: xx
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use mp, only: proc0, proc_id
@@ -301,10 +308,11 @@ contains
     integer, allocatable :: seed(:)
     real(r8) :: rms, kmin(3), kmax(3)
     real(r8) :: u1(3), b1(3)
+    character(100) :: nf_or_znf
     integer :: i, j, k
 
     integer  :: unit, ierr
-    namelist /initial_condition_params/ kmin, kmax, b0, b1, u1
+    namelist /initial_condition_params/ kmin, kmax, b0, b1, u1, nf_or_znf
 
     if(proc0) then
       print *, 'Random initialization'
@@ -318,6 +326,7 @@ contains
     b0  = (/0.d0, 0.d0, 0.d0/)
     b1   = 0.d0
     u1   = 0.d0
+    nf_or_znf = 'nf'
 
     call get_unused_unit (unit)
     open(unit=unit,file=inputfile,status='old')
@@ -436,28 +445,12 @@ contains
             endif
           endif
 
-
-          if(nky > 1)then
-            if (ky(j) == 0.d0) then
-              uy(i, k, j) = 0.d0
-              by(i, k, j) = 0.d0
-            else
-              uy(i, k, j) = -(kx(i)*ux(i, k, j) + kz(k)*uz(i, k, j))/ky(j)
-              by(i, k, j) = -(kx(i)*bx(i, k, j) + kz(k)*bz(i, k, j))/ky(j)
-            endif
-          elseif(nkx > 1)then
-            if (kx(i) == 0.d0) then
-              uy(i, k, j) = 0.d0
-              by(i, k, j) = 0.d0
-            else
-              ux(i, k, j) = -(ky(j)*uy(i, k, j) + kz(k)*uz(i, k, j))/kx(i)
-              bx(i, k, j) = -(ky(j)*by(i, k, j) + kz(k)*bz(i, k, j))/kx(i)
-            endif
-          endif
-          ! endif
         end do
       end do
     end do
+
+    call div_free(ux, uy, uz)
+    call div_free(bx, by, bz)
 
     ! normalize ux, uy, uz by rms of |u|
     call p3dfft_btran_c2r(ux, ux_r, 'tff')
@@ -482,9 +475,21 @@ contains
     call sum_allreduce(rms)
     rms = sqrt(rms/nlx/nly/nlz)
 
-    bx_r = b1(1)*bx_r/rms + b0(1)
-    by_r = b1(2)*by_r/rms + b0(2)
-    bz_r = b1(3)*bz_r/rms + b0(3)
+    if (nf_or_znf == 'nf') then
+      bx_r = b1(1)*bx_r/rms + b0(1)
+      by_r = b1(2)*by_r/rms + b0(2)
+      bz_r = b1(3)*bz_r/rms + b0(3)
+    elseif (nf_or_znf == 'znf') then
+      do i = ilx_st, ilx_en
+        do k = ilz_st, ilz_en
+          do j = ily_st, ily_en
+            bx_r(j, k, i) = b1(1)*bx_r(j, k, i)/rms
+            by_r(j, k, i) = b1(2)*by_r(j, k, i)/rms
+            bz_r(j, k, i) = b1(3)*bz_r(j, k, i)/rms + b0(3)*sin(xx(i))
+          end do
+        end do
+      end do
+    endif
 
     call p3dfft_ftran_r2c(bx_r, bx, 'fft'); bx = bx/nlx/nly/nlz 
     call p3dfft_ftran_r2c(by_r, by, 'fft'); by = by/nlx/nly/nlz 
@@ -637,6 +642,128 @@ contains
 
 !-----------------------------------------------!
 !> @author  YK
+!! @date    9 Apr 2022
+!! @brief   KH
+!-----------------------------------------------!
+  subroutine init_KH
+    use mp, only: proc0
+    use params, only: zi, pi
+    use grid, only: nlx, nly, nlz, xx, yy, kx, ky, k2inv
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
+    use params, only: inputfile
+    use mp, only: max_allreduce, broadcast
+    use utils, only: ranf
+    use file, only: get_unused_unit
+    implicit none
+    real   (r8), allocatable, dimension(:,:,:) :: omg_r, ux_r, uy_r, uz_r
+    real   (r8), allocatable, dimension(:,:,:) ::        bx_r, by_r, bz_r
+    complex(r8), allocatable, dimension(:,:,:) :: omg
+    real   (r8) :: u2max, rand1, rand2
+    integer :: i, j, k
+
+    integer  :: unit, ierr
+    namelist /initial_condition_params/ b0
+
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v                read inputfile               v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    b0  = (/0.d0, 0.d0, 0.d0/)
+
+    call get_unused_unit (unit)
+    open(unit=unit,file=inputfile,status='old')
+
+    read(unit,nml=initial_condition_params,iostat=ierr)
+        if (ierr/=0) write(*,*) "Reading initial_condition failed"
+    close(unit)
+    !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
+
+    allocate(omg_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); omg_r = 0.d0
+    allocate(omg  (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); omg   = 0.d0
+
+    allocate(ux_r (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); ux_r  = 0.d0
+    allocate(uy_r (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); uy_r  = 0.d0
+    allocate(uz_r (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); uz_r  = 0.d0
+
+    allocate(bx_r (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); bx_r  = 0.d0
+    allocate(by_r (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); by_r  = 0.d0
+    allocate(bz_r (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); bz_r  = 0.d0
+
+    if(proc0) then
+      print *, 'KH initialization'
+    endif
+
+    ! set u
+    ux = 0.d0
+    uy = 0.d0
+    uz = 0.d0
+
+    call random_number(rand1)
+    call random_number(rand2)
+    call broadcast(rand1)
+    call broadcast(rand2)
+
+    do i = ilx_st, ilx_en
+      do k = ilz_st, ilz_en
+        do j = ily_st, ily_en
+          omg_r(j, k, i) =   dexp(-(20.d0*(yy(j) - pi)**2))  &
+                           *(1.d0 + 0.01d0*dcos(2.d0*xx(i)))! &
+                           ! *(1.d0 + 0.2d0*dcos(1.d0*(zz(k) + 2.d0*pi*rand1)) + 0.1d0*dcos(2.d0*(zz(k) + 2.d0*pi*rand2)))
+        end do
+      end do
+    end do
+
+    call p3dfft_ftran_r2c(omg_r, omg, 'fft'); omg = omg/nlx/nly/nlz
+
+    ! u = z x grad(phi)
+    do j = iky_st, iky_en
+      do k = ikz_st, ikz_en
+        do i = ikx_st, ikx_en
+          ux(i, k, j) = -zi*ky(j)*omg(i, k, j)*k2inv(i, k, j)
+          uy(i, k, j) =  zi*kx(i)*omg(i, k, j)*k2inv(i, k, j)
+        enddo
+      enddo
+    enddo
+
+    ! normalize |u| to unity
+    call p3dfft_btran_c2r(ux, ux_r, 'tff')
+    call p3dfft_btran_c2r(uy, uy_r, 'tff')
+    call p3dfft_btran_c2r(uz, uz_r, 'tff')
+
+    u2max = maxval(ux_r**2 + uy_r**2 + uz_r**2)
+    call max_allreduce(u2max)
+
+    ux_r = ux_r/dsqrt(u2max)
+    uy_r = uy_r/dsqrt(u2max)
+    uz_r = uz_r/dsqrt(u2max)
+
+    call p3dfft_ftran_r2c(ux_r, ux, 'fft'); ux = ux/nlx/nly/nlz
+    call p3dfft_ftran_r2c(uy_r, uy, 'fft'); uy = uy/nlx/nly/nlz
+    call p3dfft_ftran_r2c(uz_r, uz, 'fft'); uz = uz/nlx/nly/nlz
+
+    ! set b
+    bx_r = b0(1)
+    by_r = b0(2)
+    bz_r = b0(3)
+    call p3dfft_ftran_r2c(bx_r, bx, 'fft'); bx = bx/nlx/nly/nlz
+    call p3dfft_ftran_r2c(by_r, by, 'fft'); by = by/nlx/nly/nlz
+    call p3dfft_ftran_r2c(bz_r, bz, 'fft'); bz = bz/nlx/nly/nlz
+
+    deallocate(omg_r)
+    deallocate(omg)
+
+    deallocate(ux_r)
+    deallocate(uy_r)
+    deallocate(uz_r)
+    deallocate(bx_r)
+    deallocate(by_r)
+    deallocate(bz_r)
+
+  end subroutine init_KH
+
+
+!-----------------------------------------------!
+!> @author  YK
 !! @date    29 Dec 2018
 !! @brief   Restart
 !-----------------------------------------------!
@@ -699,6 +826,160 @@ contains
 
 !-----------------------------------------------!
 !> @author  YK
+!! @date    30 Aug 2023
+!! @brief   Convert restart files to real
+!-----------------------------------------------!
+  subroutine convert_restartfiles_to_real
+    use p3dfft
+    use mp, only: proc0
+    use time, only: tt, dt
+    use grid, only: nkx, nky, nkz
+    use grid, only: nlx, nly, nlz
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
+    use params, only: restart_dir
+    use file, only: open_input_file, close_file
+    use mpiio, only: mpiio_read_one, mpiio_write_one
+    use shearing_box, only: tsc
+    use MPI
+    implicit none
+    real(r8), allocatable, dimension(:,:,:) :: ux_r, uy_r, uz_r
+    real(r8), allocatable, dimension(:,:,:) :: bx_r, by_r, bz_r
+    real(r8), allocatable, dimension(:,:,:) :: src
+    integer :: time_unit
+    integer, dimension(3) :: sizes, subsizes, starts
+
+    if(proc0) then
+      print *, 'This is not a regular simulation.'
+      print *, 'The restart files is converted to real values and saved as XXX_r.dat.'
+      print *, 'Then, the simulation goes on exactly in the same way as the regular restart.'
+    endif
+
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v                   Read time                 v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    call open_input_file (time_unit, trim(restart_dir)//'time.dat')
+    read (unit=time_unit, fmt=*)
+    read (unit=time_unit, fmt="(100es30.21)") tt, tsc
+    call close_file (time_unit)
+    !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
+
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v               Read Binary file              v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    sizes(1) = nkx
+    sizes(2) = nkz
+    sizes(3) = nky
+    subsizes(1) = ikx_en - ikx_st + 1
+    subsizes(2) = ikz_en - ikz_st + 1
+    subsizes(3) = iky_en - iky_st + 1
+    starts(1) = ikx_st - 1
+    starts(2) = ikz_st - 1
+    starts(3) = iky_st - 1
+
+    call mpiio_read_one(ux, sizes, subsizes, starts, trim(restart_dir)//'ux.dat')
+    call mpiio_read_one(uy, sizes, subsizes, starts, trim(restart_dir)//'uy.dat')
+    call mpiio_read_one(uz, sizes, subsizes, starts, trim(restart_dir)//'uz.dat')
+    call mpiio_read_one(bx, sizes, subsizes, starts, trim(restart_dir)//'bx.dat')
+    call mpiio_read_one(by, sizes, subsizes, starts, trim(restart_dir)//'by.dat')
+    call mpiio_read_one(bz, sizes, subsizes, starts, trim(restart_dir)//'bz.dat')
+
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v               Convert to real               v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    allocate(src(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
+    allocate(ux_r, source=src)
+    allocate(uy_r, source=src)
+    allocate(uz_r, source=src)
+    allocate(bx_r, source=src)
+    allocate(by_r, source=src)
+    allocate(bz_r, source=src)
+    deallocate(src)
+
+    call p3dfft_btran_c2r(ux, ux_r, 'tff')
+    call p3dfft_btran_c2r(uy, uy_r, 'tff')
+    call p3dfft_btran_c2r(uz, uz_r, 'tff')
+    call p3dfft_btran_c2r(bx, bx_r, 'tff')
+    call p3dfft_btran_c2r(by, by_r, 'tff')
+    call p3dfft_btran_c2r(bz, bz_r, 'tff')
+
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v               Save Binary file              v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    sizes(1) = nly
+    sizes(2) = nlz
+    sizes(3) = nlx
+    subsizes(1) = ily_en - ily_st + 1
+    subsizes(2) = ilz_en - ilz_st + 1
+    subsizes(3) = ilx_en - ilx_st + 1
+    starts(1) = ily_st - 1
+    starts(2) = ilz_st - 1
+    starts(3) = ilx_st - 1
+
+    call mpiio_write_one(ux_r, sizes, subsizes, starts, 'ux_r.dat')
+    call mpiio_write_one(uy_r, sizes, subsizes, starts, 'uy_r.dat')
+    call mpiio_write_one(uz_r, sizes, subsizes, starts, 'uz_r.dat')
+    call mpiio_write_one(bx_r, sizes, subsizes, starts, 'bx_r.dat')
+    call mpiio_write_one(by_r, sizes, subsizes, starts, 'by_r.dat')
+    call mpiio_write_one(bz_r, sizes, subsizes, starts, 'bz_r.dat')
+
+    deallocate(ux_r )
+    deallocate(uy_r )
+    deallocate(uz_r )
+    deallocate(bx_r )
+    deallocate(by_r )
+    deallocate(bz_r )
+  end subroutine convert_restartfiles_to_real
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    18 May 2022
+!! @brief   Enforce div free for (wx, wy, wz)
+!-----------------------------------------------!
+  subroutine div_free(wx, wy, wz)
+    use grid, only: kx, ky, kz
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use params, only: zi
+    implicit none
+    complex(r8), dimension (ikx_st:ikx_en, &
+                            ikz_st:ikz_en, &
+                            iky_st:iky_en), intent(inout) :: wx, wy, wz
+    complex(r8), allocatable, dimension(:,:,:)   :: nbl2inv_div_w ! nabla^-2 (div w)
+    complex(r8) :: k2
+    integer :: i, j, k
+
+    allocate(nbl2inv_div_w(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0,0.d0))
+
+    !$omp parallel do private(i, k) schedule(static)
+    do j = iky_st, iky_en
+      do k = ikz_st, ikz_en
+        do i = ikx_st, ikx_en
+          k2 = kx(i)**2 + ky(j)**2 + kz(k)**2
+          if(k2 == 0.d0) then
+          nbl2inv_div_w(i,k,j) = 0.d0
+          else
+            nbl2inv_div_w(i,k,j) = -zi*(   kx(i)*wx(i,k,j) &
+                                         + ky(j)*wy(i,k,j) &
+                                         + kz(k)*wz(i,k,j) )/k2
+          endif
+
+          wx(i,k,j) = wx(i,k,j) - zi*kx(i)*nbl2inv_div_w(i,k,j)
+          wy(i,k,j) = wy(i,k,j) - zi*ky(j)*nbl2inv_div_w(i,k,j)
+          wz(i,k,j) = wz(i,k,j) - zi*kz(k)*nbl2inv_div_w(i,k,j)
+        enddo
+      enddo
+    enddo
+    !$omp end parallel do
+
+    deallocate(nbl2inv_div_w)
+
+  end subroutine div_free
+
+
+!-----------------------------------------------!
+!> @author  YK
 !! @date    3 Oct 2020
 !! @brief   Check if divergence free is satisfied
 !-----------------------------------------------!
@@ -728,7 +1009,7 @@ contains
     end do
 
     abs_div_f_sum = sum(abs(abs_div_f)); call sum_reduce(abs_div_f_sum, 0)
-    abs_f_sum = sum(sqrt(fx**2 + fy**2 + fz**2)); call sum_reduce(abs_f_sum, 0)
+    abs_f_sum = sum(sqrt(abs(fx)**2 + abs(fy)**2 + abs(fz)**2)); call sum_reduce(abs_f_sum, 0)
     abs_k_sum = sum(sqrt(k2)); call sum_reduce(abs_k_sum, 0)
 
     if(proc0) write(*, "('<|k.',A2,'|>/(<|k|><|',A2,'|>) = ', es10.3)") trim(name), trim(name), abs_div_f_sum/(abs_f_sum*abs_k_sum)

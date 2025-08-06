@@ -101,36 +101,36 @@ kylab = r'$k_y$'
 kzlab = r'$k_z$'
 kplab = r'$k_\+$'
 
-# # Load series modes
-# import os
+# Load series modes
+import os
 
-# label_series = {'rho': r'$\rho$', 'mx': r'$m_x$', 'my': r'$m_y$', 'mz': r'$m_z$', 'bx': r'$B_x$', 'by': r'$B_y$', 'bz': r'$B_z$'}
+label_series = {'rho': r'$\rho$', 'mx': r'$m_x$', 'my': r'$m_y$', 'mz': r'$m_z$', 'bx': r'$B_x$', 'by': r'$B_y$', 'bz': r'$B_z$'}
 
-# filename = input_dir+runname+'.modes.out'+restart_num
-# if os.path.isfile(filename):
-  # data = np.loadtxt(filename, usecols=[0,2,3,4,5,6])
-  # name = np.loadtxt(filename, usecols=[1], dtype = "unicode")
+filename = input_dir+runname+'.modes.out'+restart_num
+if os.path.isfile(filename):
+  data = np.loadtxt(filename, usecols=[0,2,3,4,5,6])
+  name = np.loadtxt(filename, usecols=[1], dtype = "unicode")
 
-  # fldnames_unique = np.unique(name)
-  # nfld = fldnames_unique.size
+  fldnames_unique = np.unique(name)
+  nfld = fldnames_unique.size
 
-  # tt_unique = np.unique(data.T[0])
-  # ntt = tt_unique.size
+  tt_unique = np.unique(data.T[0])
+  ntt = tt_unique.size
 
-  # modes_unique = np.unique((data.T[1:4]).T, axis=0)
-  # nmodes = modes_unique.shape[0]
+  modes_unique = np.unique((data.T[1:4]).T, axis=0)
+  nmodes = modes_unique.shape[0]
 
-  # tt_ = {}
-  # f_  = {}
-  # for n in fldnames_unique:
-    # tt_[n] = np.zeros([ntt, nmodes])
-    # f_ [n] = np.zeros([ntt, nmodes], dtype=complex)
+  tt_ = {}
+  f_  = {}
+  for n in fldnames_unique:
+    tt_[n] = np.zeros([ntt, nmodes])
+    f_ [n] = np.zeros([ntt, nmodes], dtype=complex)
 
-  # for n, d in zip(name, data):
-    # time = d[0]
-    # mode = d[1:4]
-    # time_idx = np.argwhere(tt_unique == time)[0][0]
-    # mode_idx = np.argwhere([np.array_equal(x, mode) for x in modes_unique])[0][0]
+  for n, d in zip(name, data):
+    time = d[0]
+    mode = d[1:4]
+    time_idx = np.argwhere(tt_unique == time)[0][0]
+    mode_idx = np.argwhere([np.array_equal(x, mode) for x in modes_unique])[0][0]
 
-    # tt_[n][time_idx, mode_idx] = time
-    # f_ [n][time_idx, mode_idx] = d[4] + 1j*d[5]
+    tt_[n][time_idx, mode_idx] = time
+    f_ [n][time_idx, mode_idx] = d[4] + 1j*d[5]

@@ -1,0 +1,17 @@
+#!/bin/bash
+#------- qsub option -----------
+#PBS -q gpu-b
+#PBS --group 24329
+#PBS -l elapstim_req=00:10:00
+#PBS -b 2
+#PBS -T intmpi
+#PBS -v NQSV_MPI_VER=2020update0
+#PBS -v OMP_NUM_THREADS=2
+
+source /etc/profile.d/modules.sh
+export MODULEPATH=/system/apps/rhel8/lx/env-option:${MODULEPATH}
+module load p3dfft-lx/2.7.9-stride1 fftw-lx/3.3.8 netcdf-fortran-lx/4.5.2
+export LD_LIBRARY_PATH=/system/apps/rhel8/lx/netcdf-c/4.6.1/lib:$LD_LIBRARY_PATH
+
+cd ${PBS_O_WORKDIR}
+mpirun -machinefile ${PBS_NODEFILE} -n 48 -perhost 1 ./calliope < calliope.in > calliope.out.std

@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 from load import *
 from fft import *
+import sys
+sys.path.append('../')
 from plots import *
 
 print('\nplotting SF2\n')
 outdir = './fig_SF2/'
 
-plot_SF2(SF2b[final_SF2_idx, :,:], SF2u[final_SF2_idx, :,:], lpar, lper, xlab=r'$\ell_\|$', ylab=r'$\ell_\+$', title=r'$t = %.2E$' % tt_SF2[final_SF2_idx], cmp=parula_map, save=outdir+'SF2.pdf')
+plot_SF2(SF2b[final_SF2_idx, :,:], SF2u[final_SF2_idx, :,:], lpar, lper, xlab=r'$\ell_\|$', ylab=r'$\ell_\+$', title=r'$t = %.2E$' % tt_SF2[final_SF2_idx], save=outdir+'SF2.pdf')
 
 ys = [ 
        SF2b[final_SF2_idx, 1:, 0 ], 
@@ -84,6 +86,7 @@ plot_log1d_many(xs, ys, xlab=r'$k_\+$', ylab=r'$k_\|$', legends=legends, ls=ls, 
 #------------------#
 #    output data   #
 #------------------#
+np.savetxt(outdir + 'tt_SF2.txt', tt_SF2, fmt='%E')
 np.savetxt(outdir + 'kpar.txt'  , np.column_stack((kper, kpar_b, kpar_u)), fmt='%E')
 
 from scipy.io import savemat

@@ -14,6 +14,7 @@ module diagnostics
 
   public :: init_diagnostics, finish_diagnostics
   public :: loop_diagnostics, loop_diagnostics_2D, loop_diagnostics_kpar, loop_diagnostics_SF2
+  public :: loop_diagnostics_nltrans
 
   private
 contains
@@ -25,11 +26,15 @@ contains
 !! @brief   Initialization of diagnostics
 !-----------------------------------------------!
   subroutine init_diagnostics
+    use params, only: inputfile
+    use diagnostics_common, only: read_parameters
     use diagnostics_common, only: init_polar_spectrum_2d, init_polar_spectrum_3d
     use diagnostics_common, only: init_series_modes
     use io, only: init_io 
     use grid, only: nlz
     implicit none
+
+    call read_parameters(inputfile)
 
     if(nlz == 2) then
       call init_polar_spectrum_2d
@@ -63,7 +68,7 @@ contains
     use mp, only: sum_reduce
     use time, only: dt
     use time_stamp, only: put_time_stamp, timer_diagnostics_total
-    use params, only: zi, nu, nu_exp, eta, eta_exp, lmd, lmd_exp, cs2va2, shear, q
+    use params, only: zi, nu, nu_h, nu_h_exp, eta, eta_h, eta_h_exp, lmd, lmd_h, lmd_h_exp, cs2va2, shear, q
     use force, only: fmx, fmy, fmz, fmx_old, fmy_old, fmz_old
     use shearing_box, only: shear_flg, tsc, nremap, k2t
     implicit none
@@ -248,13 +253,14 @@ contains
           lnrho_mid  = 0.5d0*(lnrho (i, k, j) + lnrho_old (i, k, j))
           u2half_mid = 0.5d0*(u2half(i, k, j) + u2half_old(i, k, j))
 
-          wkin_dissip(i, k, j) = nu*(k2t(i, k, j)/k2_max)**nu_exp*0.5d0*( &
+          wkin_dissip(i, k, j) = (nu *(k2t(i, k, j)/k2_max) + nu_h *(k2t(i, k, j)/k2_max)**nu_h_exp )*0.5d0*( &
                                                                       mx_mid*conjg(ux_mid) + ux_mid*conjg(mx_mid) &
                                                                     + my_mid*conjg(uy_mid) + uy_mid*conjg(my_mid) &
                                                                     + mz_mid*conjg(uz_mid) + uz_mid*conjg(mz_mid) &
                                                                    )
-          wmag_dissip(i, k, j) = eta*(k2t(i, k, j)/k2_max)**eta_exp*(abs(bx_mid)**2 + abs(by_mid)**2 + abs(bz_mid)**2)
-          wrho_dissip(i, k, j) = lmd*(k2t(i, k, j)/k2_max)**lmd_exp*0.5d0*( &
+          wmag_dissip(i, k, j) = (eta*(k2t(i, k, j)/k2_max) + eta_h*(k2t(i, k, j)/k2_max)**eta_h_exp) &
+                                   *(abs(bx_mid)**2 + abs(by_mid)**2 + abs(bz_mid)**2)
+          wrho_dissip(i, k, j) = (lmd*(k2t(i, k, j)/k2_max) + lmd_h *(k2t(i, k, j)/k2_max)**lmd_h_exp)*0.5d0*( &
                                                                         (-u2half_mid + cs2va2*lnrho_mid)*conjg(rho_mid) &
                                                                       + rho_mid*conjg(-u2half_mid + cs2va2*lnrho_mid) &
                                                                     )
@@ -500,7 +506,9 @@ contains
     allocate(f (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); f   = 0.d0
     allocate(fr(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); fr  = 0.d0
 
-    allocate(src1(nlx, nly), source=0.d0); allocate(src2(nly, nlz), source=0.d0); allocate(src3(nlx, nlz), source=0.d0)
+    allocate(src1(ilx_st:ilx_en, ily_st:ily_en), source=0.d0) 
+    allocate(src2(ily_st:ily_en, ilz_st:ilz_en), source=0.d0) 
+    allocate(src3(ilx_st:ilx_en, ilz_st:ilz_en), source=0.d0)
     allocate(rho_r_z0, source=src1)
     allocate(rho_r_x0, source=src2)
     allocate(rho_r_y0, source=src3)
@@ -569,7 +577,9 @@ contains
     allocate(u2 (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=0.d0)
     allocate(b2 (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=0.d0)
 
-    allocate(src1(nkx, nky), source=0.d0); allocate(src2(nky, nkz), source=0.d0); allocate(src3(nkx, nkz), source=0.d0)
+    allocate(src1(ikx_st:ikx_en, iky_st:iky_en), source=0.d0); 
+    allocate(src2(iky_st:iky_en, ikz_st:ikz_en), source=0.d0); 
+    allocate(src3(ikx_st:ikx_en, ikz_st:ikz_en), source=0.d0)
     allocate(rho_kxy, source=src1)
     allocate(rho_kyz, source=src2)
     allocate(rho_kxz, source=src3)
@@ -867,6 +877,16 @@ contains
   subroutine loop_diagnostics_kpar
   ! under development...
   end subroutine loop_diagnostics_kpar
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    26 Jul 2019
+!! @brief   Calculate shell-to-shell transfer
+!-----------------------------------------------!
+  subroutine loop_diagnostics_nltrans
+  ! under development...
+  end subroutine loop_diagnostics_nltrans
 
 end module diagnostics
 

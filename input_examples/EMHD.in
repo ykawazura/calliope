@@ -3,6 +3,9 @@
 !--------------------------------------------------!
 &mpi_settings
   dim_decomp = 2
+  !dim1 = 4 ! decomp will be (dim1, nproc/dim1)
+           ! if this is empty, decomp will be (dim1, dim2)
+           ! such that dim1 ~= dim2.
 /
 
 !==============================================================================
@@ -11,21 +14,26 @@
   ly = 1.0 ! to be multiplied by 2pi
   lz = 1.0 ! to be multiplied by 2pi
 
-  nlx = 32
-  nly = 32
-  nlz = 32
+  nlx = 64
+  nly = 64
+  nlz = 64
+
+  pruned = .true.
 /
 
 !==============================================================================
 &time_parameters
   dt    = 1.0d-3
   nstep = 20000
-  cfl   = 9.0d0
+  cfl   = 1.0d0
   reset_method = 'multiply'  !'multiply'  => multiply by a factor of 0.5
                              !'decrement' => decrement the top integer of dt
   increase_dt = 0e-3         !When max dt computed from the cfl condition is 
                              ! larger than this value, set dt = increase_dt.
                              ! no increasing when this value is <= 0.d0
+
+                             ! When the file 'dt_adjust' including a float number is created,
+                             ! dt will be manually adjusted to that value while running.
 /
 
 !==============================================================================
@@ -39,14 +47,9 @@
 /
 
 !==============================================================================
-&dealias_parameters
-  dealias = '2/3' !: 2/3 or 3/2
-/
-
-!==============================================================================
 &physical_parameters
   ! hyper resistivity ~ eta*k^(2*etaexp)
-  eta     = 2d+5  ! resistivity
+  eta     = 5d+3  ! resistivity
   eta_exp = 4
 
   de = 0.023337031d0 ! electron skin depth normalized by ion skin depth
@@ -75,110 +78,110 @@
   nk_stir = 12  !Number of independent driven Fourier modes
 /
 
-!vvvvvvvvvvvvvvvvvvv       drive bx       vvvvvvvvvvvvvvvvvvv
+!vvvvvvvvvvvvvvvvvvv    bx driving    vvvvvvvvvvvvvvvvvvv
 &stir_1
- field_name = 'bx' 
- mode_amplitude = 0.5         !Amplitude of Langevin antenna.
+ field_name = 'bx'
+ mode_amplitude = 0.25        !Amplitude of Langevin antenna.
  mode_frequency = (0.9, -0.6) !Frequency of Langevin antenna.
  kx = 1
  ky = 0
  kz = 1
 /
 &stir_2
- field_name = 'bx' 
- mode_amplitude = 0.5         !Amplitude of Langevin antenna.
+ field_name = 'bx'
+ mode_amplitude = 0.25        !Amplitude of Langevin antenna.
  mode_frequency = (0.9, -0.6) !Frequency of Langevin antenna.
  kx = 1
  ky = 0
  kz = -1
 /
 &stir_3
- field_name = 'bx' 
- mode_amplitude = 0.5         !Amplitude of Langevin antenna.
+ field_name = 'bx'
+ mode_amplitude = 0.25        !Amplitude of Langevin antenna.
  mode_frequency = (0.9, -0.6) !Frequency of Langevin antenna.
  kx = 0
  ky = 1
  kz = 1
 /
 &stir_4
- field_name = 'bx' 
- mode_amplitude = 0.5         !Amplitude of Langevin antenna.
+ field_name = 'bx'
+ mode_amplitude = 0.25        !Amplitude of Langevin antenna.
  mode_frequency = (0.9, -0.6) !Frequency of Langevin antenna.
  kx = 0
  ky = 1
  kz = -1
 /
-!^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+!^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-!vvvvvvvvvvvvvvvvvvv       drive by       vvvvvvvvvvvvvvvvvvv
+!vvvvvvvvvvvvvvvvvvv    by driving    vvvvvvvvvvvvvvvvvvv
 &stir_5
- field_name = 'by' 
- mode_amplitude = 0.5         !Amplitude of Langevin antenna.
+ field_name = 'by'
+ mode_amplitude = 0.25        !Amplitude of Langevin antenna.
  mode_frequency = (0.9, -0.6) !Frequency of Langevin antenna.
  kx = 1
  ky = 0
  kz = 1
 /
 &stir_6
- field_name = 'by' 
- mode_amplitude = 0.5         !Amplitude of Langevin antenna.
+ field_name = 'by'
+ mode_amplitude = 0.25        !Amplitude of Langevin antenna.
  mode_frequency = (0.9, -0.6) !Frequency of Langevin antenna.
  kx = 1
  ky = 0
  kz = -1
 /
 &stir_7
- field_name = 'by' 
- mode_amplitude = 0.5         !Amplitude of Langevin antenna.
+ field_name = 'by'
+ mode_amplitude = 0.25        !Amplitude of Langevin antenna.
  mode_frequency = (0.9, -0.6) !Frequency of Langevin antenna.
  kx = 0
  ky = 1
  kz = 1
 /
 &stir_8
- field_name = 'by' 
- mode_amplitude = 0.5         !Amplitude of Langevin antenna.
+ field_name = 'by'
+ mode_amplitude = 0.25        !Amplitude of Langevin antenna.
  mode_frequency = (0.9, -0.6) !Frequency of Langevin antenna.
  kx = 0
  ky = 1
  kz = -1
 /
-!^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+!^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-!vvvvvvvvvvvvvvvvvvv       drive bz       vvvvvvvvvvvvvvvvvvv
+!vvvvvvvvvvvvvvvvvvv    bz driving    vvvvvvvvvvvvvvvvvvv
 &stir_9
- field_name = 'bz' 
- mode_amplitude = 0.5         !Amplitude of Langevin antenna.
+ field_name = 'bz'
+ mode_amplitude = 0.25        !Amplitude of Langevin antenna.
  mode_frequency = (0.9, -0.6) !Frequency of Langevin antenna.
  kx = 1
  ky = 0
  kz = 1
 /
 &stir_10
- field_name = 'bz' 
- mode_amplitude = 0.5         !Amplitude of Langevin antenna.
+ field_name = 'bz'
+ mode_amplitude = 0.25        !Amplitude of Langevin antenna.
  mode_frequency = (0.9, -0.6) !Frequency of Langevin antenna.
  kx = 1
  ky = 0
  kz = -1
 /
 &stir_11
- field_name = 'bz' 
- mode_amplitude = 0.5         !Amplitude of Langevin antenna.
+ field_name = 'bz'
+ mode_amplitude = 0.25        !Amplitude of Langevin antenna.
  mode_frequency = (0.9, -0.6) !Frequency of Langevin antenna.
  kx = 0
  ky = 1
  kz = 1
 /
 &stir_12
- field_name = 'bz' 
- mode_amplitude = 0.5         !Amplitude of Langevin antenna.
+ field_name = 'bz'
+ mode_amplitude = 0.25        !Amplitude of Langevin antenna.
  mode_frequency = (0.9, -0.6) !Frequency of Langevin antenna.
  kx = 0
  ky = 1
  kz = -1
 /
-!^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+!^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 !==============================================================================
 &terminate
@@ -195,14 +198,13 @@
   write_intvl       = 0.1d0  ! output every this value.
   write_intvl_2D    = 1.0d0  ! output every this value.
   write_intvl_3D    = 1.0d0  ! output every this value.
-!  write_intvl_kpar = 0.2d0  ! output every this value.
+  write_intvl_kpar  = 1.0d0  ! output every this value.
 !  write_intvl_SF2  = 0.2d0  ! output every this value.
   SF2_nsample = 100000 ! number of sample points for each separation
-
-  save_restart_intvl = 1.d0      ! save every this value.
-  restart_dir = './restart/'
 /
 
-
-
-
+!==============================================================================
+&restart_parameters
+  save_restart_intvl = 1.0d0      ! save every this value.
+  restart_dir = './restart/'
+/

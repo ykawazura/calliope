@@ -14,14 +14,22 @@ module force_common
 
   logical :: driven
   integer :: nk_stir
-  complex(r8), dimension(:), allocatable :: a_force, b_force
+  logical :: elsasser, fix_power
+  real(r8):: ene_inj, xhl_inj
+  real(r8):: kmin(3), kmax(3)
+  integer :: nfields
+  character(len=100), allocatable :: field_names(:)
+  real   (r8), allocatable :: amplitudes(:)
+  complex(r8), allocatable :: frequencies(:)
+
+  complex(r8), dimension(:,:), allocatable :: a_force, b_force
   integer :: nseed                   !Length of random number  seed integer vector
   integer, dimension(:), allocatable :: init_seed, fin_seed   !Initial and final seeds
 
-  integer, dimension(:), allocatable :: kx_stir, ky_stir, kz_stir
-  character(len=100), dimension(:), allocatable :: f_name
-  real   (r8)       , dimension(:), allocatable :: f_amplitude
-  complex(r8)       , dimension(:), allocatable :: f_frequency
+  integer, dimension(:,:), allocatable :: kx_stir, ky_stir, kz_stir
+  character(len=100), dimension(:,:), allocatable :: f_name
+  real   (r8)       , dimension(:,:), allocatable :: f_amplitude
+  complex(r8)       , dimension(:,:), allocatable :: f_frequency
 
   integer, parameter :: kind_id = selected_int_kind (15)
 
@@ -58,25 +66,31 @@ contains
     use params, only: pi
     use mp, only: proc0
     use mp, only: broadcast
+    use grid, only: kx, ky, kz
+    use grid, only: ikx, iky, ikz
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use file, only: get_unused_unit, get_indexed_namelist_unit, open_output_file
     implicit none
-    character(len=100) :: field_name
-    real   (r8) :: mode_amplitude
-    complex(r8) :: mode_frequency
-    integer :: i, kx, ky, kz, unit, in_file
+    integer :: i, j, k, count, ifield, unit, in_file
     
     character(len=100), intent(in) :: filename
     integer  :: ierr
 
-    namelist /force/ driven, nk_stir
-    namelist /stir/ field_name, mode_amplitude, mode_frequency, kx, ky, kz
+    namelist /force/ driven, elsasser, fix_power, ene_inj, xhl_inj, kmin, kmax, nfields
+    namelist /forced_fields/ field_names, amplitudes, frequencies
 
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
     !v    used only when the corresponding value   v!
     !v    does not exist in the input file         v!
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    elsasser = .false.
     driven = .false.
-    nk_stir = 1
+    fix_power = .false.
+    ene_inj = 0.d0
+    xhl_inj = 0.d0
+    kmin = (/0.d0, 0.d0, 0.d0/)
+    kmax = (/0.d0, 0.d0, 0.d0/)
+    nfields = 0
     !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
 
     call get_unused_unit (unit)
@@ -86,82 +100,80 @@ contains
         if (ierr/=0) write(*,*) "Reading force_parameters failed"
     close(unit)
 
-    allocate (f_frequency(nk_stir))
-    allocate (kx_stir    (nk_stir))
-    allocate (ky_stir    (nk_stir))
-    allocate (kz_stir    (nk_stir))
-    allocate (f_name     (nk_stir))
-    allocate (f_amplitude(nk_stir))
-    allocate (a_force    (nk_stir))
-    allocate (b_force    (nk_stir))
+    allocate(field_names(nfields))
+    allocate(amplitudes (nfields))
+    allocate(frequencies(nfields))
 
-    ! loop for the each driving mode
-    do i = 1, nk_stir
-      if (proc0) then
-        !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
-        !v    used only when the corresponding value   v!
-        !v    does not exist in the input file         v!
-        !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
-        kx = 1
-        ky = 1
-        kz = 1
-        field_name = ''
-        mode_amplitude = 1.d0
-        mode_frequency = (1.d0, 0.d0)
-        !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
+    if (proc0) then
+      call get_unused_unit (unit)
+      open(unit=unit,file=filename,status='old')
 
-        call get_indexed_namelist_unit (in_file, filename, "stir", i)
-        read (unit=in_file, nml=stir, iostat=ierr)
-        close(unit=in_file)
-      endif
+      read(unit,nml=forced_fields,iostat=ierr)
+          if (ierr/=0) write(*,*) "Reading force_parameters failed"
+      close(unit)
+    endif
 
-      call broadcast(kx)
-      call broadcast(ky)
-      call broadcast(kz)
-      call broadcast(mode_amplitude)
-      call broadcast(mode_frequency)
-      call broadcast(field_name)
+    call broadcast(field_names)
+    call broadcast(amplitudes)
+    call broadcast(frequencies)
 
-      if(kx < 0) then
-        if (proc0) then
-          print *
-          print *, '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
-          print *, '  forcing kx must be positive  '
-          print *, '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
-          print *
-        endif
-        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-        stop
-      endif
-      kx_stir(i) = kx 
+    count = 0
+    do j = iky_st, iky_en
+      do k = ikz_st, ikz_en
+        do i = ikx_st, ikx_en
+          if(       kx(i)**2 >= kmin(1)**2 .and. kx(i)**2 <= kmax(1)**2 &
+              .and. ky(j)**2 >= kmin(2)**2 .and. ky(j)**2 <= kmax(2)**2 &
+              .and. kz(k)**2 >= kmin(3)**2 .and. kz(k)**2 <= kmax(3)**2 &
+            ) then
+            count = count + 1
+          endif
+        end do
+      end do
+    end do
 
-      if(ky < 0) then
-        if (proc0) then
-          print *
-          print *, '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
-          print *, '  forcing ky must be positive  '
-          print *, '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
-          print *
-        endif
-        call MPI_BARRIER(MPI_COMM_WORLD, ierr)
-        stop
-      endif
-      ky_stir(i) = ky
+    nk_stir = count
 
-      kz_stir(i) = kz
-      f_name     (i) = field_name
-      f_amplitude(i) = mode_amplitude
-      f_frequency(i) = mode_frequency
-      a_force(i) = f_amplitude(i)*cmplx(1.d0,1.d0)/2.d0 
-      b_force(i) = f_amplitude(i)*cmplx(1.d0,1.d0)/2.d0 
-    enddo
+    allocate (kx_stir    (nfields, nk_stir))
+    allocate (ky_stir    (nfields, nk_stir))
+    allocate (kz_stir    (nfields, nk_stir))
+    allocate (f_name     (nfields, nk_stir))
+    allocate (f_amplitude(nfields, nk_stir))
+    allocate (f_frequency(nfields, nk_stir))
+    allocate (a_force    (nfields, nk_stir))
+    allocate (b_force    (nfields, nk_stir))
+
+    do ifield = 1, nfields
+      count = 1
+      do j = iky_st, iky_en
+        do k = ikz_st, ikz_en
+          do i = ikx_st, ikx_en
+            if(     kx(i)**2 >= kmin(1)**2 .and. kx(i)**2 <= kmax(1)**2 &
+              .and. ky(j)**2 >= kmin(2)**2 .and. ky(j)**2 <= kmax(2)**2 &
+              .and. kz(k)**2 >= kmin(3)**2 .and. kz(k)**2 <= kmax(3)**2 &
+              ) then
+
+              kx_stir    (ifield, count) = ikx(i)
+              ky_stir    (ifield, count) = iky(j)
+              kz_stir    (ifield, count) = ikz(k)
+              f_name     (ifield, count) = field_names(ifield)
+              f_amplitude(ifield, count) = amplitudes (ifield)
+              f_frequency(ifield, count) = frequencies(ifield)
+              a_force    (ifield, count) = amplitudes (ifield)*cmplx(1.d0,1.d0)/2.d0 
+              b_force    (ifield, count) = amplitudes (ifield)*cmplx(1.d0,1.d0)/2.d0 
+
+              count = count + 1
+            endif
+          end do
+        end do
+      end do
+    end do
 
     if(proc0) call init_ranf(.true.,init_seed)
     call broadcast (init_seed)
 
-    if(proc0) then
-      call open_output_file (force_unit, 'force.dat')
-    endif
+    ! if(proc0) then
+    !   call open_output_file (force_unit, 'force.dat')
+    ! endif
 
   end subroutine read_parameters
 
@@ -180,45 +192,50 @@ contains
     use mp, only: proc0
     use mp, only: broadcast
     use file, only: open_output_file
+    use time_stamp, only: put_time_stamp, timer_force
     implicit none
     real(r8), intent(in) :: dt
-    complex(r8), dimension(:), allocatable :: w_stir
+    complex(r8), dimension(:,:), allocatable :: w_stir
     complex(r8) :: fa, fb
     real(r8) :: sigma
-    integer :: istir
+    integer :: ifield, istir
 
-    allocate (w_stir(nk_stir))
+    if (proc0) call put_time_stamp(timer_force)
+
+    allocate (w_stir(nfields, nk_stir))
 
     do istir = 1, nk_stir
-      if (proc0) then
-        w_stir(istir) = lz/(2.d0*pi)*abs(kz_stir(istir))*f_frequency(istir)
+      do ifield = 1, nfields
+
+        w_stir(ifield, istir) = lz/(2.d0*pi)*abs(kz_stir(ifield, istir))*f_frequency(ifield, istir)
         
-        sigma = sqrt(12.d0*abs(aimag(w_stir(istir)))/dt)*f_amplitude(istir)
+        sigma = sqrt(12.d0*abs(aimag(w_stir(ifield, istir)))/dt)*f_amplitude(ifield, istir)
         fa = cmplx(ranf() - 0.5d0, ranf() - 0.5d0) * sigma
         fb = cmplx(ranf() - 0.5d0, ranf() - 0.5d0) * sigma
 
-        a_force(istir) = a_force(istir)*exp(-zi*w_stir(istir)*dt) + fa*dt
-        b_force(istir) = 0.d0
+        a_force(ifield, istir) = a_force(ifield, istir)*exp(-zi*w_stir(ifield, istir)*dt) + fa*dt
+        b_force(ifield, istir) = 0.d0
+
         call get_rnd_seed(fin_seed)
-      endif
-
-      call broadcast (fin_seed)
-    end do
-    call broadcast (a_force)
-    call broadcast (b_force)
-
-    if(proc0) then
-      write (unit=force_unit, fmt="(100es30.21)", advance='no') tt + dt
-      do istir = 1, nk_stir
-        write (unit=force_unit, fmt="(100es30.21)", advance='no') &
-                                   real(a_force(istir)), imag(a_force(istir)), &
-                                   real(b_force(istir)), imag(b_force(istir))
       end do
-      write (unit=force_unit, fmt="(100es30.21)")
-      flush (force_unit)
-    endif
+    end do
+
+    ! if(proc0) then
+    !   write (unit=force_unit, fmt="(100es30.21)", advance='no') tt + dt
+    !   do istir = 1, nk_stir
+    !     do ifield = 1, nfields
+    !       write (unit=force_unit, fmt="(100es30.21)", advance='no') &
+    !                                 real(a_force(ifield, istir)), imag(a_force(ifield, istir)), &
+    !                                 real(b_force(ifield, istir)), imag(b_force(ifield, istir))
+    !     end do
+    !   end do
+    !   write (unit=force_unit, fmt="(100es30.21)")
+    !   flush (force_unit)
+    ! endif
 
     deallocate (w_stir)
+
+    if (proc0) call put_time_stamp(timer_force)
   end subroutine update_force
 
 
@@ -230,33 +247,50 @@ contains
 !!          inputfile
 !-----------------------------------------------!
   subroutine get_force (name, u)
-    use grid, only: nkz
+    use grid, only: nkx, nkz
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use mp, only: proc0
+    use time_stamp, only: put_time_stamp, timer_force
     implicit none
     character(*) :: name
     complex(r8), dimension (ikx_st:ikx_en, &
                             ikz_st:ikz_en, &
                             iky_st:iky_en), intent(inout) :: u
-    integer :: i, j, k, istir
+    integer :: i, j, k, ifield, istir
 
+    if (proc0) call put_time_stamp(timer_force)
+
+    ifield = 0
+    do i = 1, nfields
+      if(trim(name) == field_names(i)) ifield = i
+    enddo
+
+    if (ifield == 0) return
+    
     do istir = 1, nk_stir
-      i = kx_stir(istir) + 1
-      j = ky_stir(istir) + 1
+      j = ky_stir(ifield, istir) + 1
 
-      if(kz_stir(istir) >= 0) then
-        k = kz_stir(istir) + 1
+      if(kx_stir(ifield, istir) >= 0) then
+        i = kx_stir(ifield, istir) + 1
       else
-        k = nkz + kz_stir(istir) + 1
+        i = nkx + kx_stir(ifield, istir) + 1
       endif
 
-      if(       trim(name) == f_name(istir) &
-         .and. (i >= ikx_st .and. i <= ikx_en) &
+      if(kz_stir(ifield, istir) >= 0) then
+        k = kz_stir(ifield, istir) + 1
+      else
+        k = nkz + kz_stir(ifield, istir) + 1
+      endif
+
+      if(      (i >= ikx_st .and. i <= ikx_en) &
          .and. (j >= iky_st .and. j <= iky_en) &
          .and. (k >= ikz_st .and. k <= ikz_en) ) then
 
-         u(i, k, j) = (a_force(istir) + b_force(istir))/sqrt(2.d0)
+         u(i, k, j) = (a_force(ifield, istir) + b_force(ifield, istir))/sqrt(2.d0)
       endif
     end do
+
+    if (proc0) call put_time_stamp(timer_force)
 
   end subroutine get_force
 

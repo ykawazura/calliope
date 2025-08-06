@@ -2,6 +2,8 @@
 import numpy as np
 from mayavi import mlab
 from tvtk.pyface.light_manager import CameraLight
+import sys
+sys.path.append('../')
 from parula import parula_map
 
 from load import *

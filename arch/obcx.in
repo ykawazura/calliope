@@ -1,6 +1,6 @@
 FC = mpiifort
 
-P3DFFT_HOME=/work/po7002/o07001/.local/p3dfft
+P3DFFT_HOME=/home/o07001/work/.local/p3dfft
 P3DFFT_INC=-I$(P3DFFT_HOME)/include/
 P3DFFT_LIB=-L$(P3DFFT_HOME)/lib/ -lp3dfft
 

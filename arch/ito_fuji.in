@@ -1,0 +1,17 @@
+FC = mpifrt
+
+P3DFFT_HOME=$(HOME)/.local/p3dfft_fuji
+P3DFFT_INC=-I$(P3DFFT_HOME)/include/
+P3DFFT_LIB=-L$(P3DFFT_HOME)/lib/ -lp3dfft
+
+FFTW3_HOME=$(FFTW)
+FFTW3_INC=-I$(FFTW3_HOME)/include/
+FFTW3_LIB=-L$(FFTW)/lib/ -lfftw3
+
+NETCDF_HOME=$(NCDIR)
+HDF5_PATH=/home/app/hdf5/1.12.2_FJ/process/
+NETCDF_INC=-I$(NETCDF_HOME)/include/
+NETCDF_LIB=-L$(NETCDF_HOME)/lib -lnetcdf -L$(NETCDF_HOME)/lib64 -lnetcdff -L/$(HDF5_PATH)/lib -lhdf5_hl -lhdf5
+
+F90FLAGS = -Cpp -Free -Kfast
+F90FLAGS_OPENMP = -Kopenmp # used only when USE_OPENMP=yes in ../Makefile.in

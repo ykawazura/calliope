@@ -1,0 +1,17 @@
+FC = ftn 
+
+P3DFFT_HOME=/work/kawazurayh/.local/p3dfft-CPE-intelCompiler
+P3DFFT_INC=-I$(P3DFFT_HOME)/include/
+P3DFFT_LIB=-L$(P3DFFT_HOME)/lib/ -lp3dfft
+
+FFTW3_HOME=$(FFTW_DIR)
+FFTW3_INC=-I$(FFTW3_HOME)/include/
+FFTW3_LIB=-L$(FFTW3_HOME)/lib/ -lfftw3
+
+NETCDF_HOME=$(NETCDF_DIR)
+NETCDF_INC=-I$(NETCDF_HOME)/include/
+NETCDF_LIB=-L$(NETCDF_HOME)/lib -lnetcdf -lnetcdff
+
+F90FLAGS = -DINTEL -O2
+MPI_LIB = -lm -lmpi -lmpifort
+LIB_OPENMP = -fopenmp # used only when USE_OPENMP=yes in ../Makefile.in

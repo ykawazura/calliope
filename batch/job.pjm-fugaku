@@ -1,8 +1,10 @@
 #!/bin/sh
-#PJM -L  "node=6144"
+#PJM -L  "node=6500"
 #PJM -L  "rscgrp=large"
-#PJM -L  "elapse=01:00:00"
-#PJM --mpi "max-proc-per-node=24" 
+#PJM -g  hp220027
+#PJM -x  PJM_LLIO_GFSCACHE=/vol0004
+#PJM -L  "elapse=24:00:00"
+#PJM --mpi "max-proc-per-node=6" 
 #PJM -s
 #PJM -j
 #PJM -m e
@@ -10,17 +12,13 @@
 #
 
 . /vol0004/apps/oss/spack/share/spack/setup-env.sh
-spack load netcdf-c@4.7.4%fj@4.6.1 
-spack load netcdf-fortran@4.5.3%fj@4.6.1
-spack load /kb65lmo
-spack load /iqe7btp
 
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/vol0004/apps/oss/spack-v0.16.2/opt/spack/linux-rhel8-a64fx/fj-4.6.1/hdf5-1.10.7-iqe7btpizzcuz2nvbpxxmoc5ean4ftca/lib
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/vol0004/apps/oss/spack-v0.16.2/opt/spack/linux-rhel8-a64fx/fj-4.6.1/netcdf-c-4.7.4-h3jxiqc2hquhexqlmiohcu3bwemuahhe/lib
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/vol0004/apps/oss/spack-v0.16.2/opt/spack/linux-rhel8-a64fx/fj-4.6.1/netcdf-fortran-4.5.3-bubmb4irgklabbtditixoiikqmr5brlz/lib
-export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/vol0004/apps/oss/spack-v0.16.2/opt/spack/linux-rhel8-a64fx/fj-4.6.1/fujitsu-fftw-master-ytok4j4l2qa355nopq524zx6ecktzjg2/lib
+spack load /ahea2x5
+spack load /ak35qol
+spack load /emkpfdp
+spack load /opxdwgd
 
-export PARALLEL=2
-export OMP_NUM_THREADS=${PARALLEL}
+export PARALLEL=4
+export OMP_NUM_TH1EADS=${PARALLEL}
 
-mpiexec -stdin calliope.in -std calliope.out.std -n 147456 ./calliope
+mpiexec -stdin calliope.in -std calliope.out.std -n 39000 ./calliope

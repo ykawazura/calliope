@@ -1,0 +1,23 @@
+#!/bin/zsh
+#------- qsub option -----------
+#PBS -q small24VH
+#PBS --group 24329
+#PBS -l elapstim_req=00:10:00
+#PBS --venode=8
+#PBS --venum-lhost=8
+#PBS -T necmpi
+#PBS -v OMP_NUM_THREADS=2
+#PBS -m abe
+#PBS -M yohey.44@gmail.com
+#PBS -v NMPI_SEPSELECT=3
+#PBS -v VE_FORT_SETBUF6=0
+
+#------- Program execution -----------
+source /etc/profile.d/modules.sh
+export MODULEPATH=/system/apps/rhel8/sx/env-option:${MODULEPATH}
+module load p3dfft-sx/2.7.9-stride1 fftw-sx netcdf-fortran-sx
+
+export VE_FORT6=calliope.out.std
+
+cd ${PBS_O_WORKDIR}
+mpirun -np 29  ./calliope < calliope.in > calliope.out.std

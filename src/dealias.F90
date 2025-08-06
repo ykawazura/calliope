@@ -23,42 +23,30 @@ contains
   subroutine init_filter
     use grid, only: kx, ky, kz
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
-    use mp, only: proc0
-    use params, only: dealias
+    use grid, only: kx_max_noprune, ky_max_noprune, kz_max_noprune
     implicit none
     integer :: i, j, k
 
     allocate(filter(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
 
-    if(proc0 .and. trim(dealias) /= '2/3' .and. trim(dealias) /= '3/2') then
-      print *
-      print *, '!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!'
-      print *, '!             Warning!             !'
-      print *, '!      You are not dealising!      !'
-      print *, '!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!'
-      print *
-    endif
-
     ! dealiasing filter
     filter = 1.d0
 
-    if(trim(dealias) == '3/2') then
-      do i = ikx_st, ikx_en
-        if(abs(kx(i)) >= maxval(abs(kx))*2.d0/3.d0) then
-          filter(i, :, :) = 0.d0
-        endif
-      enddo
-      do j = iky_st, iky_en
-        if(abs(ky(j)) >= maxval(abs(ky))*2.d0/3.d0) then
-          filter(:, :, j) = 0.d0
-        endif
-      enddo
-      do k = ikz_st, ikz_en
-        if(abs(kz(k)) >= maxval(abs(kz))*2.d0/3.d0) then
-          filter(:, k, :) = 0.d0
-        endif
-      enddo
-    endif
+    do i = ikx_st, ikx_en
+      if(abs(kx(i)) >= kx_max_noprune*2.d0/3.d0) then
+        filter(i, :, :) = 0.d0
+      endif
+    enddo
+    do j = iky_st, iky_en
+      if(abs(ky(j)) >= ky_max_noprune*2.d0/3.d0) then
+        filter(:, :, j) = 0.d0
+      endif
+    enddo
+    do k = ikz_st, ikz_en
+      if(abs(kz(k)) >= kz_max_noprune*2.d0/3.d0) then
+        filter(:, k, :) = 0.d0
+      endif
+    enddo
 
   end subroutine init_filter
 

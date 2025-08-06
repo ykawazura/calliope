@@ -1,0 +1,17 @@
+FC = mpiifx 
+
+P3DFFT_HOME=$(HOME)/work/.local/p3dfft
+P3DFFT_INC=-I$(P3DFFT_HOME)/include/
+P3DFFT_LIB=-L$(P3DFFT_HOME)/lib/ -lp3dfft
+
+FFTW3_HOME=/system/apps/rhel9/library/fftw/3.3.10/oneapi/2025.1
+FFTW3_INC=-I$(FFTW3_HOME)/include/
+FFTW3_LIB=-L$(FFTW3_HOME)/lib/ -lfftw3
+
+NETCDF_HOME=$(HOME)/work/.local/netcdf
+NETCDF_INC=-I$(NETCDF_HOME)/include/
+NETCDF_LIB=-L$(NETCDF_HOME)/lib -lnetcdf -lnetcdff
+
+F90FLAGS = -DINTEL -O3
+MPI_LIB = -lm -lmpi -lmpifort
+LIB_OPENMP = -fopenmp # used only when USE_OPENMP=yes in ../Makefile.in

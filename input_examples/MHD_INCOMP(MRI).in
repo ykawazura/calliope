@@ -3,6 +3,9 @@
 !--------------------------------------------------!
 &mpi_settings
   dim_decomp = 2
+  !dim1 = 4 ! decomp will be (dim1, nproc/dim1)
+           ! if this is empty, decomp will be (dim1, dim2)
+           ! such that dim1 ~= dim2.
 /
 
 !==============================================================================
@@ -12,19 +15,24 @@
   lz = 1.0 ! to be multiplied by 2pi
 
   nlx = 64
-  nly = 128
+  nly = 64
   nlz = 32
+
+  pruned = .true.
 /
 
 !==============================================================================
 &time_parameters
   dt    = 1.0d-1
   nstep = 1000
-  cfl   = 20.0d0
+  cfl   = 2.0d0
   reset_method = 'multiply'  !'multiply'  => multiply by a factor of 0.5
                              !'decrement' => decrement the top integer of dt
   increase_dt = 1e+0         !When max dt computed from the cfl condition is 
                              ! larger than this value, set dt = increase_dt.
+
+                             ! When the file 'dt_adjust' including a float number is created,
+                             ! dt will be manually adjusted to that value while running.
 /
 
 !==============================================================================
@@ -38,18 +46,15 @@
 /
 
 !==============================================================================
-&dealias_parameters
-  dealias = '2/3' !: 2/3 or 3/2
-/
-
-!==============================================================================
 &physical_parameters
-  ! hyper dissipation ~ nu*k^(2*nuexp)
-  nu      = 1d+4  ! viscosity
-  nu_exp  = 4
-  ! hyper resistivity ~ eta*k^(2*etaexp)
-  eta     = 1d+4  ! resistivity
-  eta_exp = 4
+  ! regular and hyper viscosity ~ nu*k^2 + nu_h*k^(2*nu_h_exp)
+  nu        = 1d+0  ! regular viscosity
+  nu_h      = 1d+3  ! hyper viscosity
+  nu_h_exp  = 4
+  ! regular and hyper resistivity ~ eta*k^2 + eta_h*k^(2*eta_h_exp)
+  eta       = 1d+0  ! regular resistivity
+  eta_h     = 1d+3  ! hyper resistivity
+  eta_h_exp = 4
 
   ! shear parameters
   shear  = .true.
@@ -71,6 +76,7 @@
   b0   = 0.d0   0.d0   0.5d0
   b1   = 5.d-2  5.d-2  5.d-2
   u1   = 5.d-2  5.d-2  5.d-2
+  nf_or_znf = 'znf'
 /
 
 !==============================================================================
@@ -91,18 +97,27 @@
 
 !==============================================================================
 &diagnostics_parameters
-  write_intvl       = 0.1d0  ! output every this value.
-!  write_intvl_2D    = 1.0d0  ! output every this value.
-!  write_intvl_3D    = 1.0d0  ! output every this value.
-!  write_intvl_kpar = 0.2d0  ! output every this value.
-!  write_intvl_SF2  = 0.2d0  ! output every this value.
+  write_intvl         = 0.1d0  ! output every this value.
+  write_intvl_2D      = 5.0d0  ! output every this value.
+  write_intvl_3D      = 5.0d0  ! output every this value.
+  write_intvl_kpar    = 5.0d0  ! output every this value.
+  write_intvl_SF2     = 5.0d0  ! output every this value.
+  write_intvl_nltrans = 5.0d0  ! output every this value.
   SF2_nsample = 100000 ! number of sample points for each separation
 
-!  save_restart_intvl = 1.0d0      ! save every this value.
-  restart_dir = './restart/'
+!  If one wants to change the separation of kpolar_log, one can set kpolar_log_sep so that
+!    kpolar_log_sep = (0, k1*kpolar_log_sep^i) [i = 1, 2., ....]
+!    Default is kpolar_log_sep = 2^1/3.
+
+  output_modes =   3   1   2
+                   5   1   3
+                   7   1   4
 /
 
-
-
+!==============================================================================
+&restart_parameters
+  save_restart_intvl = 1.0d0      ! save every this value.
+  restart_dir = './restart/'
+/
 
 

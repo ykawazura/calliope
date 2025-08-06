@@ -6,6 +6,8 @@ from parula import parula_map
 
 from load import *
 from fft import *
+import sys
+sys.path.append('../')
 from plots import *
 
 #-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-!-#

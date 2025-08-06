@@ -37,8 +37,17 @@ SRC_RMHD = \
 			$(MODEL_DIR)/io.F90 $(MODEL_DIR)/diagnostics.F90 \
 			$(MODEL_DIR)/advance.F90 calliope.F90
 
+### List of files for 'HRMHD'
+SRC_HRMHD = $(SRC_RMHD)
+
 ### List of files for 'RRMHD'
 SRC_RRMHD = $(SRC_RMHD)
+
+### List of files for 'WILL'
+SRC_WILL = $(SRC_RMHD)
+
+### List of files for 'HIGH_BETA_RMHD'
+SRC_HIGH_BETA_RMHD = $(SRC_RMHD)
 
 ### List of files for 'MHD_INCOMP'
 SRC_MHD_INCOMP = \

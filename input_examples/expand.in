@@ -1,0 +1,17 @@
+&mpi_parameters
+  p_row = 1
+/
+
+&parameters
+  pruned  = .true.
+  nlx_in  = 128
+  nly_in  = 128
+  nlz_in  = 128
+
+  nlx_out = 256
+  nly_out = 256
+  nlz_out = 256
+
+  input_dir = './restart1/'
+  output_dir = './restart/'
+/

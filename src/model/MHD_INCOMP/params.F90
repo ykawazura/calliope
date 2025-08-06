@@ -15,14 +15,16 @@ module params
 
   public  init_params
   public  nonlinear
-  public  nu , eta
-  public  nu_exp, eta_exp
+  public  nu   , eta  
+  public  nu_h , eta_h
+  public  nu_h_exp, eta_h_exp
   public  shear, q
   private read_parameters
 
   logical  :: nonlinear
-  real(r8) :: nu, eta
-  integer  :: nu_exp, eta_exp
+  real(r8) :: nu  , eta  
+  real(r8) :: nu_h, eta_h
+  integer  :: nu_h_exp, eta_h_exp
   logical  :: shear
   real(r8) :: q
 
@@ -57,7 +59,7 @@ contains
     integer  :: unit, ierr
 
     namelist /operation_parameters/ nonlinear
-    namelist /physical_parameters/ nu, nu_exp, eta, eta_exp, shear, q
+    namelist /physical_parameters/ nu, nu_h, nu_h_exp, eta, eta_h, eta_h_exp, shear, q
 
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
     !v    used only when the corresponding value   v!
@@ -78,7 +80,9 @@ contains
     !v    does not exist in the input file         v!
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
     nu      = 0.d0
+    nu_h    = 0.d0
     eta     = 0.d0
+    eta_h   = 0.d0
     shear   = .false.
     q       = 0.d0
     !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!

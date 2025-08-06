@@ -14,6 +14,7 @@ module diagnostics
 
   public :: init_diagnostics, finish_diagnostics
   public :: loop_diagnostics, loop_diagnostics_2D, loop_diagnostics_kpar, loop_diagnostics_SF2
+  public :: loop_diagnostics_nltrans
 
   private
 contains
@@ -25,9 +26,13 @@ contains
 !! @brief   Initialization of diagnostics
 !-----------------------------------------------!
   subroutine init_diagnostics
+    use params, only: inputfile
+    use diagnostics_common, only: read_parameters
     use diagnostics_common, only: init_polar_spectrum_2d
     use io, only: init_io 
     implicit none
+
+    call read_parameters(inputfile)
 
     call init_polar_spectrum_2d
     call init_io(nkpolar, kpbin)
@@ -53,7 +58,8 @@ contains
     use params, only: zi, &
                       nupe_x , nupe_x_exp , nupe_z , nupe_z_exp , &
                       etape_x, etape_x_exp, etape_z, etape_z_exp
-    use force, only: fomg, fpsi, fomg_old, fpsi_old
+    use force, only: fphi, fpsi, fphi_old, fpsi_old
+    use utils, only: cabs2
     implicit none
     integer :: i, j, k
 
@@ -61,16 +67,24 @@ contains
     real(r8), allocatable, dimension(:,:,:) :: upe2old, bpe2old
     real(r8), allocatable, dimension(:,:,:) :: upe2dissip_x, upe2dissip_z
     real(r8), allocatable, dimension(:,:,:) :: bpe2dissip_x, bpe2dissip_z
-    real(r8), allocatable, dimension(:,:,:) :: p_omg, p_psi
+    real(r8), allocatable, dimension(:,:,:) :: p_phi, p_psi, p_xhl
+    real(r8), allocatable, dimension(:,:,:) :: zppe2, zmpe2
+    real(r8), allocatable, dimension(:,:,:) :: hp, hm ! two-time power spectra (10.1103/PhysRevResearch.2.023357)
     real(r8), allocatable, dimension(:,:,:) :: src
 
     real(r8) :: upe2_sum, bpe2_sum
     real(r8) :: upe2dot_sum, bpe2dot_sum
     real(r8) :: upe2dissip_sum, bpe2dissip_sum
-    real(r8) :: p_omg_sum, p_psi_sum
+    real(r8) :: zppe2_sum, zmpe2_sum
+    real(r8) :: p_phi_sum, p_psi_sum, p_xhl_sum
 
-    real(r8), dimension(:, :), allocatable :: upe2_bin, bpe2_bin      ! [kprp, kz]
-    complex(r8) :: phi_mid, psi_mid, jpa_mid, fomg_mid, fpsi_mid
+    real(r8), dimension(:, :), allocatable :: upe2_bin , bpe2_bin      ! [kprp, kz]
+    real(r8), dimension(:, :), allocatable :: zppe2_bin, zmpe2_bin
+    real(r8), dimension(:, :), allocatable :: hp_bin , hm_bin     ! [nt, kprp]
+    complex(r8) :: phi_mid, psi_mid, jpa_mid, fphi_mid, fpsi_mid
+    complex(r8) :: zppe_mid, zmpe_mid, fzppe_mid, fzmpe_mid
+    complex(r8), allocatable, dimension(:,:,:), save :: phi0, psi0
+    logical :: is_first = .true.
 
     if (proc0) call put_time_stamp(timer_diagnostics_total)
 
@@ -83,34 +97,70 @@ contains
     allocate(upe2dissip_z, source=src)
     allocate(bpe2dissip_x, source=src)
     allocate(bpe2dissip_z, source=src)
-    allocate(p_omg       , source=src)
+    allocate(p_phi       , source=src)
     allocate(p_psi       , source=src)
+    allocate(p_xhl       , source=src)
+    allocate(zppe2       , source=src)
+    allocate(zmpe2       , source=src)
+    allocate(hp          , source=src)
+    allocate(hm          , source=src)
     deallocate(src)
 
-    allocate (upe2_bin(1:nkpolar, nkz)); upe2_bin = 0.d0
-    allocate (bpe2_bin(1:nkpolar, nkz)); bpe2_bin = 0.d0
+    allocate (upe2_bin (1:nkpolar, nkz)); upe2_bin  = 0.d0
+    allocate (bpe2_bin (1:nkpolar, nkz)); bpe2_bin  = 0.d0
+    allocate (zppe2_bin(1:nkpolar, nkz)); zppe2_bin = 0.d0
+    allocate (zmpe2_bin(1:nkpolar, nkz)); zmpe2_bin = 0.d0
+    allocate (hp_bin   (1:nkpolar, nkz)); hp_bin    = 0.d0
+    allocate (hm_bin   (1:nkpolar, nkz)); hm_bin    = 0.d0
+
+    if (is_first) then
+      allocate(phi0(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
+      allocate(psi0(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
+      phi0 = phi
+      psi0 = psi
+      is_first = .false.
+    endif
 
     do j = iky_st, iky_en
       do k = ikz_st, ikz_en
         do i = ikx_st, ikx_en
-          upe2   (i, k, j) = 0.5d0*abs(phi(i, k, j))**2*kprp2(i, k, j)
-          bpe2   (i, k, j) = 0.5d0*abs(psi(i, k, j))**2*kprp2(i, k, j)
+          upe2   (i, k, j) = 0.5d0*cabs2(phi(i, k, j))*kprp2(i, k, j)
+          bpe2   (i, k, j) = 0.5d0*cabs2(psi(i, k, j))*kprp2(i, k, j)
 
-          upe2old(i, k, j) = 0.5d0*abs(phi_old(i, k, j))**2*kprp2(i, k, j)
-          bpe2old(i, k, j) = 0.5d0*abs(psi_old(i, k, j))**2*kprp2(i, k, j)
+          upe2old(i, k, j) = 0.5d0*cabs2(phi_old(i, k, j))*kprp2(i, k, j)
+          bpe2old(i, k, j) = 0.5d0*cabs2(psi_old(i, k, j))*kprp2(i, k, j)
 
           phi_mid  = 0.5d0*(phi (i, k, j) + phi_old (i, k, j))
           psi_mid  = 0.5d0*(psi (i, k, j) + psi_old (i, k, j))
           jpa_mid  = -kprp2(i, k, j)*psi_mid
-          fomg_mid = 0.5d0*(fomg(i, k, j) + fomg_old(i, k, j))
+          fphi_mid = 0.5d0*(fphi(i, k, j) + fphi_old(i, k, j))
           fpsi_mid = 0.5d0*(fpsi(i, k, j) + fpsi_old(i, k, j))
 
-          upe2dissip_x(i, k, j) =  nupe_x*(kprp2(i, k, j)/kprp2_max)** nupe_x_exp*abs(phi_mid)**2*kprp2(i, k, j)
-          upe2dissip_z(i, k, j) =  nupe_z*(kz2  (k)      /kz2_max  )** nupe_z_exp*abs(phi_mid)**2*kprp2(i, k, j)
-          bpe2dissip_x(i, k, j) = etape_x*(kprp2(i, k, j)/kprp2_max)**etape_x_exp*abs(psi_mid)**2*kprp2(i, k, j)
-          bpe2dissip_z(i, k, j) = etape_z*(kz2  (k)      /kz2_max  )**etape_z_exp*abs(psi_mid)**2*kprp2(i, k, j)
-          p_omg      (i, k, j) = - 0.5d0*(fomg_mid*conjg(phi_mid) + conjg(fomg_mid)*phi_mid) 
-          p_psi      (i, k, j) = - 0.5d0*(fpsi_mid*conjg(jpa_mid) + conjg(fpsi_mid)*jpa_mid) 
+          upe2dissip_x(i, k, j) =  nupe_x*(kprp2(i, k, j)/kprp2_max)** nupe_x_exp*cabs2(phi_mid)*kprp2(i, k, j)
+          upe2dissip_z(i, k, j) =  nupe_z*(kz2  (k)      /kz2_max  )** nupe_z_exp*cabs2(phi_mid)*kprp2(i, k, j)
+          bpe2dissip_x(i, k, j) = etape_x*(kprp2(i, k, j)/kprp2_max)**etape_x_exp*cabs2(psi_mid)*kprp2(i, k, j)
+          bpe2dissip_z(i, k, j) = etape_z*(kz2  (k)      /kz2_max  )**etape_z_exp*cabs2(psi_mid)*kprp2(i, k, j)
+          p_phi       (i, k, j) = - 0.5d0*(-kprp2(i, k, j)*fphi_mid*conjg(phi_mid) + conjg(-kprp2(i, k, j)*fphi_mid)*phi_mid) 
+          p_psi       (i, k, j) = - 0.5d0*(fpsi_mid*conjg(jpa_mid) + conjg(fpsi_mid)*jpa_mid) 
+          zppe_mid  =  phi_mid +  psi_mid
+          zmpe_mid  =  phi_mid -  psi_mid
+          fzppe_mid = fphi_mid + fpsi_mid
+          fzmpe_mid = fphi_mid - fpsi_mid
+          zppe2       (i, k, j) = 0.5d0*cabs2(phi_mid + psi_mid)*kprp2(i, k, j)
+          zmpe2       (i, k, j) = 0.5d0*cabs2(phi_mid - psi_mid)*kprp2(i, k, j)
+          hp          (i, k, j) = 0.25d0*( &
+                                            conjg(phi0(i, k, j) + psi0(i, k, j))*(phi_mid + psi_mid) &
+                                          + (phi0(i, k, j) + psi0(i, k, j))*conjg(phi_mid + psi_mid) &
+                                         )*kprp2(i, k, j)
+          hm          (i, k, j) = 0.25d0*( &
+                                            conjg(phi0(i, k, j) - psi0(i, k, j))*(phi_mid - psi_mid) &
+                                          + (phi0(i, k, j) - psi0(i, k, j))*conjg(phi_mid - psi_mid) &
+                                         )*kprp2(i, k, j)
+
+          p_xhl       (i, k, j) = 0.25d0*( &
+                                            zppe_mid*conjg(kprp2(i, k, j)*fzppe_mid) + conjg(zppe_mid)*kprp2(i, k, j)*fzppe_mid &
+                                          - zmpe_mid*conjg(kprp2(i, k, j)*fzmpe_mid) - conjg(zmpe_mid)*kprp2(i, k, j)*fzmpe_mid &
+                                        ) 
 
           ! The reason for the following treatment for kx == 0 mode is the following. Compile it with LaTeX.
           !-----------------------------------------------------------------------------------------------------------------------------------
@@ -131,8 +181,13 @@ contains
             upe2dissip_z(i, k, j) = 2.0d0*upe2dissip_z(i, k, j)
             bpe2dissip_x(i, k, j) = 2.0d0*bpe2dissip_x(i, k, j)
             bpe2dissip_z(i, k, j) = 2.0d0*bpe2dissip_z(i, k, j)
-            p_omg       (i, k, j) = 2.0d0*p_omg       (i, k, j)
+            p_phi       (i, k, j) = 2.0d0*p_phi       (i, k, j)
             p_psi       (i, k, j) = 2.0d0*p_psi       (i, k, j)
+            zppe2       (i, k, j) = 2.0d0*zppe2       (i, k, j)
+            zmpe2       (i, k, j) = 2.0d0*zmpe2       (i, k, j)
+            hp          (i, k, j) = 2.0d0*hp          (i, k, j)
+            hm          (i, k, j) = 2.0d0*hm          (i, k, j)
+            p_xhl       (i, k, j) = 2.0d0*p_xhl       (i, k, j)
           endif
 
         end do
@@ -149,13 +204,21 @@ contains
     upe2dissip_sum = sum(upe2dissip_x + upe2dissip_z); call sum_reduce(upe2dissip_sum, 0)
     bpe2dissip_sum = sum(bpe2dissip_x + bpe2dissip_z); call sum_reduce(bpe2dissip_sum, 0)
 
-    p_omg_sum      = sum(p_omg); call sum_reduce(p_omg_sum, 0)
+    p_phi_sum      = sum(p_phi); call sum_reduce(p_phi_sum, 0)
     p_psi_sum      = sum(p_psi); call sum_reduce(p_psi_sum, 0)
+    p_xhl_sum      = sum(p_xhl); call sum_reduce(p_xhl_sum, 0)
+
+    zppe2_sum = sum(zppe2); call sum_reduce(zppe2_sum, 0)
+    zmpe2_sum = sum(zmpe2); call sum_reduce(zmpe2_sum, 0)
     !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
 
     !vvvvvvvvvvvvvvvvvv          bin over kprp           vvvvvvvvvvvvvvvvvv!
-    call get_polar_spectrum_2d(upe2, upe2_bin)
-    call get_polar_spectrum_2d(bpe2, bpe2_bin)
+    call get_polar_spectrum_2d(upe2 , upe2_bin )
+    call get_polar_spectrum_2d(bpe2 , bpe2_bin )
+    call get_polar_spectrum_2d(zppe2, zppe2_bin)
+    call get_polar_spectrum_2d(zmpe2, zmpe2_bin)
+    call get_polar_spectrum_2d(hp   , hp_bin   )
+    call get_polar_spectrum_2d(hm   , hm_bin   )
     !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
   
     if (proc0) call put_time_stamp(timer_diagnostics_total)
@@ -163,10 +226,13 @@ contains
                   upe2_sum, bpe2_sum, &
                   upe2dot_sum, bpe2dot_sum, &
                   upe2dissip_sum, bpe2dissip_sum, &
-                  p_omg_sum, p_psi_sum, &
+                  p_phi_sum, p_psi_sum, p_xhl_sum, &
+                  zppe2_sum, zmpe2_sum, &
                   !
                   nkpolar, &
-                  upe2_bin, bpe2_bin &
+                  upe2_bin , bpe2_bin , &
+                  zppe2_bin, zmpe2_bin, &
+                  hp_bin   , hm_bin     &
                 )
 
     deallocate(upe2)
@@ -177,11 +243,20 @@ contains
     deallocate(upe2dissip_z)
     deallocate(bpe2dissip_x)
     deallocate(bpe2dissip_z)
-    deallocate(p_omg)
+    deallocate(p_phi)
     deallocate(p_psi)
+    deallocate(p_xhl)
+    deallocate(zppe2)
+    deallocate(zmpe2)
+    deallocate(hp)
+    deallocate(hm)
 
     deallocate (upe2_bin)
     deallocate (bpe2_bin)
+    deallocate (zppe2_bin)
+    deallocate (zmpe2_bin)
+    deallocate (hp_bin)
+    deallocate (hm_bin)
   end subroutine loop_diagnostics
 
 
@@ -193,7 +268,6 @@ contains
   subroutine loop_diagnostics_2D
     use io, only: loop_io, loop_io_2D
     use mp, only: proc0
-    use grid, only: nlx, nly, nlz
     use grid, only: kx, ky, kprp2
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
@@ -223,7 +297,9 @@ contains
     allocate(f  (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); f   = 0.d0
     allocate(fr (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); fr  = 0.d0
 
-    allocate(src1(nlx, nly), source=0.d0); allocate(src2(nly, nlz), source=0.d0); allocate(src3(nlx, nlz), source=0.d0)
+    allocate(src1(ilx_st:ilx_en, ily_st:ily_en), source=0.d0) 
+    allocate(src2(ily_st:ily_en, ilz_st:ilz_en), source=0.d0) 
+    allocate(src3(ilx_st:ilx_en, ilz_st:ilz_en), source=0.d0)
     allocate(phi_r_z0, source=src1)
     allocate(phi_r_x0, source=src2)
     allocate(phi_r_y0, source=src3)
@@ -368,6 +444,17 @@ contains
   subroutine loop_diagnostics_kpar
   ! under development...
   end subroutine loop_diagnostics_kpar
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    26 Jul 2019
+!! @brief   Calculate shell-to-shell transfer
+!-----------------------------------------------!
+  subroutine loop_diagnostics_nltrans
+  ! under development...
+  end subroutine loop_diagnostics_nltrans
+
 
 end module diagnostics
 

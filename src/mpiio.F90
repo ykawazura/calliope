@@ -11,9 +11,11 @@ module mpiio
   private        ! Make everything private unless declared public
 
   public :: mpiio_write_one, mpiio_read_one, mpiio_write_var
+  public :: mpiio_write_var_2d
 
   interface mpiio_write_one
     module procedure mpiio_write_one_complex
+    module procedure mpiio_write_one_real
   end interface mpiio_write_one
 
   interface mpiio_read_one
@@ -23,6 +25,10 @@ module mpiio
   interface mpiio_write_var
      module procedure mpiio_write_var_complex
   end interface mpiio_write_var
+
+  interface mpiio_write_var_2d
+     module procedure mpiio_write_var_2d_real
+  end interface mpiio_write_var_2d
 
   integer, parameter, public :: real_type = MPI_DOUBLE_PRECISION
   integer, parameter, public :: complex_type = MPI_DOUBLE_COMPLEX
@@ -50,6 +56,24 @@ contains
     return
   end subroutine mpiio_write_one_complex
 
+  subroutine mpiio_write_one_real(var, sizes, subsizes, starts, filename)
+    
+    implicit none
+    
+    real(r8), dimension(:,:,:), intent(IN) :: var
+    integer, dimension(3), intent(IN) :: sizes, subsizes, starts
+    character(len=*), intent(IN) :: filename
+
+    integer(kind=MPI_OFFSET_KIND) :: filesize, disp
+    integer :: ierror, newtype, fh, data_type
+
+    data_type = real_type
+
+#include "mpiio_write_one.F90"
+    
+    return
+  end subroutine mpiio_write_one_real
+
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
   ! Using MPI-IO library to read from a file a single 3D array
   !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
@@ -61,7 +85,7 @@ contains
     integer, dimension(3), intent(IN) :: sizes, subsizes, starts
     character(len=*), intent(IN) :: filename
 
-    integer(kind=MPI_OFFSET_KIND) :: disp
+    ! integer(kind=MPI_OFFSET_KIND) :: disp
     integer :: ierror, newtype, fh, data_type
     
     data_type = complex_type
@@ -94,5 +118,29 @@ contains
 
     return
   end subroutine mpiio_write_var_complex
+
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  ! Write a 2D array as part of a big MPI-IO file, starting from 
+  !  displacement 'disp'; 'disp' will be updated after the writing
+  !  operation to prepare the writing of next chunk of data.
+  !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+  subroutine mpiio_write_var_2d_real(fh, disp, sizes, subsizes, starts, var)
+
+    implicit none
+
+    integer, intent(IN) :: fh
+    integer(KIND=MPI_OFFSET_KIND), intent(INOUT) :: disp
+    integer, dimension(2), intent(IN) :: sizes, subsizes, starts
+    real(r8), dimension(:,:), intent(IN) :: var
+
+    integer :: ierror, newtype, data_type, bytes
+
+    data_type = real_type
+    call MPI_TYPE_SIZE(data_type,bytes,ierror)
+
+#include "mpiio_write_var_2d.F90"
+
+    return
+  end subroutine mpiio_write_var_2d_real
 
 end module mpiio

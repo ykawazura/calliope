@@ -13,7 +13,7 @@ HDF5_PATH=$(HDF5_DIR)
 NETCDF_INC=-I$(NETCDF_HOME)/include/
 NETCDF_LIB=-L$(NETCDF_HOME)/lib -lnetcdf -lnetcdff -L/$(HDF5_PATH)/lib -lhdf5_hl -lhdf5 -lz
 
-F90FLAGS = -Cpp -Free
+F90FLAGS = -Cpp -Free -Kfast -Kopenmp
 # MPI_LIB = -lm -lmpi -lmpifort
 LIB_OPENMP = -fopenmp # used only when USE_OPENMP=yes in ../Makefile.in
 

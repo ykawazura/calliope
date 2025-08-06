@@ -23,7 +23,7 @@ module mp
   public :: send, receive, isend, ireceive
   public :: barrier
 
-  integer :: dim_decomp 
+  integer :: dim_decomp, dim1
   integer :: proc_id, nproc, dims(2), iproc, jproc
   logical :: proc0
 
@@ -37,6 +37,7 @@ module mp
 
      module procedure broadcast_complex 
      module procedure broadcast_complex_array
+     module procedure broadcast_complex_2d_array
 
      module procedure broadcast_logical 
      module procedure broadcast_logical_array 
@@ -54,6 +55,7 @@ module mp
      module procedure bcastfrom_logical_array 
 
      module procedure broadcast_character
+     module procedure broadcast_character_array
      module procedure bcastfrom_character
   end interface
 
@@ -169,11 +171,16 @@ contains
       dims(1) = 1
       dims(2) = nproc
     else if(dim_decomp == 2) then
-      dims(1) = 0
-      dims(2) = 0
-      call MPI_Dims_create(nproc,2,dims,ierr)
-      if(dims(1) > dims(2)) then
-        dims(1) = dims(2)
+      if(dim1 == 0) then
+        dims(1) = 0
+        dims(2) = 0
+        call MPI_Dims_create(nproc,2,dims,ierr)
+        if(dims(1) > dims(2)) then
+          dims(1) = dims(2)
+          dims(2) = nproc / dims(1)
+        endif
+      else
+        dims(1) = dim1
         dims(2) = nproc / dims(1)
       endif
     endif
@@ -210,7 +217,7 @@ contains
     character(len=100), intent(in) :: filename
     integer  :: unit, ierr
 
-    namelist /mpi_settings/ dim_decomp
+    namelist /mpi_settings/ dim_decomp, dim1
 
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
     !v    used only when the corresponding value   v!
@@ -218,6 +225,7 @@ contains
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
 
     dim_decomp = 2
+    dim1 = 0
     !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
 
     call get_unused_unit (unit)
@@ -251,6 +259,16 @@ contains
     integer :: ierror
     call mpi_bcast (char, len(char), MPI_CHARACTER, 0, MPI_COMM_WORLD, ierror)
   end subroutine broadcast_character
+
+  subroutine broadcast_character_array(arr)
+    use mpi
+    implicit none
+    character(len=*), dimension(:), intent(in out) :: arr
+    integer :: ierror
+    integer :: total_len
+    total_len = size(arr) * len(arr(1))
+    call mpi_bcast(arr, total_len, MPI_CHARACTER, 0, MPI_COMM_WORLD, ierror)
+  end subroutine broadcast_character_array
 
   subroutine broadcast_integer (i)
     implicit none
@@ -304,6 +322,13 @@ contains
     integer :: ierror
     call mpi_bcast (z, size(z), MPI_DOUBLE_COMPLEX, 0, MPI_COMM_WORLD, ierror)
   end subroutine broadcast_complex_array
+
+  subroutine broadcast_complex_2d_array (z)
+    implicit none
+    complex(r8), dimension (:,:), intent (in out) :: z
+    integer :: ierror
+    call mpi_bcast (z, size(z), MPI_DOUBLE_COMPLEX, 0, MPI_COMM_WORLD, ierror)
+  end subroutine broadcast_complex_2d_array
 
   subroutine broadcast_logical (f)
     implicit none

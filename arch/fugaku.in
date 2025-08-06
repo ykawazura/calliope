@@ -1,16 +1,16 @@
 FC = mpifrtpx
 
-P3DFFT_HOME=/data/hp210258/.local/p3dfft.2/
+P3DFFT_HOME=/vol0300/data/hp220027/.local/p3dfft.2/
 P3DFFT_INC=-I$(P3DFFT_HOME)/include/
 P3DFFT_LIB=-L$(P3DFFT_HOME)/lib/ -lp3dfft
 
-FFTW3_HOME=/vol0004/apps/oss/spack-v0.16.2/opt/spack/linux-rhel8-a64fx/fj-4.6.1/fujitsu-fftw-master-ytok4j4l2qa355nopq524zx6ecktzjg2
+FFTW3_HOME=/vol0004/apps/oss/spack-v0.17.0/opt/spack/linux-rhel8-a64fx/fj-4.8.0/fftw-3.3.10-ahea2x5vxlbduq4oxn2jiypicesfnvl2
 FFTW3_INC=-I$(FFTW3_HOME)/include/
 FFTW3_LIB=-L$(FFTW3_HOME)/lib/ -lfftw3
 
-NETCDF_PATH=/vol0004/apps/oss/spack-v0.16.2/opt/spack/linux-rhel8-a64fx/fj-4.6.1/netcdf-c-4.7.4-h3jxiqc2hquhexqlmiohcu3bwemuahhe
-NETCDFF_PATH=/vol0004/apps/oss/spack-v0.16.2/opt/spack/linux-rhel8-a64fx/fj-4.6.1/netcdf-fortran-4.5.3-bubmb4irgklabbtditixoiikqmr5brlz
-HDF5_PATH=/vol0004/apps/oss/spack-v0.16.2/opt/spack/linux-rhel8-a64fx/fj-4.6.1/hdf5-1.10.7-zeghjdhkqvmanhjvyznwbmtanqp5a2r5
+NETCDF_PATH=/vol0004/apps/oss/spack-v0.17.0/opt/spack/linux-rhel8-a64fx/fj-4.8.0/netcdf-c-4.8.1-m4p3whuqtjuuesfhnvbj52jyaog4boky
+NETCDFF_PATH=/vol0004/apps/oss/spack-v0.17.0/opt/spack/linux-rhel8-a64fx/fj-4.8.0/netcdf-fortran-4.5.3-opxdwgdhwi3ffootbxuttyl5nizjeeom
+HDF5_PATH=/vol0004/apps/oss/spack-v0.17.0/opt/spack/linux-rhel8-a64fx/fj-4.8.0/hdf5-1.10.7-ak35qol37bhybvmmutfhymsi3w2xen3s
 NETCDF_INC=-I/usr/include -I/$(NETCDF_PATH)/include -I$(NETCDFF_PATH)/include 
 NETCDF_LIB=-L/$(NETCDF_PATH)/lib -L$(NETCDFF_PATH)/lib -lnetcdff -lnetcdf -L/$(HDF5_PATH)/lib -lhdf5_hl -lhdf5 -lz
 

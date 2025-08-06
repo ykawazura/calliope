@@ -1,0 +1,17 @@
+#!/bin/bash
+#------- qsub option -----------
+#PBS -P NIFS24KISC013
+#PBS -q A_dev
+#PBS -l select=3:mpiprocs=128:ompthreads=2
+#PBS -l walltime=00:10:00
+#PBS -m abe
+#PBS -M yohey.44@gmail.com
+
+#------- Program execution -----------
+module load intel/2025.1
+module load fftw/3.3.10/oneapi2025.1
+export LD_LIBRARY_PATH=$HOME/work/.local/netcdf/lib:$LD_LIBRARY_PATH
+
+cd ${PBS_O_WORKDIR}
+export I_MPI_DEBUG=4
+mpirun ./calliope <calliope.in >calliope.out.std

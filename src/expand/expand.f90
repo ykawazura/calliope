@@ -71,12 +71,12 @@ contains
     call read_parameters(inputfile)
 
     if(pruned) then
-      nlxc_in  = int(nlx_in *2.d0/3.d0) ! This is for dealiasing with 2/3 pruned FFT
-      nlyc_in  = int(nly_in *2.d0/3.d0) ! This is for dealiasing with 2/3 pruned FFT
-      nlzc_in  = int(nlz_in *2.d0/3.d0) ! This is for dealiasing with 2/3 pruned FFT
-      nlxc_out = int(nlx_out*2.d0/3.d0) ! This is for dealiasing with 2/3 pruned FFT
-      nlyc_out = int(nly_out*2.d0/3.d0) ! This is for dealiasing with 2/3 pruned FFT
-      nlzc_out = int(nlz_out*2.d0/3.d0) ! This is for dealiasing with 2/3 pruned FFT
+      nlxc_in  = int(nlx_in *2.d0/3.d0) + 2 ! This is for dealiasing with 2/3 pruned FFT
+      nlyc_in  = int(nly_in *2.d0/3.d0) + 2 ! This is for dealiasing with 2/3 pruned FFT
+      nlzc_in  = int(nlz_in *2.d0/3.d0) + 2 ! This is for dealiasing with 2/3 pruned FFT
+      nlxc_out = int(nlx_out*2.d0/3.d0) + 2 ! This is for dealiasing with 2/3 pruned FFT
+      nlyc_out = int(nly_out*2.d0/3.d0) + 2 ! This is for dealiasing with 2/3 pruned FFT
+      nlzc_out = int(nlz_out*2.d0/3.d0) + 2 ! This is for dealiasing with 2/3 pruned FFT
     else
       nlxc_in  = nlx_in 
       nlyc_in  = nly_in 

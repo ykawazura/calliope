@@ -1,0 +1,108 @@
+!--------------------------------------------------!
+!                 INPUTS for WILL                  !
+!--------------------------------------------------!
+&mpi_settings
+  dim_decomp = 2
+  !dim1 = 4 ! decomp will be (dim1, nproc/dim1)
+           ! if this is empty, decomp will be (dim1, dim2)
+           ! such that dim1 ~= dim2.
+/
+
+!==============================================================================
+&box_parameters
+  lx = 3.0 ! to be multiplied by 2pi
+  ly = 1.0 ! to be multiplied by 2pi
+  lz = 0.5 ! to be multiplied by 2pi
+
+  nlx = 192
+  nly = 64
+  nlz = 192
+
+  pruned = .true.
+/
+
+!==============================================================================
+&time_parameters
+  dt    = 5.0d-3
+  nstep = 20000
+  cfl   = 0.9d0
+  reset_method = 'multiply'  !'multiply'  => multiply by a factor of 0.5
+                             !'decrement' => decrement the top integer of dt
+  increase_dt = 0e+0         !When max dt computed from the cfl condition is 
+                             ! larger than this value, set dt = increase_dt.
+
+                             ! When the file 'dt_adjust' including a float number is created,
+                             ! dt will be manually adjusted to that value while running.
+/
+
+!==============================================================================
+&scheme_parameters
+  time_step_scheme = 'eSSPIFRK3' ! 'gear3' or 'eSSPIFRK3'
+/
+
+!==============================================================================
+&operation_parameters
+  nonlinear = T
+/
+
+!==============================================================================
+&physical_parameters
+  ! hyper dissipation ~ nu*kperp^(2*nuexp)
+  nupe      = 1d+3  ! perp viscosity    for phi
+  nupe_exp  = 4                               
+  etape     = 1d+3  ! perp resistivity  for psi
+  etape_exp = 4                               
+  chipe     = 1d+3  ! perp conductivity for aaa
+  chipe_exp = 4
+
+  ! hyper dissipation ~ nu*kz^(2*nuexp)
+  nuz       = 2d+1  ! para viscosity    for phi
+  nuz_exp   = 4                              
+  etaz      = 2d+1  ! para resistivity  for psi
+  etaz_exp  = 4                              
+  chiz      = 2d+1  ! para conductivity for aaa
+  chiz_exp  = 4                              
+/
+
+!==============================================================================
+&initial_condition
+  !init_type = 'zero'
+  !init_type = 'test'
+  !init_type = 'single_mode'
+  !init_type = 'OT2'
+  !init_type = 'OT3'
+  init_type = 'random'
+  !init_type = 'restart'
+/
+
+!==============================================================================
+&force
+  driven = F
+  nk_stir = 0  !Number of independent driven Fourier modes
+/
+
+!==============================================================================
+&terminate
+  max_wall_time   = 12.             ! The simulation will be terminated when the wall  
+                                    ! time exceeds this value (in the unit of hour).
+
+  terminate_file_name = 'terminate' ! The simulation will be terminated when the file 
+                                    ! named this value is created in the root directory
+                                    ! in the middle of simulaiton.
+/
+
+!==============================================================================
+&diagnostics_parameters
+  write_intvl       = 0.1d0  ! output every this value.
+  write_intvl_2D    = 1.0d0  ! output every this value.
+  write_intvl_3D    = 1.0d0  ! output every this value.
+!  write_intvl_kpar = 0.2d0  ! output every this value.
+!  write_intvl_SF2  = 0.2d0  ! output every this value.
+  SF2_nsample = 100000 ! number of sample points for each separation
+/
+
+!==============================================================================
+&restart_parameters
+  save_restart_intvl = 1.0d0      ! save every this value.
+  restart_dir = './restart/'
+/

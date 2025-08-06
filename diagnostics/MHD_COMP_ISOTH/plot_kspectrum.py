@@ -288,34 +288,25 @@ if ismovie:
 #--------------------------------------------------------#
 #                       2D spectra                       #
 #--------------------------------------------------------#
-ncfile = netcdf.netcdf_file(input_dir+runname+'.out.2D.nc'+restart_num, 'r')   
+tt_fld = np.transpose(np.loadtxt(input_dir+'out2d/time.dat'+restart_num))[0]
+nt_fld = tt_fld.size
+if nt_fld == 1 : tt_fld = [tt_fld]
 
-tt_fld  = np.copy(ncfile.variables['tt' ][:]); tt_fld  = np.delete(tt_fld , ignored_points_fld, axis = 0)
-kx_fld  = np.copy(ncfile.variables['kx' ][:])
-ky_fld  = np.copy(ncfile.variables['ky' ][:])
-kz_fld  = np.copy(ncfile.variables['kz' ][:])
+nkx_mid = np.where(np.sign(kx) == -1)[0][0]
+nkz_mid = np.where(np.sign(kz) == -1)[0][0]
+kx_ = np.concatenate([kx[nkx_mid:], kx[0:nkx_mid]])
+kz_ = np.concatenate([kz[nkz_mid:], kz[0:nkz_mid]])
 
-nkx_mid = np.where(np.sign(kx_fld) == -1)[0][0]
-nkz_mid = np.where(np.sign(kz_fld) == -1)[0][0]
-kx_fld_ = np.concatenate([kx_fld[nkx_mid:], kx_fld[0:nkx_mid]])
-kz_fld_ = np.concatenate([kz_fld[nkz_mid:], kz_fld[0:nkz_mid]])
+u2_kxy  = np.transpose(np.fromfile(input_dir+'out2d/u2_kxy_sum_kz.dat' +restart_num).reshape(nt_fld, nky, nkx)); u2_kxy  = np.transpose(u2_kxy , axes=(2, 1, 0));  u2_kxy  = np.delete(u2_kxy , ignored_points_fld, axis = 0); u2_kxy  = np.concatenate([u2_kxy [:, :, nkx_mid:], u2_kxy [:, :, 0:nkx_mid]], axis=2)
+u2_kyz  = np.transpose(np.fromfile(input_dir+'out2d/u2_kyz_sum_kx.dat' +restart_num).reshape(nt_fld, nkz, nky)); u2_kyz  = np.transpose(u2_kyz , axes=(2, 1, 0));  u2_kyz  = np.delete(u2_kyz , ignored_points_fld, axis = 0); u2_kyz  = np.concatenate([u2_kyz [:, nkz_mid:, :], u2_kyz [:, 0:nkz_mid, :]], axis=1)
+u2_kxz  = np.transpose(np.fromfile(input_dir+'out2d/u2_kxz_sum_ky.dat' +restart_num).reshape(nt_fld, nkz, nkx)); u2_kxz  = np.transpose(u2_kxz , axes=(2, 1, 0));  u2_kxz  = np.delete(u2_kxz , ignored_points_fld, axis = 0); u2_kxz  = np.concatenate([u2_kxz [:, nkz_mid:, :], u2_kxz [:, 0:nkz_mid, :]], axis=1); u2_kxz = np.concatenate([u2_kxz[:, :, nkx_mid:], u2_kxz[:, :, 0:nkx_mid]], axis=2)
+b2_kxy  = np.transpose(np.fromfile(input_dir+'out2d/b2_kxy_sum_kz.dat' +restart_num).reshape(nt_fld, nky, nkx)); b2_kxy  = np.transpose(b2_kxy , axes=(2, 1, 0));  b2_kxy  = np.delete(b2_kxy , ignored_points_fld, axis = 0); b2_kxy  = np.concatenate([b2_kxy [:, :, nkx_mid:], b2_kxy [:, :, 0:nkx_mid]], axis=2)
+b2_kyz  = np.transpose(np.fromfile(input_dir+'out2d/b2_kyz_sum_kx.dat' +restart_num).reshape(nt_fld, nkz, nky)); b2_kyz  = np.transpose(b2_kyz , axes=(2, 1, 0));  b2_kyz  = np.delete(b2_kyz , ignored_points_fld, axis = 0); b2_kyz  = np.concatenate([b2_kyz [:, nkz_mid:, :], b2_kyz [:, 0:nkz_mid, :]], axis=1)
+b2_kxz  = np.transpose(np.fromfile(input_dir+'out2d/b2_kxz_sum_ky.dat' +restart_num).reshape(nt_fld, nkz, nkx)); b2_kxz  = np.transpose(b2_kxz , axes=(2, 1, 0));  b2_kxz  = np.delete(b2_kxz , ignored_points_fld, axis = 0); b2_kxz  = np.concatenate([b2_kxz [:, nkz_mid:, :], b2_kxz [:, 0:nkz_mid, :]], axis=1); b2_kxz = np.concatenate([b2_kxz[:, :, nkx_mid:], b2_kxz[:, :, 0:nkx_mid]], axis=2)
 
-rho_kxy = np.copy(ncfile.variables['rho_kxy'][:]);  rho_kxy = np.delete(rho_kxy, ignored_points_fld, axis = 0); rho_kxy = np.concatenate([rho_kxy[:, :, nkx_mid:], rho_kxy[:, :, 0:nkx_mid]], axis=2)
-rho_kyz = np.copy(ncfile.variables['rho_kyz'][:]);  rho_kyz = np.delete(rho_kyz, ignored_points_fld, axis = 0); rho_kyz = np.concatenate([rho_kyz[:, nkz_mid:, :], rho_kyz[:, 0:nkz_mid, :]], axis=1)
-rho_kxz = np.copy(ncfile.variables['rho_kxz'][:]);  rho_kxz = np.delete(rho_kxz, ignored_points_fld, axis = 0); rho_kxz = np.concatenate([rho_kxz[:, nkz_mid:, :], rho_kxz[:, 0:nkz_mid, :]], axis=1); rho_kxz = np.concatenate([rho_kxz[:, :, nkx_mid:], rho_kxz[:, :, 0:nkx_mid]], axis=2)
-u2_kxy  = np.copy(ncfile.variables['u2_kxy' ][:]);  u2_kxy  = np.delete(u2_kxy , ignored_points_fld, axis = 0); u2_kxy  = np.concatenate([u2_kxy [:, :, nkx_mid:], u2_kxy [:, :, 0:nkx_mid]], axis=2)
-u2_kyz  = np.copy(ncfile.variables['u2_kyz' ][:]);  u2_kyz  = np.delete(u2_kyz , ignored_points_fld, axis = 0); u2_kyz  = np.concatenate([u2_kyz [:, nkz_mid:, :], u2_kyz [:, 0:nkz_mid, :]], axis=1)
-u2_kxz  = np.copy(ncfile.variables['u2_kxz' ][:]);  u2_kxz  = np.delete(u2_kxz , ignored_points_fld, axis = 0); u2_kxz  = np.concatenate([u2_kxz [:, nkz_mid:, :], u2_kxz [:, 0:nkz_mid, :]], axis=1); u2_kxz  = np.concatenate([u2_kxz [:, :, nkx_mid:], u2_kxz [:, :, 0:nkx_mid]], axis=2)
-b2_kxy  = np.copy(ncfile.variables['b2_kxy' ][:]);  b2_kxy  = np.delete(b2_kxy , ignored_points_fld, axis = 0); b2_kxy  = np.concatenate([b2_kxy [:, :, nkx_mid:], b2_kxy [:, :, 0:nkx_mid]], axis=2)
-b2_kyz  = np.copy(ncfile.variables['b2_kyz' ][:]);  b2_kyz  = np.delete(b2_kyz , ignored_points_fld, axis = 0); b2_kyz  = np.concatenate([b2_kyz [:, nkz_mid:, :], b2_kyz [:, 0:nkz_mid, :]], axis=1)
-b2_kxz  = np.copy(ncfile.variables['b2_kxz' ][:]);  b2_kxz  = np.delete(b2_kxz , ignored_points_fld, axis = 0); b2_kxz  = np.concatenate([b2_kxz [:, nkz_mid:, :], b2_kxz [:, 0:nkz_mid, :]], axis=1); b2_kxz  = np.concatenate([b2_kxz [:, :, nkx_mid:], b2_kxz [:, :, 0:nkx_mid]], axis=2)
-
-plot_2d(np.log10(rho_kxy[final_idx,:,:]), kx_fld_, ky_fld , xlab=r'$k_x$', ylab=r'$k_y$', title=r'$E_\rho(t = %.2E) $' % tt[final_idx], save=outdir+'rho_kxy.pdf')
-plot_2d(np.log10(rho_kyz[final_idx,:,:]), ky_fld , kz_fld_, xlab=r'$k_y$', ylab=r'$k_z$', title=r'$E_\rho(t = %.2E) $' % tt[final_idx], save=outdir+'rho_kyz.pdf')
-plot_2d(np.log10(rho_kxz[final_idx,:,:]), kx_fld_, kz_fld_, xlab=r'$k_x$', ylab=r'$k_z$', title=r'$E_\rho(t = %.2E) $' % tt[final_idx], save=outdir+'rho_kxz.pdf')
-plot_2d(np.log10( u2_kxy[final_idx,:,:]), kx_fld_, ky_fld , xlab=r'$k_x$', ylab=r'$k_y$', title=r'$E_{u} (t = %.2E) $' % tt[final_idx], save=outdir+'u2_kxy.pdf' )
-plot_2d(np.log10( u2_kyz[final_idx,:,:]), ky_fld , kz_fld_, xlab=r'$k_y$', ylab=r'$k_z$', title=r'$E_{u} (t = %.2E) $' % tt[final_idx], save=outdir+'u2_kyz.pdf' )
-plot_2d(np.log10( u2_kxz[final_idx,:,:]), kx_fld_, kz_fld_, xlab=r'$k_x$', ylab=r'$k_z$', title=r'$E_{u} (t = %.2E) $' % tt[final_idx], save=outdir+'u2_kxz.pdf' )
-plot_2d(np.log10( b2_kxy[final_idx,:,:]), kx_fld_, ky_fld , xlab=r'$k_x$', ylab=r'$k_y$', title=r'$E_{b} (t = %.2E) $' % tt[final_idx], save=outdir+'b2_kxy.pdf' )
-plot_2d(np.log10( b2_kyz[final_idx,:,:]), ky_fld , kz_fld_, xlab=r'$k_y$', ylab=r'$k_z$', title=r'$E_{b} (t = %.2E) $' % tt[final_idx], save=outdir+'b2_kyz.pdf' )
-plot_2d(np.log10( b2_kxz[final_idx,:,:]), kx_fld_, kz_fld_, xlab=r'$k_x$', ylab=r'$k_z$', title=r'$E_{b} (t = %.2E) $' % tt[final_idx], save=outdir+'b2_kxz.pdf' )
+plot_2d(np.log10(u2_kxy [final_idx,1:-1,1:-1]), kx_[1:-1], ky [1:-1], xlab=r'$k_x$', ylab=r'$k_y$', title=r'$E_{u}    (t = %.2E) $' % tt[final_idx], save=outdir+'u2_kxy.pdf' )
+plot_2d(np.log10(u2_kyz [final_idx,1:-1,1:-1]), ky [1:-1], kz_[1:-1], xlab=r'$k_y$', ylab=r'$k_z$', title=r'$E_{u}    (t = %.2E) $' % tt[final_idx], save=outdir+'u2_kyz.pdf' )
+plot_2d(np.log10(u2_kxz [final_idx,1:-1,1:-1]), kx_[1:-1], kz_[1:-1], xlab=r'$k_x$', ylab=r'$k_z$', title=r'$E_{u}    (t = %.2E) $' % tt[final_idx], save=outdir+'u2_kxz.pdf' )
+plot_2d(np.log10(b2_kxy [final_idx,1:-1,1:-1]), kx_[1:-1], ky [1:-1], xlab=r'$k_x$', ylab=r'$k_y$', title=r'$E_{b}    (t = %.2E) $' % tt[final_idx], save=outdir+'b2_kxy.pdf' )
+plot_2d(np.log10(b2_kyz [final_idx,1:-1,1:-1]), ky [1:-1], kz_[1:-1], xlab=r'$k_y$', ylab=r'$k_z$', title=r'$E_{b}    (t = %.2E) $' % tt[final_idx], save=outdir+'b2_kyz.pdf' )
+plot_2d(np.log10(b2_kxz [final_idx,1:-1,1:-1]), kx_[1:-1], kz_[1:-1], xlab=r'$k_x$', ylab=r'$k_z$', title=r'$E_{b}    (t = %.2E) $' % tt[final_idx], save=outdir+'b2_kxz.pdf' )

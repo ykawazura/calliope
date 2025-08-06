@@ -3,18 +3,21 @@
 #=======================================================================
 
 # Set architecture name; 'arch/$(arch).in' will be included.
-arch = danann_gfortran
+arch = ps-fes
 
 # MODEL : 
 # 	RMHD           ! reduced MHD
+# 	HRMHD          ! Hall reduced MHD
 # 	RRMHD          ! rotational reduced MHD
 # 	MHD_INCOMP     ! incompressible MHD
 # 	MHD_COMP_ISOTH ! isothermal compressible MHD
 # 	MHD_COMP_ADIAB ! adiabatic compressible MHD (under development)
 # 	EMHD           ! electron MHD
-MODEL = RRMHD
+# 	WILL           ! Will's equations (= Strauss's Not-really-high beta RMHD)
+# 	HIGH_BETA_RMHD ! Truely-high beta RMHD
+MODEL = RMHD
 
-# use openm_COMP_ISOTHp
+# use openmp
 USE_OPENMP = yes
 # debug
 DEBG = no

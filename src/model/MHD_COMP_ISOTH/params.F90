@@ -15,16 +15,18 @@ module params
 
   public  init_params
   public  nonlinear
-  public  nu , eta, lmd
-  public  nu_exp, eta_exp, lmd_exp
+  public  nu   , eta  , lmd  
+  public  nu_h , eta_h, lmd_h
+  public  nu_h_exp, eta_h_exp, lmd_h_exp
   public  beta0, cs2va2
   public  rho_min
   public  shear, q
   private read_parameters
 
   logical  :: nonlinear
-  real(r8) :: nu, eta, lmd
-  integer  :: nu_exp, eta_exp, lmd_exp
+  real(r8) :: nu  , eta  , lmd  
+  real(r8) :: nu_h, eta_h, lmd_h
+  integer  :: nu_h_exp, eta_h_exp, lmd_h_exp
   real(r8) :: beta0, cs2va2
   real(r8) :: rho_min
   logical  :: shear
@@ -61,7 +63,8 @@ contains
     integer  :: unit, ierr
 
     namelist /operation_parameters/ nonlinear
-    namelist /physical_parameters/ nu, nu_exp, eta, eta_exp, lmd, lmd_exp, beta0, rho_min, shear, q
+    namelist /physical_parameters/ nu, nu_h, nu_h_exp, eta, eta_h, eta_h_exp, lmd, lmd_h, lmd_h_exp, &
+                                   beta0, rho_min, shear, q
 
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
     !v    used only when the corresponding value   v!
@@ -81,9 +84,12 @@ contains
     !v    used only when the corresponding value   v!
     !v    does not exist in the input file         v!
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
-    nu      = 0.d0
-    eta     = 0.d0
-    lmd     = 0.d0
+    nu        = 0.d0
+    nu_h      = 0.d0
+    eta       = 0.d0
+    eta_h     = 0.d0
+    lmd       = 0.d0
+    lmd_h     = 0.d0
     beta0   = 1.d0
     rho_min = 1.d-2
     shear   = .false.

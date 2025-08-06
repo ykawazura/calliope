@@ -11,8 +11,9 @@
 #PJM --mail-list "yohey.44@gmail.com"
 
 
-module load intel
-module load openmpi/1.10.7
+# module load intel
+# module load openmpi/1.10.7
+module load oneapi/2021.3
 module load netcdf
 module load hdf5/1.10.5_intel2020.1-process
 module load fftw

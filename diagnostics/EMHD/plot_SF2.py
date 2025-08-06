@@ -1,12 +1,14 @@
 # -*- coding: utf-8 -*-
 from load import *
 from fft import *
+import sys
+sys.path.append('../')
 from plots import *
 
 print('\nplotting SF2\n')
 outdir = './fig_SF2/'
 
-plot_SF2(SF2b[final_SF2_idx, :,:], lpar, lper, xlab=r'$\ell_\|$', ylab=r'$\ell_\+$', title=r'$t = %.2E$' % tt_SF2[final_SF2_idx], cmp=parula_map, save=outdir+'SF2.pdf')
+plot_SF2(SF2b[final_SF2_idx, :,:], lpar, lper, xlab=r'$\ell_\|$', ylab=r'$\ell_\+$', title=r'$t = %.2E$' % tt_SF2[final_SF2_idx], save=outdir+'SF2.pdf')
 
 ys = [ 
        SF2b[final_SF2_idx, 1:, 0 ], 

@@ -14,16 +14,31 @@ module io
 
   private
 
-  ! MPIIO
-    ! For time stacking 3D output files
+  ! MPIIO for 3D
   integer :: fh_bx, fh_by, fh_bz
   character(len=100) :: filename
   integer (kind=MPI_OFFSET_KIND) :: disp_bx
   integer (kind=MPI_OFFSET_KIND) :: disp_by
   integer (kind=MPI_OFFSET_KIND) :: disp_bz
-  integer :: field_time_unit
-    ! For restart files
-  integer :: fh_rst_bx, fh_rst_by, fh_rst_bz
+  integer :: out3d_time_unit
+
+  ! MPIIO for 2D
+  integer :: fh_bx_r_z0, fh_bx_r_x0, fh_bx_r_y0, &
+             fh_by_r_z0, fh_by_r_x0, fh_by_r_y0, &
+             fh_bz_r_z0, fh_bz_r_x0, fh_bz_r_y0
+  integer :: fh_jx_r_z0, fh_jx_r_x0, fh_jx_r_y0, &
+             fh_jy_r_z0, fh_jy_r_x0, fh_jy_r_y0, &
+             fh_jz_r_z0, fh_jz_r_x0, fh_jz_r_y0
+  integer :: fh_b2_kxy, fh_b2_kyz, fh_b2_kxz
+
+  integer (kind=MPI_OFFSET_KIND) :: disp_bx_r_z0, disp_bx_r_x0, disp_bx_r_y0, &
+                                    disp_by_r_z0, disp_by_r_x0, disp_by_r_y0, &
+                                    disp_bz_r_z0, disp_bz_r_x0, disp_bz_r_y0
+  integer (kind=MPI_OFFSET_KIND) :: disp_jx_r_z0, disp_jx_r_x0, disp_jx_r_y0, &
+                                    disp_jy_r_z0, disp_jy_r_x0, disp_jy_r_y0, &
+                                    disp_jz_r_z0, disp_jz_r_x0, disp_jz_r_y0
+  integer (kind=MPI_OFFSET_KIND) :: disp_b2_kxy, disp_b2_kyz, disp_b2_kxz
+  integer :: out2d_time_unit
 
   ! NETCDF for regular output file
   integer :: status
@@ -51,34 +66,13 @@ module io
 
   integer :: nout
 
-  ! NETCDF for cross section output file
-  integer (kind_nf) :: ncid_2D
-  integer :: xx_2D_id, yy_2D_id, zz_2D_id, tt_2D_id
-  integer :: kx_2D_id, ky_2D_id, kz_2D_id
-
-  integer :: bx_r_z0_id, bx_r_x0_id, bx_r_y0_id
-  integer :: by_r_z0_id, by_r_x0_id, by_r_y0_id
-  integer :: bz_r_z0_id, bz_r_x0_id, bz_r_y0_id
-
-  integer :: jx_r_z0_id, jx_r_x0_id, jx_r_y0_id
-  integer :: jy_r_z0_id, jy_r_x0_id, jy_r_y0_id
-  integer :: jz_r_z0_id, jz_r_x0_id, jz_r_y0_id
-
-  integer :: b2_kxy_id, b2_kyz_id, b2_kxz_id
-
-  integer (kind_nf) :: xx_2D_dim, yy_2D_dim, zz_2D_dim, tt_2D_dim
-  integer (kind_nf) :: kx_2D_dim, ky_2D_dim, kz_2D_dim
-  integer, dimension (3) ::  z0_dim,  x0_dim,  y0_dim
-  integer, dimension (3) :: kxy_dim, kyz_dim, kxz_dim
-
-  integer :: nout_2D
-
   ! NETCDF for kpar output file
   integer (kind_nf) :: ncid_kpar
   ! coordinate
-  integer :: tt_kpar_id, kpbin_kpar_id
+  integer :: tt_kpar_id, kpbin_log_kpar_id
   integer :: kpar_b_id, b1_ovr_b0_id
-  integer (kind_nf) :: tt_kpar_dim, kpbin_kpar_dim
+  integer :: b1par2_id, b1prp2_id
+  integer (kind_nf) :: tt_kpar_dim, kpbin_log_kpar_dim
   integer, dimension (2) :: kpar_dim
   integer :: nout_kpar
 
@@ -101,67 +95,106 @@ contains
 !! @date    29 Dec 2018
 !! @brief   Initialization of IO
 !-----------------------------------------------!
-  subroutine init_io(nkpolar, kpbin, nl, lpar, lper)
+  subroutine init_io(nkpolar, kpbin, nkpolar_log, kpbin_log, nl, lpar, lper)
     implicit none
-    integer, intent(in) :: nkpolar, nl
-    real(r8), intent(in) :: kpbin(1:nkpolar), lpar(nl), lper(nl)
+    integer, intent(in) :: nkpolar, nkpolar_log, nl
+    real(r8), intent(in) :: kpbin(1:nkpolar), kpbin_log(1:nkpolar_log), lpar(nl), lper(nl)
 
-    call init_io_decomp
-    call init_io_netcdf(nkpolar, kpbin, nl, lpar, lper)
+    call init_io_decomp_2d
+    call init_io_decomp_3d
+    call init_io_netcdf(nkpolar, kpbin, nkpolar_log, kpbin_log, nl, lpar, lper)
   end subroutine init_io
 
 
 !-----------------------------------------------!
 !> @author  YK
 !! @date    29 Dec 2018
-!! @brief   Initialization of MPIIO
+!! @brief   Initialization of MPIIO for 3D
 !-----------------------------------------------!
-  subroutine init_io_decomp
+  subroutine init_io_decomp_3d
     use mp, only: proc0
     use file, only: open_output_file
-    use params, only: restart_dir
     implicit none
-    integer :: ierr
 
-    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
-    !v      For time stacking 3D output files      v!
-    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
-    ! open file for IO
-    filename = 'bx.dat'
-    call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, MPI_MODE_CREATE+MPI_MODE_WRONLY, MPI_INFO_NULL, fh_bx, ierr)
-    call MPI_FILE_SET_SIZE(fh_bx, 0_MPI_OFFSET_KIND, ierr)  ! guarantee overwriting
-    disp_bx = 0_MPI_OFFSET_KIND
-
-    filename = 'by.dat'
-    call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, MPI_MODE_CREATE+MPI_MODE_WRONLY, MPI_INFO_NULL, fh_by, ierr)
-    call MPI_FILE_SET_SIZE(fh_by, 0_MPI_OFFSET_KIND, ierr)  ! guarantee overwriting
-    disp_by = 0_MPI_OFFSET_KIND
-
-    filename = 'bz.dat'
-    call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, MPI_MODE_CREATE+MPI_MODE_WRONLY, MPI_INFO_NULL, fh_bz, ierr)
-    call MPI_FILE_SET_SIZE(fh_bz, 0_MPI_OFFSET_KIND, ierr)  ! guarantee overwriting
-    disp_bz = 0_MPI_OFFSET_KIND
-
-    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
-    !v              For restart files              v!
-    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
-    ! open file for IO
-    filename = trim(restart_dir)//'bx.dat'
-    call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, MPI_MODE_CREATE+MPI_MODE_WRONLY, MPI_INFO_NULL, fh_rst_bx, ierr)
-    call MPI_FILE_SET_SIZE(fh_rst_bx, 0_MPI_OFFSET_KIND, ierr)  ! guarantee overwriting
-
-    filename = trim(restart_dir)//'by.dat'
-    call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, MPI_MODE_CREATE+MPI_MODE_WRONLY, MPI_INFO_NULL, fh_rst_by, ierr)
-    call MPI_FILE_SET_SIZE(fh_rst_by, 0_MPI_OFFSET_KIND, ierr)  ! guarantee overwriting
-
-    filename = trim(restart_dir)//'bz.dat'
-    call MPI_FILE_OPEN(MPI_COMM_WORLD, filename, MPI_MODE_CREATE+MPI_MODE_WRONLY, MPI_INFO_NULL, fh_rst_bz, ierr)
-    call MPI_FILE_SET_SIZE(fh_rst_bz, 0_MPI_OFFSET_KIND, ierr)  ! guarantee overwriting
+    call set_file_handle('out3d/bx.dat', fh_bx, disp_bx)
+    call set_file_handle('out3d/by.dat', fh_by, disp_bx)
+    call set_file_handle('out3d/bz.dat', fh_bz, disp_bx)
 
     if(proc0) then
-      call open_output_file (field_time_unit, 'field_time.dat')
+      call open_output_file (out3d_time_unit, 'out3d/time.dat')
     endif
-  end subroutine init_io_decomp
+  end subroutine init_io_decomp_3d
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    7 May 2022
+!! @brief   Initialization of MPIIO for 2D
+!-----------------------------------------------!
+  subroutine init_io_decomp_2d
+    use mp, only: proc0
+    use file, only: open_output_file
+    implicit none
+
+    !--------------------------------------------------!
+    !                        b
+    !--------------------------------------------------!
+    call set_file_handle('out2d/bx_r_z0.dat', fh_bx_r_z0, disp_bx_r_z0)
+    call set_file_handle('out2d/bx_r_x0.dat', fh_bx_r_x0, disp_bx_r_x0)
+    call set_file_handle('out2d/bx_r_y0.dat', fh_bx_r_y0, disp_bx_r_y0)
+
+    call set_file_handle('out2d/by_r_z0.dat', fh_by_r_z0, disp_by_r_z0)
+    call set_file_handle('out2d/by_r_x0.dat', fh_by_r_x0, disp_by_r_x0)
+    call set_file_handle('out2d/by_r_y0.dat', fh_by_r_y0, disp_by_r_y0)
+
+    call set_file_handle('out2d/bz_r_z0.dat', fh_bz_r_z0, disp_bz_r_z0)
+    call set_file_handle('out2d/bz_r_x0.dat', fh_bz_r_x0, disp_bz_r_x0)
+    call set_file_handle('out2d/bz_r_y0.dat', fh_bz_r_y0, disp_bz_r_y0)
+
+    !--------------------------------------------------!
+    !                        j
+    !--------------------------------------------------!
+    call set_file_handle('out2d/jx_r_z0.dat', fh_jx_r_z0, disp_jx_r_z0)
+    call set_file_handle('out2d/jx_r_x0.dat', fh_jx_r_x0, disp_jx_r_x0)
+    call set_file_handle('out2d/jx_r_y0.dat', fh_jx_r_y0, disp_jx_r_y0)
+
+    call set_file_handle('out2d/jy_r_z0.dat', fh_jy_r_z0, disp_jy_r_z0)
+    call set_file_handle('out2d/jy_r_x0.dat', fh_jy_r_x0, disp_jy_r_x0)
+    call set_file_handle('out2d/jy_r_y0.dat', fh_jy_r_y0, disp_jy_r_y0)
+
+    call set_file_handle('out2d/jz_r_z0.dat', fh_jz_r_z0, disp_jz_r_z0)
+    call set_file_handle('out2d/jz_r_x0.dat', fh_jz_r_x0, disp_jz_r_x0)
+    call set_file_handle('out2d/jz_r_y0.dat', fh_jz_r_y0, disp_jz_r_y0)
+
+    !--------------------------------------------------!
+    !                      b^2_k
+    !--------------------------------------------------!
+    call set_file_handle('out2d/b2_kxy_sum_kz.dat', fh_b2_kxy, disp_b2_kxy)
+    call set_file_handle('out2d/b2_kyz_sum_kx.dat', fh_b2_kyz, disp_b2_kyz)
+    call set_file_handle('out2d/b2_kxz_sum_ky.dat', fh_b2_kxz, disp_b2_kxz)
+
+    if(proc0) then
+      call open_output_file (out2d_time_unit, 'out2d/time.dat')
+    endif
+  end subroutine init_io_decomp_2d
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    20 Jun 2022
+!! @brief   Set file handle for MPIIO
+!-----------------------------------------------!
+  subroutine set_file_handle(fn, fh, disp)
+    implicit none
+    character(*) :: fn
+    integer :: fh
+    integer (kind=MPI_OFFSET_KIND) :: disp
+    integer :: ierr
+
+    call MPI_FILE_OPEN(MPI_COMM_WORLD, trim(fn), MPI_MODE_CREATE+MPI_MODE_WRONLY, MPI_INFO_NULL, fh, ierr)
+    call MPI_FILE_SET_SIZE(fh, 0_MPI_OFFSET_KIND, ierr)  ! guarantee overwriting
+    disp = 0_MPI_OFFSET_KIND
+  end subroutine set_file_handle
 
 
 !-----------------------------------------------!
@@ -169,14 +202,14 @@ contains
 !! @date    29 Dec 2018
 !! @brief   Initialization of NETCDF
 !-----------------------------------------------!
-  subroutine init_io_netcdf(nkpolar, kpbin, nl, lpar, lper)
+  subroutine init_io_netcdf(nkpolar, kpbin, nkpolar_log, kpbin_log, nl, lpar, lper)
     use grid, only: nlx, nly, nlz 
     use grid, only: xx, yy, zz, kx, ky, kz
     use mp, only: proc0
     use params, only: runname, eta, eta_exp, de2
     implicit none
-    integer, intent(in) :: nkpolar, nl
-    real(r8), intent(in) :: kpbin(1:nkpolar), lpar(nl), lper(nl)
+    integer, intent(in) :: nkpolar, nkpolar_log, nl
+    real(r8), intent(in) :: kpbin(1:nkpolar), kpbin_log(1:nkpolar_log), lpar(nl), lper(nl)
 
     if(proc0) then
       !--------------------------------------------------!
@@ -246,91 +279,6 @@ contains
       nout = 1
 
       !--------------------------------------------------!
-      ! Output for cross sections of fields
-      !--------------------------------------------------!
-      filename = trim(runname)//'.out.2D.nc' ! File name
-      status = nf90_create (filename, NF90_CLOBBER, ncid_2D)
-
-      status = nf90_put_att (ncid_2D, NF90_GLOBAL, 'title', 'calliope simulation data')
-      status = nf90_def_dim (ncid_2D, 'char10', 10, char10_dim)
-      status = nf90_def_var (ncid_2D, 'run_info', NF90_CHAR, char10_dim, run_id)
-      status = nf90_put_att (ncid_2D, run_id, 'model', _MODEL_)
-
-      status = nf90_def_dim (ncid_2D, 'xx', size(xx), xx_2D_dim)
-      status = nf90_def_dim (ncid_2D, 'yy', size(yy), yy_2D_dim)
-      status = nf90_def_dim (ncid_2D, 'zz', size(zz), zz_2D_dim)
-      status = nf90_def_dim (ncid_2D, 'kx', size(kx), kx_2D_dim)
-      status = nf90_def_dim (ncid_2D, 'ky', size(ky), ky_2D_dim)
-      status = nf90_def_dim (ncid_2D, 'kz', size(kz), kz_2D_dim)
-      status = nf90_def_dim (ncid_2D, 'tt', NF90_UNLIMITED, tt_2D_dim)
-
-      status = nf90_def_var (ncid_2D, 'xx', NF90_DOUBLE, xx_2D_dim, xx_2D_id)
-      status = nf90_def_var (ncid_2D, 'yy', NF90_DOUBLE, yy_2D_dim, yy_2D_id)
-      status = nf90_def_var (ncid_2D, 'zz', NF90_DOUBLE, zz_2D_dim, zz_2D_id)
-      status = nf90_def_var (ncid_2D, 'kx', NF90_DOUBLE, kx_2D_dim, kx_2D_id)
-      status = nf90_def_var (ncid_2D, 'ky', NF90_DOUBLE, ky_2D_dim, ky_2D_id)
-      status = nf90_def_var (ncid_2D, 'kz', NF90_DOUBLE, kz_2D_dim, kz_2D_id)
-      status = nf90_def_var (ncid_2D, 'tt', NF90_DOUBLE, tt_2D_dim, tt_2D_id)
-
-      z0_dim (1) = xx_2D_dim
-      z0_dim (2) = yy_2D_dim
-      z0_dim (3) = tt_2D_dim
-
-      x0_dim (1) = yy_2D_dim
-      x0_dim (2) = zz_2D_dim
-      x0_dim (3) = tt_2D_dim
-
-      y0_dim (1) = xx_2D_dim
-      y0_dim (2) = zz_2D_dim
-      y0_dim (3) = tt_2D_dim
-
-      kxy_dim(1) = kx_2D_dim
-      kxy_dim(2) = ky_2D_dim
-      kxy_dim(3) = tt_2D_dim
-
-      kyz_dim(1) = ky_2D_dim
-      kyz_dim(2) = kz_2D_dim
-      kyz_dim(3) = tt_2D_dim
-
-      kxz_dim(1) = kx_2D_dim
-      kxz_dim(2) = kz_2D_dim
-      kxz_dim(3) = tt_2D_dim
-      status = nf90_def_var (ncid_2D, 'bx_r_z0', NF90_DOUBLE, z0_dim, bx_r_z0_id)
-      status = nf90_def_var (ncid_2D, 'bx_r_x0', NF90_DOUBLE, x0_dim, bx_r_x0_id)
-      status = nf90_def_var (ncid_2D, 'bx_r_y0', NF90_DOUBLE, y0_dim, bx_r_y0_id)
-      status = nf90_def_var (ncid_2D, 'by_r_z0', NF90_DOUBLE, z0_dim, by_r_z0_id)
-      status = nf90_def_var (ncid_2D, 'by_r_x0', NF90_DOUBLE, x0_dim, by_r_x0_id)
-      status = nf90_def_var (ncid_2D, 'by_r_y0', NF90_DOUBLE, y0_dim, by_r_y0_id)
-      status = nf90_def_var (ncid_2D, 'bz_r_z0', NF90_DOUBLE, z0_dim, bz_r_z0_id)
-      status = nf90_def_var (ncid_2D, 'bz_r_x0', NF90_DOUBLE, x0_dim, bz_r_x0_id)
-      status = nf90_def_var (ncid_2D, 'bz_r_y0', NF90_DOUBLE, y0_dim, bz_r_y0_id)
-                                             
-      status = nf90_def_var (ncid_2D, 'jx_r_z0', NF90_DOUBLE, z0_dim, jx_r_z0_id)
-      status = nf90_def_var (ncid_2D, 'jx_r_x0', NF90_DOUBLE, x0_dim, jx_r_x0_id)
-      status = nf90_def_var (ncid_2D, 'jx_r_y0', NF90_DOUBLE, y0_dim, jx_r_y0_id)
-      status = nf90_def_var (ncid_2D, 'jy_r_z0', NF90_DOUBLE, z0_dim, jy_r_z0_id)
-      status = nf90_def_var (ncid_2D, 'jy_r_x0', NF90_DOUBLE, x0_dim, jy_r_x0_id)
-      status = nf90_def_var (ncid_2D, 'jy_r_y0', NF90_DOUBLE, y0_dim, jy_r_y0_id)
-      status = nf90_def_var (ncid_2D, 'jz_r_z0', NF90_DOUBLE, z0_dim, jz_r_z0_id)
-      status = nf90_def_var (ncid_2D, 'jz_r_x0', NF90_DOUBLE, x0_dim, jz_r_x0_id)
-      status = nf90_def_var (ncid_2D, 'jz_r_y0', NF90_DOUBLE, y0_dim, jz_r_y0_id)
-
-      status = nf90_def_var (ncid_2D, 'b2_kxy', NF90_DOUBLE, kxy_dim, b2_kxy_id)
-      status = nf90_def_var (ncid_2D, 'b2_kyz', NF90_DOUBLE, kyz_dim, b2_kyz_id)
-      status = nf90_def_var (ncid_2D, 'b2_kxz', NF90_DOUBLE, kxz_dim, b2_kxz_id)
-
-      status = nf90_enddef (ncid_2D)  ! out of definition mode
-
-      status = nf90_put_var (ncid_2D, xx_2D_id, xx)
-      status = nf90_put_var (ncid_2D, yy_2D_id, yy)
-      status = nf90_put_var (ncid_2D, zz_2D_id, zz)
-      status = nf90_put_var (ncid_2D, kx_2D_id, kx)
-      status = nf90_put_var (ncid_2D, ky_2D_id, ky)
-      status = nf90_put_var (ncid_2D, kz_2D_id, kz)
-
-      nout_2D = 1
-
-      !--------------------------------------------------!
       ! Output for kpar
       !--------------------------------------------------!
       filename = trim(runname)//'.out.kpar.nc' ! File name
@@ -342,20 +290,22 @@ contains
       status = nf90_put_att (ncid_kpar, run_id, 'model', _MODEL_)
 
       status = nf90_def_dim (ncid_kpar, 'tt', NF90_UNLIMITED, tt_kpar_dim)
-      status = nf90_def_dim (ncid_kpar, 'kpbin', size(kpbin), kpbin_kpar_dim)
+      status = nf90_def_dim (ncid_kpar, 'kpbin_log', size(kpbin_log), kpbin_log_kpar_dim)
 
       status = nf90_def_var (ncid_kpar, 'tt'  , NF90_DOUBLE, tt_kpar_dim, tt_kpar_id)
-      status = nf90_def_var (ncid_kpar, 'kpbin', NF90_DOUBLE, kpbin_kpar_dim, kpbin_kpar_id)
+      status = nf90_def_var (ncid_kpar, 'kpbin_log', NF90_DOUBLE, kpbin_log_kpar_dim, kpbin_log_kpar_id)
 
-      kpar_dim (1) = kpbin_kpar_dim
+      kpar_dim (1) = kpbin_log_kpar_dim
       kpar_dim (2) = tt_kpar_dim
 
       status = nf90_def_var (ncid_kpar, 'kpar_b'   , NF90_DOUBLE, kpar_dim, kpar_b_id)
       status = nf90_def_var (ncid_kpar, 'b1_ovr_b0', NF90_DOUBLE, kpar_dim, b1_ovr_b0_id)
+      status = nf90_def_var (ncid_kpar, 'b1par2'   , NF90_DOUBLE, kpar_dim, b1par2_id)
+      status = nf90_def_var (ncid_kpar, 'b1prp2'   , NF90_DOUBLE, kpar_dim, b1prp2_id)
 
       status = nf90_enddef (ncid_kpar)  ! out of definition mode
 
-      status = nf90_put_var (ncid_kpar, kpbin_kpar_id, kpbin)
+      status = nf90_put_var (ncid_kpar, kpbin_log_kpar_id, kpbin_log)
 
       nout_kpar = 1
 
@@ -412,7 +362,7 @@ contains
     use time, only: tt
     use grid, only: nlx, nly, nlz
     use mp, only: proc0
-    use time_stamp, only: put_time_stamp, timer_io_total, timer_io_2D
+    use time_stamp, only: put_time_stamp, timer_io_total
     implicit none
     real(r8), intent(in) :: wmag_sum
     real(r8), intent(in) :: wmag_dot_sum
@@ -465,8 +415,7 @@ contains
 !-----------------------------------------------!
 !> @author  YK
 !! @date    28 Jun 2021
-!! @brief   Append variables to NETCDF
-!           for cross section of fields
+!! @brief   Append cross section via MPIIO
 !-----------------------------------------------!
   subroutine loop_io_2D( &
                       bx_r_z0, bx_r_x0, bx_r_y0, &
@@ -479,110 +428,191 @@ contains
                       !
                       b2_kxy, b2_kyz, b2_kxz  &
                     )
-    use time, only: tt
     use grid, only: nlx, nly, nlz, nkx, nky, nkz
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
+    use time, only: tt
     use mp, only: proc0
+    use mpiio, only: mpiio_write_var_2d
     use time_stamp, only: put_time_stamp, timer_io_total, timer_io_2D
     implicit none
-                                                                                  
-    real(r8), intent(in) :: bx_r_z0(nlx, nly), bx_r_x0(nly, nlz), bx_r_y0(nlx, nlz)
-    real(r8), intent(in) :: by_r_z0(nlx, nly), by_r_x0(nly, nlz), by_r_y0(nlx, nlz)
-    real(r8), intent(in) :: bz_r_z0(nlx, nly), bz_r_x0(nly, nlz), bz_r_y0(nlx, nlz)
-                                                                                  
-    real(r8), intent(in) :: jx_r_z0(nlx, nly), jx_r_x0(nly, nlz), jx_r_y0(nlx, nlz)
-    real(r8), intent(in) :: jy_r_z0(nlx, nly), jy_r_x0(nly, nlz), jy_r_y0(nlx, nlz)
-    real(r8), intent(in) :: jz_r_z0(nlx, nly), jz_r_x0(nly, nlz), jz_r_y0(nlx, nlz)
 
-    real(r8), intent(in) :: b2_kxy(nkx, nky), b2_kyz(nky, nkz), b2_kxz(nkx, nkz)
+    real(r8), intent(in) :: bx_r_z0(ilx_st:ilx_en, ily_st:ily_en), &
+                            bx_r_x0(ily_st:ily_en, ilz_st:ilz_en), &
+                            bx_r_y0(ilx_st:ilx_en, ilz_st:ilz_en)
+    real(r8), intent(in) :: by_r_z0(ilx_st:ilx_en, ily_st:ily_en), &
+                            by_r_x0(ily_st:ily_en, ilz_st:ilz_en), &
+                            by_r_y0(ilx_st:ilx_en, ilz_st:ilz_en)
+    real(r8), intent(in) :: bz_r_z0(ilx_st:ilx_en, ily_st:ily_en), &
+                            bz_r_x0(ily_st:ily_en, ilz_st:ilz_en), &
+                            bz_r_y0(ilx_st:ilx_en, ilz_st:ilz_en)
+                                                                           
+    real(r8), intent(in) :: jx_r_z0(ilx_st:ilx_en, ily_st:ily_en), &
+                            jx_r_x0(ily_st:ily_en, ilz_st:ilz_en), &
+                            jx_r_y0(ilx_st:ilx_en, ilz_st:ilz_en)
+    real(r8), intent(in) :: jy_r_z0(ilx_st:ilx_en, ily_st:ily_en), &
+                            jy_r_x0(ily_st:ily_en, ilz_st:ilz_en), &
+                            jy_r_y0(ilx_st:ilx_en, ilz_st:ilz_en)
+    real(r8), intent(in) :: jz_r_z0(ilx_st:ilx_en, ily_st:ily_en), &
+                            jz_r_x0(ily_st:ily_en, ilz_st:ilz_en), &
+                            jz_r_y0(ilx_st:ilx_en, ilz_st:ilz_en)
 
-    integer, dimension (3) :: start3, count3
+    real(r8), intent(in) :: b2_kxy(ikx_st:ikx_en, iky_st:iky_en), &
+                            b2_kyz(iky_st:iky_en, ikz_st:ikz_en), &
+                            b2_kxz(ikx_st:ikx_en, ikz_st:ikz_en)
+
+    integer, dimension(2) :: sizes, subsizes, starts
 
     if (proc0) call put_time_stamp(timer_io_total)
     if (proc0) call put_time_stamp(timer_io_2D)
 
-    ! output via NETCDF
+    !--------------------------------------------------!
+    !                    z = 0 cut
+    !--------------------------------------------------!
+    if(ilz_st == 1) then ! only the processe that has z = 0 write
+      sizes(1) = nlx
+      sizes(2) = nly
+      subsizes(1) = ilx_en - ilx_st + 1
+      subsizes(2) = ily_en - ily_st + 1
+      starts(1) = ilx_st - 1
+      starts(2) = ily_st - 1
+    else
+      sizes(1) = nlx
+      sizes(2) = nly
+      subsizes(1) = 1
+      subsizes(2) = 1
+      starts(1) = 0
+      starts(2) = 0
+    endif
+
+    call mpiio_write_var_2d(fh_bx_r_z0, disp_bx_r_z0, sizes, subsizes, starts, bx_r_z0)
+    call mpiio_write_var_2d(fh_by_r_z0, disp_by_r_z0, sizes, subsizes, starts, by_r_z0)
+    call mpiio_write_var_2d(fh_bz_r_z0, disp_bz_r_z0, sizes, subsizes, starts, bz_r_z0)
+
+    call mpiio_write_var_2d(fh_jx_r_z0, disp_jx_r_z0, sizes, subsizes, starts, jx_r_z0)
+    call mpiio_write_var_2d(fh_jy_r_z0, disp_jy_r_z0, sizes, subsizes, starts, jy_r_z0)
+    call mpiio_write_var_2d(fh_jz_r_z0, disp_jz_r_z0, sizes, subsizes, starts, jz_r_z0)
+
+    !--------------------------------------------------!
+    !                    x = 0 cut
+    !--------------------------------------------------!
+    if(ilx_st == 1) then ! only the processe that has x = 0 write
+      sizes(1) = nly
+      sizes(2) = nlz
+      subsizes(1) = ily_en - ily_st + 1
+      subsizes(2) = ilz_en - ilz_st + 1
+      starts(1) = ily_st - 1
+      starts(2) = ilz_st - 1
+    else
+      sizes(1) = nly
+      sizes(2) = nlz
+      subsizes(1) = 1
+      subsizes(2) = 1
+      starts(1) = 0
+      starts(2) = 0
+    endif
+
+    call mpiio_write_var_2d(fh_bx_r_x0, disp_bx_r_x0, sizes, subsizes, starts, bx_r_x0)
+    call mpiio_write_var_2d(fh_by_r_x0, disp_by_r_x0, sizes, subsizes, starts, by_r_x0)
+    call mpiio_write_var_2d(fh_bz_r_x0, disp_bz_r_x0, sizes, subsizes, starts, bz_r_x0)
+
+    call mpiio_write_var_2d(fh_jx_r_x0, disp_jx_r_x0, sizes, subsizes, starts, jx_r_x0)
+    call mpiio_write_var_2d(fh_jy_r_x0, disp_jy_r_x0, sizes, subsizes, starts, jy_r_x0)
+    call mpiio_write_var_2d(fh_jz_r_x0, disp_jz_r_x0, sizes, subsizes, starts, jz_r_x0)
+
+    !--------------------------------------------------!
+    !                    y = 0 cut
+    !--------------------------------------------------!
+    if(ily_st == 1) then ! only the processe that has y = 0 write
+      sizes(1) = nlx
+      sizes(2) = nlz
+      subsizes(1) = ilx_en - ilx_st + 1
+      subsizes(2) = ilz_en - ilz_st + 1
+      starts(1) = ilx_st - 1
+      starts(2) = ilz_st - 1
+    else
+      sizes(1) = nlx
+      sizes(2) = nlz
+      subsizes(1) = 1
+      subsizes(2) = 1
+      starts(1) = 0
+      starts(2) = 0
+    endif
+
+    call mpiio_write_var_2d(fh_bx_r_y0, disp_bx_r_y0, sizes, subsizes, starts, bx_r_y0)
+    call mpiio_write_var_2d(fh_by_r_y0, disp_by_r_y0, sizes, subsizes, starts, by_r_y0)
+    call mpiio_write_var_2d(fh_bz_r_y0, disp_bz_r_y0, sizes, subsizes, starts, bz_r_y0)
+
+    call mpiio_write_var_2d(fh_jx_r_y0, disp_jx_r_y0, sizes, subsizes, starts, jx_r_y0)
+    call mpiio_write_var_2d(fh_jy_r_y0, disp_jy_r_y0, sizes, subsizes, starts, jy_r_y0)
+    call mpiio_write_var_2d(fh_jz_r_y0, disp_jz_r_y0, sizes, subsizes, starts, jz_r_y0)
+
+    !--------------------------------------------------!
+    !                      kz sum
+    !--------------------------------------------------!
+    if(ikz_st == 1) then ! only the processe that has kz = 0 write
+      sizes(1) = nkx
+      sizes(2) = nky
+      subsizes(1) = ikx_en - ikx_st + 1
+      subsizes(2) = iky_en - iky_st + 1
+      starts(1) = ikx_st - 1
+      starts(2) = iky_st - 1
+    else
+      sizes(1) = nkx
+      sizes(2) = nky
+      subsizes(1) = 1
+      subsizes(2) = 1
+      starts(1) = 0
+      starts(2) = 0
+    endif
+
+    call mpiio_write_var_2d(fh_b2_kxy, disp_b2_kxy, sizes, subsizes, starts, b2_kxy)
+
+    !--------------------------------------------------!
+    !                      kx sum
+    !--------------------------------------------------!
+    if(ikx_st == 1) then ! only the processe that has kx = 0 write
+      sizes(1) = nky
+      sizes(2) = nkz
+      subsizes(1) = iky_en - iky_st + 1
+      subsizes(2) = ikz_en - ikz_st + 1
+      starts(1) = iky_st - 1
+      starts(2) = ikz_st - 1
+    else
+      sizes(1) = nky
+      sizes(2) = nkz
+      subsizes(1) = 1
+      subsizes(2) = 1
+      starts(1) = 0
+      starts(2) = 0
+    endif
+
+    call mpiio_write_var_2d(fh_b2_kyz, disp_b2_kyz, sizes, subsizes, starts, b2_kyz)
+
+    !--------------------------------------------------!
+    !                      ky sum
+    !--------------------------------------------------!
+    if(iky_st == 1) then ! only the processe that has ky = 0 write
+      sizes(1) = nkx
+      sizes(2) = nkz
+      subsizes(1) = ikx_en - ikx_st + 1
+      subsizes(2) = ikz_en - ikz_st + 1
+      starts(1) = ikx_st - 1
+      starts(2) = ikz_st - 1
+    else
+      sizes(1) = nkx
+      sizes(2) = nkz
+      subsizes(1) = 1
+      subsizes(2) = 1
+      starts(1) = 0
+      starts(2) = 0
+    endif
+
+    call mpiio_write_var_2d(fh_b2_kxz, disp_b2_kxz, sizes, subsizes, starts, b2_kxz)
+
     if(proc0) then
-      ! z=0 cut
-      status = nf90_put_var (ncid_2D, tt_2D_id, tt, start=(/nout_2D/))
-      start3(1) = 1
-      start3(2) = 1
-      start3(3) = nout_2D
-
-      count3(1) = nlx
-      count3(2) = nly
-      count3(3) = 1
-      status = nf90_put_var (ncid_2D, bx_r_z0_id, bx_r_z0, start=start3, count=count3)
-      status = nf90_put_var (ncid_2D, by_r_z0_id, by_r_z0, start=start3, count=count3)
-      status = nf90_put_var (ncid_2D, bz_r_z0_id, bz_r_z0, start=start3, count=count3)
-                                             
-      status = nf90_put_var (ncid_2D, jx_r_z0_id, jx_r_z0, start=start3, count=count3)
-      status = nf90_put_var (ncid_2D, jy_r_z0_id, jy_r_z0, start=start3, count=count3)
-      status = nf90_put_var (ncid_2D, jz_r_z0_id, jz_r_z0, start=start3, count=count3)
-      ! x=0 cut
-      start3(1) = 1
-      start3(2) = 1
-      start3(3) = nout_2D
-
-      count3(1) = nly
-      count3(2) = nlz
-      count3(3) = 1
-      status = nf90_put_var (ncid_2D, bx_r_x0_id, bx_r_x0, start=start3, count=count3)
-      status = nf90_put_var (ncid_2D, by_r_x0_id, by_r_x0, start=start3, count=count3)
-      status = nf90_put_var (ncid_2D, bz_r_x0_id, bz_r_x0, start=start3, count=count3)
-                                             
-      status = nf90_put_var (ncid_2D, jx_r_x0_id, jx_r_x0, start=start3, count=count3)
-      status = nf90_put_var (ncid_2D, jy_r_x0_id, jy_r_x0, start=start3, count=count3)
-      status = nf90_put_var (ncid_2D, jz_r_x0_id, jz_r_x0, start=start3, count=count3)
-      ! y=0 cut
-      start3(1) = 1
-      start3(2) = 1
-      start3(3) = nout_2D
-
-      count3(1) = nlx
-      count3(2) = nlz
-      count3(3) = 1
-      status = nf90_put_var (ncid_2D, bx_r_y0_id, bx_r_y0, start=start3, count=count3)
-      status = nf90_put_var (ncid_2D, by_r_y0_id, by_r_y0, start=start3, count=count3)
-      status = nf90_put_var (ncid_2D, bz_r_y0_id, bz_r_y0, start=start3, count=count3)
-                                             
-      status = nf90_put_var (ncid_2D, jx_r_y0_id, jx_r_y0, start=start3, count=count3)
-      status = nf90_put_var (ncid_2D, jy_r_y0_id, jy_r_y0, start=start3, count=count3)
-      status = nf90_put_var (ncid_2D, jz_r_y0_id, jz_r_y0, start=start3, count=count3)
-
-      ! kz sum
-      status = nf90_put_var (ncid_2D, tt_2D_id, tt, start=(/nout_2D/))
-      start3(1) = 1
-      start3(2) = 1
-      start3(3) = nout_2D
-
-      count3(1) = nkx
-      count3(2) = nky
-      count3(3) = 1
-      status = nf90_put_var (ncid_2D, b2_kxy_id, b2_kxy, start=start3, count=count3)
-      ! kx sum
-      status = nf90_put_var (ncid_2D, tt_2D_id, tt, start=(/nout_2D/))
-      start3(1) = 1
-      start3(2) = 1
-      start3(3) = nout_2D
-
-      count3(1) = nky
-      count3(2) = nkz
-      count3(3) = 1
-      status = nf90_put_var (ncid_2D, b2_kyz_id, b2_kyz, start=start3, count=count3)
-      ! ky sum
-      status = nf90_put_var (ncid_2D, tt_2D_id, tt, start=(/nout_2D/))
-      start3(1) = 1
-      start3(2) = 1
-      start3(3) = nout_2D
-
-      count3(1) = nkx
-      count3(2) = nkz
-      count3(3) = 1
-      status = nf90_put_var (ncid_2D, b2_kxz_id, b2_kxz, start=start3, count=count3)
-
-      status = nf90_sync (ncid_2D)
-
-      nout_2D = nout_2D + 1
+      write (unit=out2d_time_unit, fmt="(100es30.21)") tt
+      flush (out2d_time_unit)
     endif
 
     if (proc0) call put_time_stamp(timer_io_total)
@@ -596,12 +626,14 @@ contains
 !! @brief   Append variables to NETCDF
 !           for kpar
 !-----------------------------------------------!
-  subroutine loop_io_kpar(nkpolar, kpar_b, b1_ovr_b0)
+  subroutine loop_io_kpar(nkpolar_log, kpar_b, b1_ovr_b0, &
+                          b1par2, b1prp2)
     use time, only: tt
     use mp, only: proc0
     implicit none
-    integer , intent(in) :: nkpolar
-    real(r8), intent(in) :: kpar_b(1:nkpolar), b1_ovr_b0(1:nkpolar)
+    integer , intent(in) :: nkpolar_log
+    real(r8), intent(in) :: kpar_b(1:nkpolar_log), b1_ovr_b0(1:nkpolar_log)
+    real(r8), intent(in) :: b1par2(1:nkpolar_log), b1prp2(1:nkpolar_log)
 
     integer, dimension (2) :: start2, count2
 
@@ -611,10 +643,12 @@ contains
       start2(1) = 1
       start2(2) = nout_kpar
 
-      count2(1) = nkpolar
+      count2(1) = nkpolar_log
       count2(2) = 1
       status = nf90_put_var (ncid_kpar, kpar_b_id   , kpar_b   , start=start2, count=count2)
       status = nf90_put_var (ncid_kpar, b1_ovr_b0_id, b1_ovr_b0, start=start2, count=count2)
+      status = nf90_put_var (ncid_kpar, b1par2_id   , b1par2   , start=start2, count=count2)
+      status = nf90_put_var (ncid_kpar, b1prp2_id   , b1prp2   , start=start2, count=count2)
 
       status = nf90_sync (ncid_kpar)
 
@@ -691,8 +725,8 @@ contains
     call mpiio_write_var(fh_bz, disp_bz, sizes, subsizes, starts, bz)
 
     if(proc0) then
-      write (unit=field_time_unit, fmt="(100es30.21)") tt
-      flush (field_time_unit)
+      write (unit=out3d_time_unit, fmt="(100es30.21)") tt
+      flush (out3d_time_unit)
     endif
 
     if (proc0) call put_time_stamp(timer_io_total)
@@ -757,11 +791,44 @@ contains
     implicit none
     integer :: ierr
 
+    !3D
     call MPI_FILE_CLOSE(fh_bx,ierr)
     call MPI_FILE_CLOSE(fh_by,ierr)
     call MPI_FILE_CLOSE(fh_bz,ierr)
+
+
+    !2D
+    call MPI_FILE_CLOSE(fh_bx_r_z0,ierr)
+    call MPI_FILE_CLOSE(fh_bx_r_x0,ierr)
+    call MPI_FILE_CLOSE(fh_bx_r_y0,ierr)
+
+    call MPI_FILE_CLOSE(fh_by_r_z0,ierr)
+    call MPI_FILE_CLOSE(fh_by_r_x0,ierr)
+    call MPI_FILE_CLOSE(fh_by_r_y0,ierr)
+
+    call MPI_FILE_CLOSE(fh_bz_r_z0,ierr)
+    call MPI_FILE_CLOSE(fh_bz_r_x0,ierr)
+    call MPI_FILE_CLOSE(fh_bz_r_y0,ierr)
+
+    call MPI_FILE_CLOSE(fh_jx_r_z0,ierr)
+    call MPI_FILE_CLOSE(fh_jx_r_x0,ierr)
+    call MPI_FILE_CLOSE(fh_jx_r_y0,ierr)
+
+    call MPI_FILE_CLOSE(fh_jy_r_z0,ierr)
+    call MPI_FILE_CLOSE(fh_jy_r_x0,ierr)
+    call MPI_FILE_CLOSE(fh_jy_r_y0,ierr)
+
+    call MPI_FILE_CLOSE(fh_jz_r_z0,ierr)
+    call MPI_FILE_CLOSE(fh_jz_r_x0,ierr)
+    call MPI_FILE_CLOSE(fh_jz_r_y0,ierr)
+
+    call MPI_FILE_CLOSE(fh_b2_kxy,ierr)
+    call MPI_FILE_CLOSE(fh_b2_kyz,ierr)
+    call MPI_FILE_CLOSE(fh_b2_kxz,ierr)
+
     if(proc0) then
-      call close_file (field_time_unit)
+      call close_file (out2d_time_unit)
+      call close_file (out3d_time_unit)
     endif
 
     if(proc0) then

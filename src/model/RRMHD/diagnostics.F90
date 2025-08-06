@@ -14,6 +14,7 @@ module diagnostics
 
   public :: init_diagnostics, finish_diagnostics
   public :: loop_diagnostics, loop_diagnostics_2D, loop_diagnostics_kpar, loop_diagnostics_SF2
+  public :: loop_diagnostics_nltrans
 
   private
 contains
@@ -25,9 +26,13 @@ contains
 !! @brief   Initialization of diagnostics
 !-----------------------------------------------!
   subroutine init_diagnostics
+    use params, only: inputfile
+    use diagnostics_common, only: read_parameters
     use diagnostics_common, only: init_polar_spectrum_2d
     use io, only: init_io 
     implicit none
+
+    call read_parameters(inputfile)
 
     call init_polar_spectrum_2d
     call init_io(nkpolar, kpbin)
@@ -184,7 +189,7 @@ contains
           zpep2      (i, k, j) = abs(phi(i, k, j) + psi(i, k, j))**2*kprp2(i, k, j)
           zpem2      (i, k, j) = abs(phi(i, k, j) - psi(i, k, j))**2*kprp2(i, k, j)
           zpap2      (i, k, j) = abs(upa(i, k, j) + bpa(i, k, j)*sqrt(va2cs2_plus_1))**2
-          zpam2      (i, k, j) = abs(upa(i, k, j) - bpa(i, j, k)*sqrt(va2cs2_plus_1))**2
+          zpam2      (i, k, j) = abs(upa(i, k, j) - bpa(i, k, j)*sqrt(va2cs2_plus_1))**2
 
           ! The reason for the following treatment for kx == 0 mode is the following. Compile it with LaTeX.
           !-----------------------------------------------------------------------------------------------------------------------------------
@@ -341,7 +346,6 @@ contains
   subroutine loop_diagnostics_2D
     use io, only: loop_io, loop_io_2D
     use mp, only: proc0
-    use grid, only: nlx, nly, nlz
     use grid, only: kx, ky, kprp2
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
@@ -373,7 +377,9 @@ contains
     allocate(f  (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); f   = 0.d0
     allocate(fr (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); fr  = 0.d0
 
-    allocate(src1(nlx, nly), source=0.d0); allocate(src2(nly, nlz), source=0.d0); allocate(src3(nlx, nlz), source=0.d0)
+    allocate(src1(ilx_st:ilx_en, ily_st:ily_en), source=0.d0) 
+    allocate(src2(ily_st:ily_en, ilz_st:ilz_en), source=0.d0) 
+    allocate(src3(ilx_st:ilx_en, ilz_st:ilz_en), source=0.d0)
     allocate(phi_r_z0, source=src1)
     allocate(phi_r_x0, source=src2)
     allocate(phi_r_y0, source=src3)
@@ -1016,6 +1022,17 @@ contains
     ! deallocate(nlin_bpe_bx_r, nlin_bpe_by_r, nlin_bpe_bpa_r)
 
   ! end subroutine get_nonlinear_terms
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    26 Jul 2019
+!! @brief   Calculate shell-to-shell transfer
+!-----------------------------------------------!
+  subroutine loop_diagnostics_nltrans
+  ! under development...
+  end subroutine loop_diagnostics_nltrans
+
 
 end module diagnostics
 

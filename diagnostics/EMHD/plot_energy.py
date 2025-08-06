@@ -1,6 +1,8 @@
 # -*- coding: utf-8 -*-
 from load import *
 from fft import *
+import sys
+sys.path.append('../')
 from plots import *
 
 print('\nplotting energy\n')

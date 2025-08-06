@@ -1,0 +1,18 @@
+FC = mpinfort
+
+P3DFFT_HOME=/system/apps/rhel8/sx/p3dfft/2.7.9-stride1
+P3DFFT_INC=-I$(P3DFFT_HOME)/include/
+P3DFFT_LIB=-L$(P3DFFT_HOME)/lib/ -lp3dfft
+
+FFTW3_HOME=/system/apps/rhel8/sx/fftw/3.3.8/
+FFTW3_INC=-I$(FFTW3_HOME)/include/
+FFTW3_LIB=-L$(FFTW3_HOME)/lib/ -lfftw3
+
+NETCDF_C_HOME=/system/apps/rhel8/sx/netcdf-c/4.6.1/
+NETCDF_F_HOME=/system/apps/rhel8/sx/netcdf-fortran/4.5.2/
+HDF5_HOME=/system/apps/rhel8/sx/hdf5/1.10.4/
+NETCDF_INC=-I$(NETCDF_C_HOME)/include/ -I$(NETCDF_F_HOME)/include/ -I$(HDF5_HOME)/include/
+NETCDF_LIB=-L$(NETCDF_C_HOME)/lib -L$(NETCDF_F_HOME)/lib -lnetcdf -lnetcdff -L/$(HDF5_HOME)/lib -lhdf5_hl -lhdf5
+
+LIB_OPENMP = -fopenmp # used only when USE_OPENMP=yes in ../Makefile.in
+F90FLAGS = -Cpp -Free -O3 # -Kfast fails

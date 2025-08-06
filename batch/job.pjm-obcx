@@ -2,11 +2,11 @@
 
 #------ pjsub option --------#
 #PJM -L rscgrp=regular
-#PJM -L node=256
-#PJM --mpi proc=7168
+#PJM -L node=5
+#PJM --mpi proc=280
 #PJM --omp thread=1
-#PJM -L elapse=00:15:00
-#PJM -g po7002
+#PJM -L elapse=02:00:00
+#PJM -g gv89
 #PJM -j
 #PJM -S
 #PJM -o "calliope.out.std"

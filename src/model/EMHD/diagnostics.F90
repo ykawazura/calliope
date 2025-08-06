@@ -14,6 +14,7 @@ module diagnostics
 
   public :: init_diagnostics, finish_diagnostics
   public :: loop_diagnostics, loop_diagnostics_2D, loop_diagnostics_kpar, loop_diagnostics_SF2
+  public :: loop_diagnostics_nltrans
 
   private
 
@@ -28,11 +29,15 @@ contains
 !! @brief   Initialization of diagnostics
 !-----------------------------------------------!
   subroutine init_diagnostics
+    use params, only: inputfile
+    use diagnostics_common, only: read_parameters
     use diagnostics_common, only: init_polar_spectrum_2d, init_polar_spectrum_3d
     use diagnostics_common, only: init_series_modes
     use io, only: init_io 
     use grid, only: nlz
     implicit none
+
+    call read_parameters(inputfile)
 
     if(nlz == 2) then
       call init_polar_spectrum_2d
@@ -40,7 +45,7 @@ contains
       call init_polar_spectrum_3d
     endif
     call init_SF2
-    call init_io(nkpolar, kpbin, nl, lpar, lper)
+    call init_io(nkpolar, kpbin, nkpolar_log, kpbin_log, nl, lpar, lper)
     call init_series_modes
   end subroutine init_diagnostics
 
@@ -236,7 +241,9 @@ contains
     allocate(f (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); f   = 0.d0
     allocate(fr(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); fr  = 0.d0
 
-    allocate(src1(nlx, nly), source=0.d0); allocate(src2(nly, nlz), source=0.d0); allocate(src3(nlx, nlz), source=0.d0)
+    allocate(src1(ilx_st:ilx_en, ily_st:ily_en), source=0.d0) 
+    allocate(src2(ily_st:ily_en, ilz_st:ilz_en), source=0.d0) 
+    allocate(src3(ilx_st:ilx_en, ilz_st:ilz_en), source=0.d0)
     allocate(bx_r_z0, source=src1)
     allocate(bx_r_x0, source=src2)
     allocate(bx_r_y0, source=src3)
@@ -270,7 +277,9 @@ contains
 
     allocate(b2 (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=0.d0)
 
-    allocate(src1(nkx, nky), source=0.d0); allocate(src2(nky, nkz), source=0.d0); allocate(src3(nkx, nkz), source=0.d0)
+    allocate(src1(ikx_st:ikx_en, iky_st:iky_en), source=0.d0); 
+    allocate(src2(iky_st:iky_en, ikz_st:ikz_en), source=0.d0); 
+    allocate(src3(ikx_st:ikx_en, ikz_st:ikz_en), source=0.d0)
     allocate(b2_kxy(nkx, nky), source=0.d0)
     allocate(b2_kyz(nky, nkz), source=0.d0)
     allocate(b2_kxz(nkx, nkz), source=0.d0)
@@ -374,7 +383,7 @@ contains
 !-----------------------------------------------!
   subroutine init_SF2
     use grid, only: lx, ly, lz, dlx, dly, dlz
-    use params, only: SF2_nsample
+    use diagnostics_common, only: SF2_nsample
     use mp, only: nproc
     implicit none
     real(r8) :: l, d
@@ -424,7 +433,7 @@ contains
     integer  :: i0, j0, k0, i1, j1, k1
     integer  :: il, isamp_r0, isamp_ang , iproc
     integer  :: demand(nproc, 3)
-    real(r8) :: supply_b(nproc, 3), supply_u(nproc, 3)
+    real(r8) :: supply_b(nproc, 3)
     real(r8) :: b0x, b0y, b0z, b1x, b1y, b1z
     real(r8) :: bloc_x, bloc_y, bloc_z, lpar_, lper_
     real(r8) :: sf2b(nl, nl), count(nl, nl)
@@ -603,8 +612,8 @@ contains
 !-----------------------------------------------!
   subroutine loop_diagnostics_kpar
     use fields, only: bx, by, bz
-    use mp, only: proc0, sum_reduce
-    use grid, only: kx, ky, kz, k2, nlx, nly, nlz
+    use mp, only: proc0, sum_allreduce
+    use grid, only: k2, kx, ky, kz, nlx, nly, nlz
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     use params, only: zi
@@ -613,7 +622,7 @@ contains
     implicit none
     integer :: ii, i, j, k
 
-    real   (r8), dimension(:), allocatable :: kpar_b, kpar_u, b1_ovr_b0
+    real   (r8), dimension(:), allocatable :: kpar_b, b1_ovr_b0
 
     complex(r8), allocatable, dimension(:,:,:) :: bx0, by0, bz0                ! local mean field
     complex(r8), allocatable, dimension(:,:,:) :: bx1, by1, bz1                ! local fluctuating field
@@ -629,15 +638,21 @@ contains
     real   (r8), allocatable, dimension(:,:,:) :: b0_gradb1_sq, b0sq, b1sq
     real   (r8) :: b0_gradb1_sq_avg, b0sq_avg, b1sq_avg
 
+    real   (r8), allocatable, dimension(:,:,:) :: bx0hat, by0hat, bz0hat ! local mean field unit vector
+    real   (r8), allocatable, dimension(:,:,:) :: b1par, b1prpx, b1prpy  ! b1par : projection of b1 to b0 => Pseudo AW
+                                                                         ! b1per : b1 - b1par*b0hat       => Shear AW
+    real   (r8), allocatable, dimension(:) :: b1par2, b1prp2
+
     complex(r8), allocatable, dimension(:,:,:) :: src_c
     real   (r8), allocatable, dimension(:,:,:) :: src_r
 
     if (proc0) call put_time_stamp(timer_diagnostics_total)
     if (proc0) call put_time_stamp(timer_diagnostics_kpar)
 
-    allocate(kpar_b   (nkpolar))
-    allocate(kpar_u   (nkpolar))
-    allocate(b1_ovr_b0(nkpolar))
+    allocate(kpar_b   (nkpolar_log), source=0.d0)
+    allocate(b1_ovr_b0(nkpolar_log), source=0.d0)
+    allocate(b1par2   (nkpolar_log), source=0.d0)
+    allocate(b1prp2   (nkpolar_log), source=0.d0)
 
     allocate(src_c(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0,0.d0))
     allocate(bx0    , source=src_c)
@@ -673,23 +688,28 @@ contains
     allocate(dbx1_dzr, source=src_r)
     allocate(dby1_dzr, source=src_r)
     allocate(dbz1_dzr, source=src_r)
-    deallocate(src_r)
 
-    allocate(src_r(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=0.d0)
     allocate(b0_gradb1_sq, source=src_r)
     allocate(b0sq        , source=src_r)
     allocate(b1sq        , source=src_r)
+
+    allocate(bx0hat      , source=src_r)
+    allocate(by0hat      , source=src_r)
+    allocate(bz0hat      , source=src_r)
+    allocate(b1par       , source=src_r)
+    allocate(b1prpx      , source=src_r)
+    allocate(b1prpy      , source=src_r)
     deallocate(src_r)
 
-    ! get kpar for each kprp(ii)
-    do ii = 1, nkpolar
+    ! get kpar for each kprp_log(ii)
+    do ii = 1, nkpolar_log
 
       ! filter out to get local mean field and local fluctuating field
       do j = iky_st, iky_en
         do k = ikz_st, ikz_en
           do i = ikx_st, ikx_en
             ! smaller than kprp/2
-            if(k2(i, k, j) < (0.5d0*kpbin(ii))**2) then
+            if(k2(i, k, j) < (0.5d0*kpbin_log(ii))**2) then
               bx0(i, k, j) = bx(i, k, j)
               by0(i, k, j) = by(i, k, j)
               bz0(i, k, j) = bz(i, k, j)
@@ -700,7 +720,7 @@ contains
             endif
 
             ! larger than kprp/2 and smaller than 2*kprp
-            if(k2(i, k, j) >= (0.5d0*kpbin(ii))**2 .and. k2(i, k, j) < (2.0d0*kpbin(ii))**2) then
+            if(k2(i, k, j) >= (0.5d0*kpbin_log(ii))**2 .and. k2(i, k, j) < (2.0d0*kpbin_log(ii))**2) then
               bx1(i, k, j) = bx(i, k, j)
               by1(i, k, j) = by(i, k, j)
               bz1(i, k, j) = bz(i, k, j)
@@ -710,6 +730,13 @@ contains
               bz1(i, k, j) = 0.d0
             endif
 
+            if(abs(bx0(i,k,j)) < epsilon(1.d0) .or. abs(bx0(i,k,j)) > 1.d0/epsilon(1.d0)) bx0(i,k,j) = 0.d0
+            if(abs(by0(i,k,j)) < epsilon(1.d0) .or. abs(by0(i,k,j)) > 1.d0/epsilon(1.d0)) by0(i,k,j) = 0.d0
+            if(abs(bz0(i,k,j)) < epsilon(1.d0) .or. abs(bz0(i,k,j)) > 1.d0/epsilon(1.d0)) bz0(i,k,j) = 0.d0
+            if(abs(bx1(i,k,j)) < epsilon(1.d0) .or. abs(bx1(i,k,j)) > 1.d0/epsilon(1.d0)) bx1(i,k,j) = 0.d0
+            if(abs(by1(i,k,j)) < epsilon(1.d0) .or. abs(by1(i,k,j)) > 1.d0/epsilon(1.d0)) by1(i,k,j) = 0.d0
+            if(abs(bz1(i,k,j)) < epsilon(1.d0) .or. abs(bz1(i,k,j)) > 1.d0/epsilon(1.d0)) bz1(i,k,j) = 0.d0
+
             dbx1_dx(i, k, j) = zi*kx(i)*bx1(i, k, j)
             dby1_dx(i, k, j) = zi*kx(i)*by1(i, k, j)
             dbz1_dx(i, k, j) = zi*kx(i)*bz1(i, k, j)
@@ -717,7 +744,7 @@ contains
             dbx1_dy(i, k, j) = zi*ky(j)*bx1(i, k, j)
             dby1_dy(i, k, j) = zi*ky(j)*by1(i, k, j)
             dbz1_dy(i, k, j) = zi*ky(j)*bz1(i, k, j)
-
+                                       
             dbx1_dz(i, k, j) = zi*kz(k)*bx1(i, k, j)
             dby1_dz(i, k, j) = zi*kz(k)*by1(i, k, j)
             dbz1_dz(i, k, j) = zi*kz(k)*bz1(i, k, j)
@@ -742,15 +769,16 @@ contains
       call p3dfft_btran_c2r(dby1_dz, dby1_dzr, 'tff')
       call p3dfft_btran_c2r(dbz1_dz, dbz1_dzr, 'tff')
 
+      ! Get kpar & delta b/b0
       b0_gradb1_sq =   (bx0r*dbx1_dxr + by0r*dbx1_dyr + bz0r*dbx1_dzr)**2 &
                      + (bx0r*dby1_dxr + by0r*dby1_dyr + bz0r*dby1_dzr)**2 &
                      + (bx0r*dbz1_dxr + by0r*dbz1_dyr + bz0r*dbz1_dzr)**2 
       b0sq = bx0r**2 + by0r**2 + bz0r**2
       b1sq = bx1r**2 + by1r**2 + bz1r**2
 
-      b0_gradb1_sq_avg = sum(b0_gradb1_sq); call sum_reduce(b0_gradb1_sq_avg, 0); b0_gradb1_sq_avg = b0_gradb1_sq_avg/(nlx*nly*nlz)
-      b0sq_avg         = sum(b0sq)        ; call sum_reduce(b0sq_avg        , 0); b0sq_avg         = b0sq_avg        /(nlx*nly*nlz)
-      b1sq_avg         = sum(b1sq)        ; call sum_reduce(b1sq_avg        , 0); b1sq_avg         = b1sq_avg        /(nlx*nly*nlz)
+      b0_gradb1_sq_avg = sum(b0_gradb1_sq); call sum_allreduce(b0_gradb1_sq_avg); b0_gradb1_sq_avg = b0_gradb1_sq_avg/nlx/nly/nlz
+      b0sq_avg         = sum(b0sq)        ; call sum_allreduce(b0sq_avg        ); b0sq_avg         = b0sq_avg        /nlx/nly/nlz
+      b1sq_avg         = sum(b1sq)        ; call sum_allreduce(b1sq_avg        ); b1sq_avg         = b1sq_avg        /nlx/nly/nlz
 
       if (b0sq_avg /= 0.d0 .and. b1sq_avg /= 0.d0) then
         kpar_b   (ii) = dsqrt( b0_gradb1_sq_avg/(b1sq_avg*b0sq_avg) )
@@ -759,12 +787,37 @@ contains
         kpar_b   (ii) = 0.d0
         b1_ovr_b0(ii) = 0.d0
       endif
+
+      ! Get Shear AWs and pseudo AWs
+      do i = ilx_st, ilx_en
+        do k = ilz_st, ilz_en
+          do j = ily_st, ily_en
+            if(bx0r(j,k,i)**2 + by0r(j,k,i)**2 + bz0r(j,k,i)**2 /= 0.d0) then 
+              bx0hat(j,k,i) = bx0r(j,k,i)/dsqrt(bx0r(j,k,i)**2 + by0r(j,k,i)**2 + bz0r(j,k,i)**2)
+              by0hat(j,k,i) = by0r(j,k,i)/dsqrt(bx0r(j,k,i)**2 + by0r(j,k,i)**2 + bz0r(j,k,i)**2)
+              bz0hat(j,k,i) = bz0r(j,k,i)/dsqrt(bx0r(j,k,i)**2 + by0r(j,k,i)**2 + bz0r(j,k,i)**2)
+            else 
+              bx0hat(j,k,i) = 0.d0 
+              by0hat(j,k,i) = 0.d0 
+              bz0hat(j,k,i) = 0.d0 
+            endif
+
+            b1par (j,k,i) = bx1r(j,k,i)*bx0hat(j,k,i) + by1r(j,k,i)*by0hat(j,k,i) + bz1r(j,k,i)*bz0hat(j,k,i)
+            b1prpx(j,k,i) = bx1r(j,k,i) - b1par(j,k,i)*bx0hat(j,k,i)
+            b1prpy(j,k,i) = by1r(j,k,i) - b1par(j,k,i)*by0hat(j,k,i)
+          enddo
+        enddo
+      enddo
+
+      b1par2(ii) = sum(b1par**2)             ; call sum_allreduce(b1par2(ii)); b1par2(ii) = b1par2(ii)/nlx/nly/nlz
+      b1prp2(ii) = sum(b1prpx**2 + b1prpy**2); call sum_allreduce(b1prp2(ii)); b1prp2(ii) = b1prp2(ii)/nlx/nly/nlz
     enddo
 
     if (proc0) call put_time_stamp(timer_diagnostics_total)
     if (proc0) call put_time_stamp(timer_diagnostics_kpar)
 
-    call loop_io_kpar(nkpolar, kpar_b, b1_ovr_b0)
+    call loop_io_kpar(nkpolar_log, kpar_b, b1_ovr_b0, &
+                      b1par2, b1prp2)
 
     deallocate(kpar_b)
     deallocate(b1_ovr_b0)
@@ -779,8 +832,26 @@ contains
     deallocate(dbx1_dyr, dby1_dyr, dbz1_dyr)
     deallocate(dbx1_dzr, dby1_dzr, dbz1_dzr)
     deallocate(b0_gradb1_sq, b0sq, b1sq)
-
+    deallocate(bx0hat)
+    deallocate(by0hat)
+    deallocate(bz0hat)
+    deallocate(b1par )
+    deallocate(b1prpx)
+    deallocate(b1prpy)
+    deallocate(b1par2)
+    deallocate(b1prp2)
   end subroutine loop_diagnostics_kpar
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    26 Jul 2019
+!! @brief   Calculate shell-to-shell transfer
+!-----------------------------------------------!
+  subroutine loop_diagnostics_nltrans
+  ! under development...
+  end subroutine loop_diagnostics_nltrans
+
 
 end module diagnostics
 

@@ -9,6 +9,7 @@ module advance_common
   implicit none
   public gear1, gear2, gear3
   public eSSPIFRK1, eSSPIFRK2, eSSPIFRK3
+  public dt_adjust_while_running 
 contains
 
 

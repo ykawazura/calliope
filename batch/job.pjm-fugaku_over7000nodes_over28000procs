@@ -1,0 +1,31 @@
+#!/bin/sh
+#PJM -L  "node=6500"
+#PJM -L  "rscgrp=large"
+#PJM -g  hp220027
+#PJM -x  PJM_LLIO_GFSCACHE=/vol0004
+#PJM -L  "elapse=24:00:00"
+#PJM --mpi "max-proc-per-node=12" 
+#PJM -s
+#PJM -j
+#PJM -m e
+#PJM --mail-list "yohey.44@gmail.com"
+#
+
+. /vol0004/apps/oss/spack/share/spack/setup-env.sh
+
+spack load /ahea2x5
+spack load /ak35qol
+spack load /emkpfdp
+spack load /opxdwgd
+
+echo $LD_LIBRARY_PATH | sed -e 's/:/\n/g' | grep '^/vol0004/apps/oss/spack' | xargs /home/system/tool/dir_transfer
+echo $PATH | sed -e 's/:/\n/g' | grep '^/vol0004/apps/oss/spack' | xargs /home/system/tool/dir_transfer
+
+export PARALLEL=4
+export OMP_NUM_TH1EADS=${PARALLEL}
+
+llio_transfer ./calliope
+llio_transfer ./calliope.in
+mpiexec -stdin ./calliope.in -std-proc ./output.%j/%/1000r/calliope.out.std -n 78000 ./calliope
+llio_transfer --purge ./calliope
+llio_transfer --purge ./calliope.in

@@ -1,0 +1,107 @@
+!--------------------------------------------------!
+!               INPUTS for MHD INCOMP              !
+!--------------------------------------------------!
+&mpi_settings
+  dim_decomp = 1
+  !dim1 = 4 ! decomp will be (dim1, nproc/dim1)
+           ! if this is empty, decomp will be (dim1, dim2)
+           ! such that dim1 ~= dim2.
+/
+
+!==============================================================================
+&box_parameters
+  lx = 1.0 ! to be multiplied by 2pi
+  ly = 1.0 ! to be multiplied by 2pi
+  lz = 1.0 ! to be multiplied by 2pi
+
+  nlx = 128
+  nly = 128
+  nlz = 2
+
+  pruned = .true.
+/
+
+!==============================================================================
+&time_parameters
+  dt    = 1.0d-2
+  nstep = 15000 
+  cfl   = 5.0d0
+  reset_method = 'multiply'  !'multiply'  => multiply by a factor of 0.5
+                             !'decrement' => decrement the top integer of dt
+  increase_dt = 0e+0         !When max dt computed from the cfl condition is 
+                             ! larger than this value, set dt = increase_dt.
+
+                             ! When the file 'dt_adjust' including a float number is created,
+                             ! dt will be manually adjusted to that value while running.
+/
+
+!==============================================================================
+&scheme_parameters
+  time_step_scheme = 'eSSPIFRK3' ! 'gear3' or 'eSSPIFRK3'
+/
+
+!==============================================================================
+&operation_parameters
+  nonlinear = T
+/
+
+!==============================================================================
+&physical_parameters
+  ! hyper dissipation ~ nu*k^(2*nuexp)
+  nu      = 1d+2  ! viscosity
+  nu_exp  = 4
+  ! hyper resistivity ~ eta*k^(2*etaexp)
+  eta     = 1d+2  ! resistivity
+  eta_exp = 4
+
+  ! shear parameters
+  shear  = .false.
+  q      = 0.d0
+/
+
+!==============================================================================
+&initial_condition
+  !init_type = 'zero'
+  !init_type = 'single_vortex'
+  !init_type = 'OT2'
+  init_type = 'KH'
+  !init_type = 'random'
+  !init_type = 'restart'
+/
+
+!==============================================================================
+&force
+  driven = F
+  nk_stir = 0  !Number of independent driven Fourier modes
+/
+
+!==============================================================================
+&terminate
+  max_wall_time   = 24.             ! The simulation will be terminated when the wall  
+                                    ! time exceeds this value (in the unit of hour).
+
+  terminate_file_name = 'terminate' ! The simulation will be terminated when the file 
+                                    ! named this value is created in the root directory
+                                    ! in the middle of simulaiton.
+/
+
+!==============================================================================
+&diagnostics_parameters
+  write_intvl         = 0.1d0  ! output every this value.
+  write_intvl_2D      = 1.0d0  ! output every this value.
+  write_intvl_3D      = 1.0d0  ! output every this value.
+  write_intvl_kpar    = 0.2d0  ! output every this value.
+  write_intvl_SF2     = 0.2d0  ! output every this value.
+  write_intvl_nltrans = 0.2d0  ! output every this value.
+  SF2_nsample = 100000 ! number of sample points for each separation
+
+!  If one wants to change the separation of kpolar_log, one can set kpolar_log_sep so that
+!    kpolar_log_sep = (0, k1*kpolar_log_sep^i) [i = 1, 2., ....]
+!    Default is kpolar_log_sep = 2^1/3.
+/
+
+!==============================================================================
+&restart_parameters
+  save_restart_intvl = 1.0d0      ! save every this value.
+  restart_dir = './restart/'
+/

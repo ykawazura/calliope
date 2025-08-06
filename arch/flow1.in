@@ -13,9 +13,9 @@ HDF5_PATH=/home/center/opt/spack/aarch64/fj/4.1.0/hdf5/1.10.6/3dn
 NETCDF_INC=-I/usr/include -I/$(NETCDF_DIR)/include -I$(NETCDFF_PATH)/include 
 NETCDF_LIB=-L/$(NETCDF_DIR)/lib -L$(NETCDFF_PATH)/lib -lnetcdff -lnetcdf -L/$(HDF5_PATH)/lib -lhdf5_hl -lhdf5 -lz
 
-F90FLAGS = -Cpp -Free -Kfast
+F90FLAGS = -Cpp -Free -O3 # -Kfast fails
 # MPI_LIB = -lm -lmpi -lmpifort
-LIB_OPENMP = -fopenmp # used only when USE_OPENMP=yes in ../Makefile.in
+F90FLAGS_OPENMP = -Kopenmp # used only when USE_OPENMP=yes in ../Makefile.in
 
 # CPPFLAGS += -DFCOMPILER=_FUJ_
 # FFLAGS = -Cpp -Free -Kfast

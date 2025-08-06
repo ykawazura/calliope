@@ -11,6 +11,8 @@ module grid
   public  lx, ly, lz
   public  nlx, nly, nlz, nlxc, nlyc, nlzc
   public  nkx, nky, nkz
+  public  pruned
+  public  kx_max_noprune, ky_max_noprune, kz_max_noprune
   public  nk_local_tot, nl_local_tot
   public  xx, yy, zz
   public  kx, ky, kz, kprp2, kprp2inv, kz2, kprp2_max, kz2_max
@@ -19,11 +21,14 @@ module grid
   public  k2, k2inv, k2_max
   public  ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
   public  ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+  public  idx2procid
   private read_parameters
 
   real(r8) :: lx, ly, lz
   integer  :: nlx, nly, nlz, nlxc, nlyc, nlzc
   integer  :: nkx, nky, nkz
+  logical  :: pruned
+  real(r8) :: kx_max_noprune, ky_max_noprune, kz_max_noprune
   integer  :: nk_local_tot, nl_local_tot
   real(r8), allocatable :: xx(:), yy(:), zz(:)
   real(r8), allocatable :: kx(:), ky(:), kz(:), kz2(:)
@@ -33,6 +38,8 @@ module grid
   integer  :: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
   integer  :: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
   real(r8) :: kprp2_max, kz2_max, k2_max
+  integer , allocatable :: ilz_st_by_proc(:), ilz_en_by_proc(:), ilx_st_by_proc(:), ilx_en_by_proc(:)
+  integer , allocatable :: ikz_st_by_proc(:), ikz_en_by_proc(:), iky_st_by_proc(:), iky_en_by_proc(:)
 
 contains
 
@@ -43,10 +50,8 @@ contains
 !! @brief   Initialization of grid
 !-----------------------------------------------!
   subroutine init_grid
-    use mp, only: dims, proc0
-#ifdef DEBG
+    use mp, only: dims, proc0, sum_allreduce
     use mp, only: proc_id, nproc
-#endif
     use params, only: pi, inputfile
     implicit none
     include 'mpif.h'
@@ -115,6 +120,10 @@ contains
     kprp2_max = maxval(abs(kx))**2 + maxval(abs(ky))**2
     kz2_max   = maxval(kz2)
     k2_max    = maxval(abs(kx))**2 + maxval(abs(ky))**2 + maxval(abs(kz))**2
+
+    kx_max_noprune = 2.d0*pi*dble(nlx/2)/lx
+    ky_max_noprune = 2.d0*pi*dble(nly/2)/ly
+    kz_max_noprune = 2.d0*pi*dble(nlz/2)/lz
 
     ! P3DFFT initialization
     call p3dfft_setup (dims, nly, nlz, nlx, MPI_COMM_WORLD, nlyc, nlzc, nlxc, .true.)
@@ -216,6 +225,33 @@ contains
         enddo
       enddo
     enddo
+    
+    allocate (ilx_st_by_proc(0:nproc-1), source=0)
+    allocate (ilx_en_by_proc(0:nproc-1), source=0)
+    allocate (ilz_st_by_proc(0:nproc-1), source=0)
+    allocate (ilz_en_by_proc(0:nproc-1), source=0)
+    allocate (iky_st_by_proc(0:nproc-1), source=0)
+    allocate (iky_en_by_proc(0:nproc-1), source=0)
+    allocate (ikz_st_by_proc(0:nproc-1), source=0)
+    allocate (ikz_en_by_proc(0:nproc-1), source=0)
+
+    ilx_st_by_proc(proc_id) = ilx_st
+    ilx_en_by_proc(proc_id) = ilx_en
+    ilz_st_by_proc(proc_id) = ilz_st
+    ilz_en_by_proc(proc_id) = ilz_en
+    iky_st_by_proc(proc_id) = iky_st
+    iky_en_by_proc(proc_id) = iky_en
+    ikz_st_by_proc(proc_id) = ikz_st
+    ikz_en_by_proc(proc_id) = ikz_en
+
+    call sum_allreduce(ilx_st_by_proc)
+    call sum_allreduce(ilx_en_by_proc)
+    call sum_allreduce(ilz_st_by_proc)
+    call sum_allreduce(ilz_en_by_proc)
+    call sum_allreduce(iky_st_by_proc)
+    call sum_allreduce(iky_en_by_proc)
+    call sum_allreduce(ikz_st_by_proc)
+    call sum_allreduce(ikz_en_by_proc)
 
   end subroutine init_grid
 
@@ -228,13 +264,13 @@ contains
   subroutine read_parameters(filename)
     use mp, only: nproc, proc0, iproc, jproc
     use file, only: get_unused_unit
-    use params, only: pi, dealias
+    use params, only: pi
     implicit none
     
     character(len=100), intent(in) :: filename
     integer  :: unit, ierr
 
-    namelist /box_parameters/ lx, ly, lz, nlx, nly, nlz
+    namelist /box_parameters/ lx, ly, lz, nlx, nly, nlz, pruned
 
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
     !v    used only when the corresponding value   v!
@@ -247,6 +283,8 @@ contains
     nlx = 32
     nly = 32
     nlz = 32
+
+    pruned = .true.
     !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
 
     call get_unused_unit (unit)
@@ -260,24 +298,14 @@ contains
     ly = 2.d0*pi*ly
     lz = 2.d0*pi*lz
 
-    if(trim(dealias) == '2/3') then
-      nlxc = int(nlx*2.d0/3.d0) ! This is for dealiasing with 2/3 pruned FFT
-      nlyc = int(nly*2.d0/3.d0) ! This is for dealiasing with 2/3 pruned FFT
-      nlzc = int(nlz*2.d0/3.d0) ! This is for dealiasing with 2/3 pruned FFT
+    if(pruned) then
+      nlxc = int(nlx*2.d0/3.d0) + 2 ! This is for dealiasing with 2/3 pruned FFT
+      nlyc = int(nly*2.d0/3.d0) + 2 ! This is for dealiasing with 2/3 pruned FFT
+      nlzc = int(nlz*2.d0/3.d0) + 2 ! This is for dealiasing with 2/3 pruned FFT
     else
       nlxc = nlx
       nlyc = nly
       nlzc = nlz
-    endif
-
-    if((nlx <= 2 .or. nly <= 2 .or. nlz <=2) .and. nproc > 1) then
-      if(proc0) then
-        print *, '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
-        print *, '!                 Only a serial run is allowed for 2D.               !'
-        print *, '!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!'
-        print *
-        stop
-      endif
     endif
 
     if(proc0) then
@@ -287,6 +315,40 @@ contains
     endif
 
   end subroutine read_parameters
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    9 Jun 2022
+!! @brief   Find which proc_id has (idx1, idx2)
+!           For real   , ilz_st <= idx1 <= ilz_en
+!                        ilx_st <= idx2 <= ilx_en
+!           For complex, ikz_st <= idx1 <= ikz_en
+!                        iky_st <= idx2 <= iky_en
+!-----------------------------------------------!
+  function idx2procid(idx1, idx2, r_or_c)
+    use mp, only: nproc
+    use mp, only: sum_allreduce
+    implicit none
+    integer, intent(in) :: idx1, idx2
+    character(len=1), intent(in) :: r_or_c
+    integer :: i, idx2procid
+
+    do i = 0, nproc - 1
+      if(r_or_c == 'r') then
+        if(      (idx1 >= ilz_st_by_proc(i) .and. idx1 <= ilz_en_by_proc(i)) &
+           .and. (idx2 >= ilx_st_by_proc(i) .and. idx2 <= ilx_en_by_proc(i))) then
+          idx2procid = i
+        endif
+      elseif(r_or_c == 'c') then
+        if(       (idx1 >= ikz_st_by_proc(i) .and. idx1 <= ikz_en_by_proc(i)) &
+            .and. (idx2 >= iky_st_by_proc(i) .and. idx2 <= iky_en_by_proc(i))) then
+          idx2procid = i
+        endif
+      endif
+    enddo
+
+  end function idx2procid
 
 end module grid
 
