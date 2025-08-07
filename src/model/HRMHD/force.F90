@@ -188,8 +188,8 @@ contains
       zmpe_dot_nbl2_fzmpe_sum = sum(zmpe_dot_nbl2_fzmpe); call sum_allreduce(zmpe_dot_nbl2_fzmpe_sum)
 
       if(abs(zppe_dot_nbl2_fzppe_sum) > 1.0d-6 .and. abs(zmpe_dot_nbl2_fzmpe_sum) > 1.0d-6) then
-        fzppe = 0.5d0*ene_inj*(1.d0 + xhl_inj)*fzppe/abs(zppe_dot_nbl2_fzppe_sum)
-        fzmpe = 0.5d0*ene_inj*(1.d0 - xhl_inj)*fzmpe/abs(zmpe_dot_nbl2_fzmpe_sum)
+        fzppe = 0.5d0*ene_inj*(1.d0 + xhl_inj)*fzppe/abs(zppe_dot_nbl2_fzppe_sum)*(-sign(1.d0, zppe_dot_nbl2_fzppe_sum))
+        fzmpe = 0.5d0*ene_inj*(1.d0 - xhl_inj)*fzmpe/abs(zmpe_dot_nbl2_fzmpe_sum)*(-sign(1.d0, zmpe_dot_nbl2_fzmpe_sum))
       endif
     endif
 

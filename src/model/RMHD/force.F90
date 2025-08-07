@@ -64,24 +64,28 @@ contains
     complex(r8), dimension (ikx_st:ikx_en, &
                             ikz_st:ikz_en, &
                             iky_st:iky_en), intent(inout) :: fphi, fpsi
-    complex(r8) :: jpa
-    real(r8) :: p_ext_ene_sum
-    real(r8), allocatable, dimension(:,:,:) :: p_ext_ene
+
+    real(r8) :: phi_dot_nbl2_fphi_sum, psi_dot_nbl2_fpsi_sum
+    real(r8), allocatable, dimension(:,:,:) :: phi_dot_nbl2_fphi, psi_dot_nbl2_fpsi
 
     integer :: i, j, k, istir
 
     if (proc0) call put_time_stamp(timer_force)
 
-    allocate(p_ext_ene(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=0.d0)
+    allocate(phi_dot_nbl2_fphi(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=0.d0)
+    allocate(psi_dot_nbl2_fpsi(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=0.d0)
     
     if (fix_power) then
       do j = iky_st, iky_en
         do k = ikz_st, ikz_en
           do i = ikx_st, ikx_en
-            jpa  = -kprp2(i, k, j)*psi(i, k, j)
-            p_ext_ene(i, k, j) = - 0.5d0*( &
-                                  -kprp2(i, k, j)*fphi(i, k, j)*conjg(phi(i, k, j)) + conjg(-kprp2(i, k, j)*fphi(i, k, j))*phi(i, k, j) &
-                                  +fpsi(i, k, j)*conjg(jpa) + conjg(fpsi(i, k, j))*jpa &
+            phi_dot_nbl2_fphi(i, k, j) = - 0.5d0*( &
+                                    phi(i, k, j)*conjg(kprp2(i, k, j)*fphi(i, k, j)) &
+                                  + conjg(phi(i, k, j))*kprp2(i, k, j)*fphi(i, k, j) &
+                                ) 
+            psi_dot_nbl2_fpsi(i, k, j) = - 0.5d0*( &
+                                    psi(i, k, j)*conjg(kprp2(i, k, j)*fpsi(i, k, j)) &
+                                  + conjg(psi(i, k, j))*kprp2(i, k, j)*fpsi(i, k, j) &
                                 ) 
             ! The reason for the following treatment for kx == 0 mode is the following. Compile it with LaTeX.
             !-----------------------------------------------------------------------------------------------------------------------------------
@@ -92,22 +96,25 @@ contains
             ! Since FFTW only computes the second and third terms, we need to compensate the first term, which is equivalent to the third term.
             !-----------------------------------------------------------------------------------------------------------------------------------
             if (j /= 1) then
-              p_ext_ene(i, k, j) = 2.0d0*p_ext_ene(i, k, j)
+              phi_dot_nbl2_fphi(i, k, j) = 2.0d0*phi_dot_nbl2_fphi(i, k, j)
+              psi_dot_nbl2_fpsi(i, k, j) = 2.0d0*psi_dot_nbl2_fpsi(i, k, j)
             endif
 
           end do
         end do
       end do
 
-      p_ext_ene_sum = sum(p_ext_ene); call sum_allreduce(p_ext_ene_sum)
+      phi_dot_nbl2_fphi_sum = sum(phi_dot_nbl2_fphi); call sum_allreduce(phi_dot_nbl2_fphi_sum)
+      psi_dot_nbl2_fpsi_sum = sum(psi_dot_nbl2_fpsi); call sum_allreduce(psi_dot_nbl2_fpsi_sum)
 
-      if(abs(p_ext_ene_sum) > 1.0d-6) then
-        fphi = ene_inj*fphi/p_ext_ene_sum
-        fpsi = ene_inj*fpsi/p_ext_ene_sum
+      if(abs(phi_dot_nbl2_fphi_sum) > 1.0d-6 .and. abs(psi_dot_nbl2_fpsi_sum) > 1.0d-6) then
+        fphi = 0.5d0*ene_inj*(1.d0 + res_inj)*fphi/abs(phi_dot_nbl2_fphi_sum)*(-sign(1.d0, phi_dot_nbl2_fphi_sum))
+        fpsi = 0.5d0*ene_inj*(1.d0 - res_inj)*fpsi/abs(psi_dot_nbl2_fpsi_sum)*(-sign(1.d0, psi_dot_nbl2_fpsi_sum))
       endif
     endif
 
-    deallocate(p_ext_ene)
+    deallocate(phi_dot_nbl2_fphi)
+    deallocate(psi_dot_nbl2_fpsi)
 
     if (proc0) call put_time_stamp(timer_force)
 
@@ -180,8 +187,8 @@ contains
       zmpe_dot_nbl2_fzmpe_sum = sum(zmpe_dot_nbl2_fzmpe); call sum_allreduce(zmpe_dot_nbl2_fzmpe_sum)
 
       if(abs(zppe_dot_nbl2_fzppe_sum) > 1.0d-6 .and. abs(zmpe_dot_nbl2_fzmpe_sum) > 1.0d-6) then
-        fzppe = 0.5d0*ene_inj*(1.d0 + xhl_inj)*fzppe/abs(zppe_dot_nbl2_fzppe_sum)
-        fzmpe = 0.5d0*ene_inj*(1.d0 - xhl_inj)*fzmpe/abs(zmpe_dot_nbl2_fzmpe_sum)
+        fzppe = 0.5d0*ene_inj*(1.d0 + xhl_inj)*fzppe/abs(zppe_dot_nbl2_fzppe_sum)*(-sign(1.d0, zppe_dot_nbl2_fzppe_sum))
+        fzmpe = 0.5d0*ene_inj*(1.d0 - xhl_inj)*fzmpe/abs(zmpe_dot_nbl2_fzmpe_sum)*(-sign(1.d0, zmpe_dot_nbl2_fzmpe_sum))
       endif
     endif
 

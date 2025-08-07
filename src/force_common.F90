@@ -15,7 +15,7 @@ module force_common
   logical :: driven
   integer :: nk_stir
   logical :: elsasser, fix_power
-  real(r8):: ene_inj, xhl_inj
+  real(r8):: ene_inj, xhl_inj, res_inj
   real(r8):: kmin(3), kmax(3)
   integer :: nfields
   character(len=100), allocatable :: field_names(:)
@@ -76,7 +76,7 @@ contains
     character(len=100), intent(in) :: filename
     integer  :: ierr
 
-    namelist /force/ driven, elsasser, fix_power, ene_inj, xhl_inj, kmin, kmax, nfields
+    namelist /force/ driven, elsasser, fix_power, ene_inj, xhl_inj, res_inj, kmin, kmax, nfields
     namelist /forced_fields/ field_names, amplitudes, frequencies
 
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
@@ -88,6 +88,7 @@ contains
     fix_power = .false.
     ene_inj = 0.d0
     xhl_inj = 0.d0
+    res_inj = 0.d0
     kmin = (/0.d0, 0.d0, 0.d0/)
     kmax = (/0.d0, 0.d0, 0.d0/)
     nfields = 0

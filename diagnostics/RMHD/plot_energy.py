@@ -64,21 +64,40 @@ legends = [
 plot_1d_many(xs, ys, xlab=tlab, legends=legends, ls=ls, legendloc='upper left', title='', ylab='', term=True, save=outdir + 'energy_all.pdf')
 
 # plot helicity change
-plot_1d(tt, (zppe2_sum - zmpe2_sum)/(zppe2_sum + zmpe2_sum), xlab=tlab, ylab=r'$H := \f{\int\rmd^3\bm{x}[(Z_\+^+)^2 - (Z_\+^-)^2]}{\int\rmd^3\bm{x}[(Z_\+^+)^2 + (Z_\+^-)^2]}$', ymin=-1.0, ymax=1.0, save=outdir+'helicity.pdf')
-
 ys = [ 
-       p_phi_sum + p_psi_sum, p_xhl_sum, 
+       (zppe2_sum - zmpe2_sum)/(zppe2_sum + zmpe2_sum), 
+       (upe2_sum - bpe2_sum)/(upe2_sum + bpe2_sum), 
      ]
 ls = [ 
-       '', '', 
+       '', '' 
      ]
 xs = [
-       tt, tt,
+       tt, tt
      ]
 legends = [ 
-       r'$\int \rmd^3\bm{x}(-\zeta_\+^+\nbl^2 f_{\zeta_\+^+} - \zeta_\+^-\nbl^2 f_{\zeta_\+^-})$', r'$\int \rmd^3\bm{x}(-\zeta_\+^+\nbl^2 f_{\zeta_\+^+} + \zeta_\+^-\nbl^2 f_{\zeta_\+^-})$', 
+       r'$H := \f{\int\rmd^3\bm{x}[(Z_\+^+)^2 - (Z_\+^-)^2]}{\int\rmd^3\bm{x}[(Z_\+^+)^2 + (Z_\+^-)^2]}$', 
+       r'$R := \f{\int\rmd^3\bm{x}[(u_\+)^2 - (b_\+^-)^2]}{\int\rmd^3\bm{x}[(u_\+)^2 + (b_\+)^2]}$', 
      ]
-plot_1d_many(xs, ys, xlab=tlab, legends=legends, ls=ls, legendloc='upper left', title='', ylab='', term=True, ymin=0.0, save=outdir + 'helicity_injection.pdf')
+plot_1d_many(xs, ys, xlab=tlab, legends=legends, ls=ls, legendloc='upper left', title='', ylab='', term=True, save=outdir + 'helicity_resiene.pdf')
+
+
+ys = [ 
+       p_phi_sum + p_psi_sum, 
+       p_xhl_sum, 
+       p_phi_sum - p_psi_sum, 
+     ]
+ls = [ 
+       '', '', '', 
+     ]
+xs = [
+       tt, tt, tt,
+     ]
+legends = [ 
+       r'$\int \rmd^3\bm{x}(-\zeta_\+^+\nbl^2 f_{\zeta_\+^+} - \zeta_\+^-\nbl^2 f_{\zeta_\+^-})$', 
+       r'$\int \rmd^3\bm{x}(-\zeta_\+^+\nbl^2 f_{\zeta_\+^+} + \zeta_\+^-\nbl^2 f_{\zeta_\+^-})$', 
+       r'$\int \rmd^3\bm{x}(-\Phi\nbl^2 f_{\Phi} + \Psi\nbl^2 f_{\Psi})$', 
+     ]
+plot_1d_many(xs, ys, xlab=tlab, legends=legends, ls=ls, legendloc='upper left', title='', ylab='', term=True, ymin=0.0, save=outdir + 'helicity_resiene_injection.pdf')
 
 
 # ascii output
