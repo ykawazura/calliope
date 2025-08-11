@@ -15,7 +15,7 @@ arch = ps-fes
 # 	EMHD           ! electron MHD
 # 	WILL           ! Will's equations (= Strauss's Not-really-high beta RMHD)
 # 	HIGH_BETA_RMHD ! Truely-high beta RMHD
-MODEL = RMHD
+MODEL = HRMHD
 
 # use openmp
 USE_OPENMP = yes

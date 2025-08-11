@@ -73,20 +73,25 @@
 
 !==============================================================================
 &force
+!-=-=-=
+!  CB amplitudes = kz0/kperp0^2
+!  CB energy     = kz0^3/kperp0^2
+!-=-=-=
   driven = T
   elsasser = .true.
   fix_power = .true.
-  ene_inj = 0.05d0
-  xhl_inj = 0.5d0 ! 0 <= xhl_inj <= 1
+  ene_inj = 1.0d2
+  xhl_inj = 0.8d0 ! 0 <= xhl_inj <= 1 ! helicity injection rate. only when elsasser = .true.
+!  res_inj = 0.99d0 ! 0 <= res_inj <= 1 ! residual energy injection rate. only when elsasser = .false.
   kmin = 0.d0  0.d0  1.d0
-  kmax = 2.d0  2.d0  2.d0
+  kmax = 0.1d0  0.1d0  2.d0
   nfields = 2
 /
 &forced_fields
-  field_names = 'zppe'     , 'zmpe'            
+  field_names = 'zppe'      , 'zmpe'            
 !  field_names = 'phi'      , 'psi'            
-  amplitudes  =  0.1       ,  0.1             
-  frequencies = (0.03, -0.2), (0.03, -0.2)
+  amplitudes  =  100.0      ,  100.0             
+  frequencies = (0.9, -0.6), (0.9, -0.6)
 /
 
 !==============================================================================

@@ -1,5 +1,5 @@
 !--------------------------------------------------!
-!                  INPUTS for RMHD                 !
+!                 INPUTS for HRMHD                 !
 !--------------------------------------------------!
 &mpi_settings
   dim_decomp = 2
@@ -10,23 +10,23 @@
 
 !==============================================================================
 &box_parameters
-  lx = 1.0 ! to be multiplied by 2pi
-  ly = 1.0 ! to be multiplied by 2pi
+  lx = 5.0 ! to be multiplied by 2pi
+  ly = 5.0 ! to be multiplied by 2pi
   lz = 1.0 ! to be multiplied by 2pi
 
-  nlx = 64
-  nly = 64
-  nlz = 64
+  nlx = 32
+  nly = 32
+  nlz = 32
 
   pruned = .true.
 /
 
 !==============================================================================
 &time_parameters
-  dt    = 7.0d-3
-  nstep = 20000
-  cfl   = 1.0d0
-  reset_method = 'decrement'  !'multiply'  => multiply by a factor of 0.5
+  dt    = 2.0d-3
+  nstep = 15000 
+  cfl   = 2.0d0
+  reset_method = 'multiply'  !'multiply'  => multiply by a factor of 0.5
                              !'decrement' => decrement the top integer of dt
   increase_dt = 0e+0         !When max dt computed from the cfl condition is 
                              ! larger than this value, set dt = increase_dt.
@@ -47,17 +47,27 @@
 
 !==============================================================================
 &physical_parameters
+  sgm    = 1d+0
+
   ! hyper dissipation ~ nu*kperp^(2*nuexp)
-  nupe_x      = 1d+3  ! perp viscosity   for phi
-  nupe_x_exp  = 4
-  etape_x     = 1d+3  ! perp resistivity for psi
-  etape_x_exp = 4
+  nupe_x      = 1d+2  ! perp viscosity   for phi
+  nupe_x_exp  = 4                               
+  etape_x     = 5d+2  ! perp resistivity for psi
+  etape_x_exp = 4                               
+  nupa_x      = 1d+2  ! perp viscosity   for upa
+  nupa_x_exp  = 4                               
+  etapa_x     = 5d+2  ! perp resistivity for bpa
+  etapa_x_exp = 4
 
   ! hyper dissipation ~ nu*kz^(2*nuexp)
-  nupe_z      = 1d+1  ! para viscosity   for phi
-  nupe_z_exp  = 4
-  etape_z     = 1d+1  ! para resistivity for psi
-  etape_z_exp = 4
+  nupe_z      = 2d+0  ! para viscosity   for phi
+  nupe_z_exp  = 4                              
+  etape_z     = 2d+0  ! para resistivity for psi
+  etape_z_exp = 4                              
+  nupa_z      = 2d+0  ! para viscosity   for upa
+  nupa_z_exp  = 4                              
+  etapa_z     = 2d+0  ! para resistivity for bpa
+  etapa_z_exp = 4
 /
 
 !==============================================================================
@@ -73,21 +83,25 @@
 
 !==============================================================================
 &force
+!-=-=-=
+!  CB amplitudes = kz0/kperp0^2
+!  CB energy     = kz0^3/kperp0^2
+!-=-=-=
   driven = T
-  elsasser = .false.
+  elsasser = .true.
   fix_power = .true.
-  ene_inj = 0.05d0
-!  xhl_inj = 0.5d0 ! 0 <= xhl_inj <= 1 ! helicity injection rate. only when elsasser = .true.
-  res_inj = 0.99d0 ! 0 <= res_inj <= 1 ! residual energy injection rate. only when elsasser = .false.
+  ene_inj = 2.5d1
+  xhl_inj = 0.8d0 ! 0 <= xhl_inj <= 1 ! helicity injection rate. only when elsasser = .true.
+!  res_inj = 0.99d0 ! 0 <= res_inj <= 1 ! residual energy injection rate. only when elsasser = .false.
   kmin = 0.d0  0.d0  1.d0
-  kmax = 2.d0  2.d0  2.d0
+  kmax = 0.2d0  0.2d0  2.d0
   nfields = 2
 /
 &forced_fields
-!  field_names = 'zppe'     , 'zmpe'            
-  field_names = 'phi'      , 'psi'            
-  amplitudes  =  0.1       ,  0.1             
-  frequencies = (0.03, -0.2), (0.03, -0.2)
+  field_names = 'zppe'      , 'zmpe'            
+!  field_names = 'phi'      , 'psi'            
+  amplitudes  =  25.0       ,  25.0             
+  frequencies = (0.9, -0.6), (0.9, -0.6)
 /
 
 !==============================================================================
@@ -102,9 +116,9 @@
 
 !==============================================================================
 &diagnostics_parameters
-  write_intvl       = 0.02d0  ! output every this value.
+  write_intvl       = 0.1d0  ! output every this value.
   write_intvl_2D    = 1.0d0  ! output every this value.
-  write_intvl_3D    = 1.0d0  ! output every this value.
+  write_intvl_3D    = 0.0d0  ! output every this value.
 !  write_intvl_kpar = 0.2d0  ! output every this value.
 !  write_intvl_SF2  = 0.2d0  ! output every this value.
   SF2_nsample = 100000 ! number of sample points for each separation
@@ -112,6 +126,7 @@
 
 !==============================================================================
 &restart_parameters
-  save_restart_intvl = 1.0d0      ! save every this value.
+  save_restart_intvl = 0.0d0      ! save every this value.
   restart_dir = './restart/'
 /
+
