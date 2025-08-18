@@ -52,7 +52,7 @@ module advance
   complex(r8), allocatable, dimension(:,:,:)   :: fupa_old2
   complex(r8), allocatable, dimension(:,:,:)   :: fbpa_old2
 
-  integer :: cfl_unit
+  integer :: cfl_unit, rms_unit
 
   ! Backward FFT variables
   integer, parameter :: nbtran = 12
@@ -91,6 +91,7 @@ contains
     use force, only: fzppe, fzmpe, fzppa, fzmpa
     use advance_common, only: eSSPIFRK1, eSSPIFRK2, eSSPIFRK3
     use advance_common, only: gear1, gear2, gear3
+    use diagnostics_common, only: series_output
     use params, only: time_step_scheme
     implicit none
     real(r8) :: imp_terms_tintg0(nfields), imp_terms_tintg1(nfields)
@@ -578,6 +579,8 @@ contains
 
     tt = tt  + dt
 
+    if(series_output) call output_series_modes
+
     if (proc0) call put_time_stamp(timer_advance)
   end subroutine solve
 
@@ -619,6 +622,7 @@ contains
     endif
 
     if(proc0) call open_output_file (cfl_unit, 'cfl.dat')
+    if(proc0) call open_output_file (rms_unit, 'rms.dat')
 
   end subroutine init_work_fields
 
@@ -640,7 +644,7 @@ contains
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use grid, only: nl_local_tot, nk_local_tot
     use params, only: zi, sgm
-    use mp, only: proc0, max_allreduce
+    use mp, only: proc0, max_allreduce, sum_allreduce
     use time, only: cfl, dt, tt, reset_method, increase_dt
     use time_stamp, only: put_time_stamp, timer_nonlinear_terms, timer_fft
     use advance_common, only: dt_adjust_while_running 
@@ -654,6 +658,7 @@ contains
     integer :: i, j, k
     real   (r8), allocatable :: v_KAW(:,:,:)
     real   (r8) :: max_vel_x, max_vel_y, max_vel_KAW, dt_cfl, dt_digit
+    real   (r8) :: ux_rms, uy_rms, bx_rms, by_rms
 
     if (proc0) call put_time_stamp(timer_nonlinear_terms)
 
@@ -697,6 +702,23 @@ contains
       call p3dfft_btran_c2r(w(:,:,:,i), w_r(:,:,:,i), 'tff')
     enddo
     if (proc0) call put_time_stamp(timer_fft)
+
+
+    ! write rms
+    ux_rms = sum(w_r(:,:,:,idphi_dy)**2); uy_rms = sum(w_r(:,:,:,idphi_dx)**2)
+    bx_rms = sum(w_r(:,:,:,idpsi_dy)**2); by_rms = sum(w_r(:,:,:,idpsi_dx)**2)
+
+    call sum_allreduce(ux_rms); call sum_allreduce(uy_rms)
+    call sum_allreduce(bx_rms); call sum_allreduce(by_rms)
+
+    ux_rms = sqrt(ux_rms/nlx/nly/nlz); uy_rms = sqrt(uy_rms/nlx/nly/nlz)
+    bx_rms = sqrt(bx_rms/nlx/nly/nlz); by_rms = sqrt(by_rms/nlx/nly/nlz)
+
+    if(proc0) then
+      write (unit=rms_unit, fmt="(100es30.21)") tt, ux_rms, uy_rms, bx_rms, by_rms
+      call flush(rms_unit) 
+    endif
+
 
     ! (get max_vel for dt reset)
     if(dt_reset) then
@@ -845,6 +867,69 @@ contains
 
     imp_terms_tintg = -(coeff_x*(kprp2/kprp2_max)**nexp_x + coeff_z*(kz2/kz2_max)**nexp_z)*t
   end subroutine get_imp_terms_tintg
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    15 Jul 2021
+!! @brief   Output series modes
+!-----------------------------------------------!
+  subroutine output_series_modes
+    use fields, only: phi, psi, upa, bpa
+    use grid, only: kx, ky, kz
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use mp, only: proc0, sum_reduce
+    use time, only: tt
+    use diagnostics_common, only: n_series_modes, series_modes
+    use diagnostics_common, only: series_modes_unit
+    implicit none
+    complex(r8), dimension(n_series_modes) :: phi_modes, psi_modes, upa_modes, bpa_modes
+    integer :: n, i, j, k
+
+    phi_modes(:) = 0.d0
+    psi_modes(:) = 0.d0
+    upa_modes(:) = 0.d0
+    bpa_modes(:) = 0.d0
+
+    do n = 1, n_series_modes
+      i = series_modes(n, 1)
+      j = series_modes(n, 2)
+      k = series_modes(n, 3)
+
+      if(       (i >= ikx_st .and. i <= ikx_en) &
+          .and. (j >= iky_st .and. j <= iky_en) &
+          .and. (k >= ikz_st .and. k <= ikz_en) &
+        ) then
+
+        phi_modes(n) = phi(i, k, j)
+        psi_modes(n) = psi(i, k, j)
+        upa_modes(n) = upa(i, k, j)
+        bpa_modes(n) = bpa(i, k, j)
+
+      endif
+    enddo
+
+    call sum_reduce(phi_modes, 0)
+    call sum_reduce(psi_modes, 0)
+    call sum_reduce(upa_modes, 0)
+    call sum_reduce(bpa_modes, 0)
+
+    do n = 1, n_series_modes
+      if(proc0) then
+        i = series_modes(n, 1)
+        j = series_modes(n, 2)
+        k = series_modes(n, 3)
+999 format(es30.21, A6, 5es30.21e3)
+        write (unit=series_modes_unit, fmt=999) tt, 'phi', kx(i), ky(j), kz(k), phi_modes(n)
+        write (unit=series_modes_unit, fmt=999) tt, 'psi', kx(i), ky(j), kz(k), psi_modes(n)
+        write (unit=series_modes_unit, fmt=999) tt, 'upa', kx(i), ky(j), kz(k), upa_modes(n)
+        write (unit=series_modes_unit, fmt=999) tt, 'bpa', kx(i), ky(j), kz(k), bpa_modes(n)
+        call flush(series_modes_unit) 
+
+      endif
+    enddo
+
+  end subroutine output_series_modes
 
 
 !-----------------------------------------------!

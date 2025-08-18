@@ -29,12 +29,14 @@ contains
     use params, only: inputfile
     use diagnostics_common, only: read_parameters
     use diagnostics_common, only: init_polar_spectrum_2d
+    use diagnostics_common, only: init_series_modes
     use io, only: init_io 
     implicit none
 
     call read_parameters(inputfile)
 
     call init_polar_spectrum_2d
+    call init_series_modes
     call init_io(nkpolar, kpbin)
   end subroutine init_diagnostics
 
