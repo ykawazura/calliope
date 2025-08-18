@@ -882,14 +882,37 @@ contains
     use time, only: tt
     use diagnostics_common, only: n_series_modes, series_modes
     use diagnostics_common, only: series_modes_unit
+    use diagnostics, only: split_KAW_ICW
     implicit none
     complex(r8), dimension(n_series_modes) :: phi_modes, psi_modes, upa_modes, bpa_modes
+    complex(r8), dimension(n_series_modes) :: phi_KAW_modes, psi_KAW_modes, upa_KAW_modes, bpa_KAW_modes
+    complex(r8), dimension(n_series_modes) :: phi_ICW_modes, psi_ICW_modes, upa_ICW_modes, bpa_ICW_modes
+    complex(r8), allocatable, dimension(:,:,:) :: src_c
+    complex(r8), allocatable, dimension(:,:,:) :: phi_KAW, psi_KAW, upa_KAW, bpa_KAW
+    complex(r8), allocatable, dimension(:,:,:) :: phi_ICW, psi_ICW, upa_ICW, bpa_ICW
     integer :: n, i, j, k
+
+    allocate(src_c(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
+    allocate(phi_KAW, source=src_c)
+    allocate(psi_KAW, source=src_c)
+    allocate(upa_KAW, source=src_c)
+    allocate(bpa_KAW, source=src_c)
+    allocate(phi_ICW, source=src_c)
+    allocate(psi_ICW, source=src_c)
+    allocate(upa_ICW, source=src_c)
+    allocate(bpa_ICW, source=src_c)
+    deallocate(src_c)
 
     phi_modes(:) = 0.d0
     psi_modes(:) = 0.d0
     upa_modes(:) = 0.d0
     bpa_modes(:) = 0.d0
+
+    call split_KAW_ICW( &
+                        phi    , psi    , upa    , bpa    , &
+                        phi_KAW, psi_KAW, upa_KAW, bpa_KAW, &
+                        phi_ICW, psi_ICW, upa_ICW, bpa_ICW  &
+                      )
 
     do n = 1, n_series_modes
       i = series_modes(n, 1)
@@ -901,33 +924,73 @@ contains
           .and. (k >= ikz_st .and. k <= ikz_en) &
         ) then
 
-        phi_modes(n) = phi(i, k, j)
-        psi_modes(n) = psi(i, k, j)
-        upa_modes(n) = upa(i, k, j)
-        bpa_modes(n) = bpa(i, k, j)
+        phi_modes    (n) = phi    (i, k, j)
+        psi_modes    (n) = psi    (i, k, j)
+        upa_modes    (n) = upa    (i, k, j)
+        bpa_modes    (n) = bpa    (i, k, j)
+
+        phi_KAW_modes(n) = phi_KAW(i, k, j)
+        psi_KAW_modes(n) = psi_KAW(i, k, j)
+        upa_KAW_modes(n) = upa_KAW(i, k, j)
+        bpa_KAW_modes(n) = bpa_KAW(i, k, j)
+
+        phi_ICW_modes(n) = phi_ICW(i, k, j)
+        psi_ICW_modes(n) = psi_ICW(i, k, j)
+        upa_ICW_modes(n) = upa_ICW(i, k, j)
+        bpa_ICW_modes(n) = bpa_ICW(i, k, j)
 
       endif
     enddo
 
-    call sum_reduce(phi_modes, 0)
-    call sum_reduce(psi_modes, 0)
-    call sum_reduce(upa_modes, 0)
-    call sum_reduce(bpa_modes, 0)
+    call sum_reduce(phi_modes    , 0)
+    call sum_reduce(psi_modes    , 0)
+    call sum_reduce(upa_modes    , 0)
+    call sum_reduce(bpa_modes    , 0)
+
+    call sum_reduce(phi_KAW_modes, 0)
+    call sum_reduce(psi_KAW_modes, 0)
+    call sum_reduce(upa_KAW_modes, 0)
+    call sum_reduce(bpa_KAW_modes, 0)
+
+    call sum_reduce(phi_ICW_modes, 0)
+    call sum_reduce(psi_ICW_modes, 0)
+    call sum_reduce(upa_ICW_modes, 0)
+    call sum_reduce(bpa_ICW_modes, 0)
 
     do n = 1, n_series_modes
       if(proc0) then
         i = series_modes(n, 1)
         j = series_modes(n, 2)
         k = series_modes(n, 3)
-999 format(es30.21, A6, 5es30.21e3)
-        write (unit=series_modes_unit, fmt=999) tt, 'phi', kx(i), ky(j), kz(k), phi_modes(n)
-        write (unit=series_modes_unit, fmt=999) tt, 'psi', kx(i), ky(j), kz(k), psi_modes(n)
-        write (unit=series_modes_unit, fmt=999) tt, 'upa', kx(i), ky(j), kz(k), upa_modes(n)
-        write (unit=series_modes_unit, fmt=999) tt, 'bpa', kx(i), ky(j), kz(k), bpa_modes(n)
+999 format(es30.21, A10, 5es30.21e3)
+        write (unit=series_modes_unit, fmt=999) tt, 'phi'    , kx(i), ky(j), kz(k), phi_modes(n)
+        write (unit=series_modes_unit, fmt=999) tt, 'psi'    , kx(i), ky(j), kz(k), psi_modes(n)
+        write (unit=series_modes_unit, fmt=999) tt, 'upa'    , kx(i), ky(j), kz(k), upa_modes(n)
+        write (unit=series_modes_unit, fmt=999) tt, 'bpa'    , kx(i), ky(j), kz(k), bpa_modes(n)
+
+        write (unit=series_modes_unit, fmt=999) tt, 'phi_KAW', kx(i), ky(j), kz(k), phi_KAW_modes(n)
+        write (unit=series_modes_unit, fmt=999) tt, 'psi_KAW', kx(i), ky(j), kz(k), psi_KAW_modes(n)
+        write (unit=series_modes_unit, fmt=999) tt, 'upa_KAW', kx(i), ky(j), kz(k), upa_KAW_modes(n)
+        write (unit=series_modes_unit, fmt=999) tt, 'bpa_KAW', kx(i), ky(j), kz(k), bpa_KAW_modes(n)
+
+        write (unit=series_modes_unit, fmt=999) tt, 'phi_ICW', kx(i), ky(j), kz(k), phi_ICW_modes(n)
+        write (unit=series_modes_unit, fmt=999) tt, 'psi_ICW', kx(i), ky(j), kz(k), psi_ICW_modes(n)
+        write (unit=series_modes_unit, fmt=999) tt, 'upa_ICW', kx(i), ky(j), kz(k), upa_ICW_modes(n)
+        write (unit=series_modes_unit, fmt=999) tt, 'bpa_ICW', kx(i), ky(j), kz(k), bpa_ICW_modes(n)
+
         call flush(series_modes_unit) 
 
       endif
     enddo
+
+    deallocate(phi_KAW)
+    deallocate(psi_KAW)
+    deallocate(upa_KAW)
+    deallocate(bpa_KAW)
+    deallocate(phi_ICW)
+    deallocate(psi_ICW)
+    deallocate(upa_ICW)
+    deallocate(bpa_ICW)
 
   end subroutine output_series_modes
 

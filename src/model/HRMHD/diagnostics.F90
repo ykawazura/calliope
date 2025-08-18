@@ -15,6 +15,7 @@ module diagnostics
   public :: init_diagnostics, finish_diagnostics
   public :: loop_diagnostics, loop_diagnostics_2D, loop_diagnostics_kpar, loop_diagnostics_SF2
   public :: loop_diagnostics_nltrans
+  public :: split_KAW_ICW
 
   private
 contains

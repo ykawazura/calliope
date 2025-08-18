@@ -134,3 +134,67 @@ ncfile.close()
 tlab  = r'(v_\mathrm{A}/L_\|) t'
 zlab  = r'z/L_\|'
 kzlab = r'k_z L_\|'
+
+# Load series modes
+import os
+
+label_series = {'ux': r'$u_x$', 'uy': r'$u_y$', 'uz': r'$u_z$', 'bx': r'$B_x$', 'by': r'$B_y$', 'bz': r'$B_z$'}
+
+filename = input_dir+runname+'.modes.out'+restart_num
+if os.path.isfile(filename):
+    try:
+        data = np.loadtxt(filename, usecols=[0,2,3,4,5,6])
+        name = np.loadtxt(filename, usecols=[1], dtype = "unicode")
+        print (name)
+
+        fldnames_unique = np.unique(name)
+        nfld = fldnames_unique.size
+
+        tt_unique = np.unique(data.T[0])
+        ntt = tt_unique.size
+
+        modes_unique = np.unique((data.T[1:4]).T, axis=0)
+        nmodes = modes_unique.shape[0]
+
+        print ('loading series modes output...')
+        print ('names = \n', fldnames_unique)
+        print ('modes = \n', modes_unique)
+
+        tt_ = {}
+        f_  = {}
+        for n in fldnames_unique:
+            tt_[n] = np.zeros([ntt, nmodes])
+            f_ [n] = np.zeros([ntt, nmodes], dtype=complex)
+
+        for n, d in zip(name, data):
+            time = d[0]
+            mode = d[1:4]
+            time_idx = np.argwhere(tt_unique == time)[0][0]
+            mode_idx = np.argwhere([np.array_equal(x, mode) for x in modes_unique])[0][0]
+
+            tt_[n][time_idx, mode_idx] = time
+            f_ [n][time_idx, mode_idx] = d[4] + 1j*d[5]
+
+        series_time  = tt_unique
+        series_names = fldnames_unique
+        series_modes = modes_unique
+        series_data  = f_
+    except:
+        pass
+# Load rms
+filename = input_dir+'rms.dat'+restart_num
+if os.path.isfile(filename):
+  data = np.loadtxt(filename).T
+
+  # Reduce multiple points at the same time because of multistep update (RK or Gear)
+  _, indices = np.unique(data[0], return_index=True)
+  data = np.asarray([data.T[i] for i in indices]).T
+  tt_rms, ux_rms, uy_rms, bx_rms, by_rms = data
+
+  # Pick up where tt_rms = tt
+  indices = [np.abs(tt_rms - t).argmin() for t in tt]
+  tt_rms, ux_rms, uy_rms, bx_rms, by_rms = np.asarray([data.T[i] for i in indices]).T
+else:
+  tt_rms, ux_rms, uy_rms, bx_rms, by_rms = [np.array([0])] * 5
+
+
