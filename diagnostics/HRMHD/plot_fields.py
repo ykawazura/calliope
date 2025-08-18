@@ -61,14 +61,14 @@ upe_r_x0 = np.sqrt(ux_r_x0**2 + uy_r_x0**2)
 bpe_r_z0 = np.sqrt(bx_r_z0**2 + by_r_z0**2)
 bpe_r_y0 = np.sqrt(bx_r_y0**2 + by_r_y0**2)
 bpe_r_x0 = np.sqrt(bx_r_x0**2 + by_r_x0**2)
-plot_3d(phi_r_z0[final_fld_idx,:,:], phi_r_y0[final_fld_idx,:,:], phi_r_x0[final_fld_idx,:,:], xx, yy, zz, xlab=r'$x/\rho_\mathrm{H}$', ylab=r'$y/\rho_\mathrm{H}$', zlab='$'+zlab+'$', title=r'$\Phi (t = %.2E)$' % tt_fld[final_fld_idx], cmp='diverging', save=outdir+'phi.pdf')
-plot_3d(omg_r_z0[final_fld_idx,:,:], omg_r_y0[final_fld_idx,:,:], omg_r_x0[final_fld_idx,:,:], xx, yy, zz, xlab=r'$x/\rho_\mathrm{H}$', ylab=r'$y/\rho_\mathrm{H}$', zlab='$'+zlab+'$', title=r'$\nbl_\+^2\Phi (t = %.2E)$' % tt_fld[final_fld_idx], cmp='diverging', save=outdir+'omg.pdf')
-plot_3d(psi_r_z0[final_fld_idx,:,:], psi_r_y0[final_fld_idx,:,:], psi_r_x0[final_fld_idx,:,:], xx, yy, zz, xlab=r'$x/\rho_\mathrm{H}$', ylab=r'$y/\rho_\mathrm{H}$', zlab='$'+zlab+'$', title=r'$\Psi (t = %.2E)$' % tt_fld[final_fld_idx], cmp='diverging', save=outdir+'psi.pdf')
-plot_3d(jpa_r_z0[final_fld_idx,:,:], jpa_r_y0[final_fld_idx,:,:], jpa_r_x0[final_fld_idx,:,:], xx, yy, zz, xlab=r'$x/\rho_\mathrm{H}$', ylab=r'$y/\rho_\mathrm{H}$', zlab='$'+zlab+'$', title=r'$\nbl_\+^2\Psi (t = %.2E)$' % tt_fld[final_fld_idx], cmp='diverging', save=outdir+'jpa.pdf')
-plot_3d(upa_r_z0[final_fld_idx,:,:], upa_r_y0[final_fld_idx,:,:], upa_r_x0[final_fld_idx,:,:], xx, yy, zz, xlab=r'$x/\rho_\mathrm{H}$', ylab=r'$y/\rho_\mathrm{H}$', zlab='$'+zlab+'$', title=r'$u_\| (t = %.2E)$' % tt_fld[final_fld_idx], cmp='diverging', save=outdir+'upa.pdf')
-plot_3d(bpa_r_z0[final_fld_idx,:,:], bpa_r_y0[final_fld_idx,:,:], bpa_r_x0[final_fld_idx,:,:], xx, yy, zz, xlab=r'$x/\rho_\mathrm{H}$', ylab=r'$y/\rho_\mathrm{H}$', zlab='$'+zlab+'$', title=r'$\delta B_\| (t = %.2E)$' % tt_fld[final_fld_idx], cmp='diverging', save=outdir+'bpa.pdf')
-plot_3d(upe_r_z0[final_fld_idx,:,:], upe_r_y0[final_fld_idx,:,:], upe_r_x0[final_fld_idx,:,:], xx, yy, zz, xlab=r'$x/\rho_\mathrm{H}$', ylab=r'$y/\rho_\mathrm{H}$', zlab='$'+zlab+'$', title=r'$|\bm{u}_\+| (t = %.2E)$' % tt_fld[final_fld_idx], cmp='sequential', save=outdir+'upe.pdf')
-plot_3d(bpe_r_z0[final_fld_idx,:,:], bpe_r_y0[final_fld_idx,:,:], bpe_r_x0[final_fld_idx,:,:], xx, yy, zz, xlab=r'$x/\rho_\mathrm{H}$', ylab=r'$y/\rho_\mathrm{H}$', zlab='$'+zlab+'$', title=r'$|\delta\bm{B}_\+| (t = %.2E)$' % tt_fld[final_fld_idx], cmp='sequential', save=outdir+'bpe.pdf')
+plot_3d(phi_r_z0[final_fld_idx,:,:], phi_r_y0[final_fld_idx,:,:], phi_r_x0[final_fld_idx,:,:], xx, yy, zz, xlab=r'$'+xlab+'$', ylab=r'$'+ylab+'$', zlab='$'+zlab+'$', title=r'$\Phi (t = %.2E)$' % tt_fld[final_fld_idx], cmp='diverging', save=outdir+'phi.pdf')
+plot_3d(omg_r_z0[final_fld_idx,:,:], omg_r_y0[final_fld_idx,:,:], omg_r_x0[final_fld_idx,:,:], xx, yy, zz, xlab=r'$'+xlab+'$', ylab=r'$'+ylab+'$', zlab='$'+zlab+'$', title=r'$\nbl_\+^2\Phi (t = %.2E)$' % tt_fld[final_fld_idx], cmp='diverging', save=outdir+'omg.pdf')
+plot_3d(psi_r_z0[final_fld_idx,:,:], psi_r_y0[final_fld_idx,:,:], psi_r_x0[final_fld_idx,:,:], xx, yy, zz, xlab=r'$'+xlab+'$', ylab=r'$'+ylab+'$', zlab='$'+zlab+'$', title=r'$\Psi (t = %.2E)$' % tt_fld[final_fld_idx], cmp='diverging', save=outdir+'psi.pdf')
+plot_3d(jpa_r_z0[final_fld_idx,:,:], jpa_r_y0[final_fld_idx,:,:], jpa_r_x0[final_fld_idx,:,:], xx, yy, zz, xlab=r'$'+xlab+'$', ylab=r'$'+ylab+'$', zlab='$'+zlab+'$', title=r'$\nbl_\+^2\Psi (t = %.2E)$' % tt_fld[final_fld_idx], cmp='diverging', save=outdir+'jpa.pdf')
+plot_3d(upa_r_z0[final_fld_idx,:,:], upa_r_y0[final_fld_idx,:,:], upa_r_x0[final_fld_idx,:,:], xx, yy, zz, xlab=r'$'+xlab+'$', ylab=r'$'+ylab+'$', zlab='$'+zlab+'$', title=r'$u_\| (t = %.2E)$' % tt_fld[final_fld_idx], cmp='diverging', save=outdir+'upa.pdf')
+plot_3d(bpa_r_z0[final_fld_idx,:,:], bpa_r_y0[final_fld_idx,:,:], bpa_r_x0[final_fld_idx,:,:], xx, yy, zz, xlab=r'$'+xlab+'$', ylab=r'$'+ylab+'$', zlab='$'+zlab+'$', title=r'$\delta B_\| (t = %.2E)$' % tt_fld[final_fld_idx], cmp='diverging', save=outdir+'bpa.pdf')
+plot_3d(upe_r_z0[final_fld_idx,:,:], upe_r_y0[final_fld_idx,:,:], upe_r_x0[final_fld_idx,:,:], xx, yy, zz, xlab=r'$'+xlab+'$', ylab=r'$'+ylab+'$', zlab='$'+zlab+'$', title=r'$|\bm{u}_\+| (t = %.2E)$' % tt_fld[final_fld_idx], cmp='sequential', save=outdir+'upe.pdf')
+plot_3d(bpe_r_z0[final_fld_idx,:,:], bpe_r_y0[final_fld_idx,:,:], bpe_r_x0[final_fld_idx,:,:], xx, yy, zz, xlab=r'$'+xlab+'$', ylab=r'$'+ylab+'$', zlab='$'+zlab+'$', title=r'$|\delta\bm{B}_\+| (t = %.2E)$' % tt_fld[final_fld_idx], cmp='sequential', save=outdir+'bpe.pdf')
 
 
 #--------------------------------------------------------#
@@ -107,12 +107,12 @@ if ismovie:
   bpe_r_y0 = np.sqrt(bx_r_y0**2 + by_r_y0**2)
   bpe_r_x0 = np.sqrt(bx_r_x0**2 + by_r_x0**2)
   #^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^#
-  movie_3d(tt_fld, phi_r_z0, phi_r_y0, phi_r_x0, xx_fld, yy_fld, zz_fld, xlab=r'$x/\rho_\mathrm{H}$', ylab=r'$y/\rho_\mathrm{H}$', zlab='$'+zlab+'$', title=r'$\Phi$', cmp='diverging', save=outdir+'phi_anim.gif')
-  movie_3d(tt_fld, omg_r_z0, omg_r_y0, omg_r_x0, xx_fld, yy_fld, zz_fld, xlab=r'$x/\rho_\mathrm{H}$', ylab=r'$y/\rho_\mathrm{H}$', zlab='$'+zlab+'$', title=r'$\nbl_\+^2\Phi$', cmp='diverging', save=outdir+'omg_anim.gif')
-  movie_3d(tt_fld, psi_r_z0, psi_r_y0, psi_r_x0, xx_fld, yy_fld, zz_fld, xlab=r'$x/\rho_\mathrm{H}$', ylab=r'$y/\rho_\mathrm{H}$', zlab='$'+zlab+'$', title=r'$\Psi$', cmp='diverging', save=outdir+'psi_anim.gif')
-  movie_3d(tt_fld, jpa_r_z0, jpa_r_y0, jpa_r_x0, xx_fld, yy_fld, zz_fld, xlab=r'$x/\rho_\mathrm{H}$', ylab=r'$y/\rho_\mathrm{H}$', zlab='$'+zlab+'$', title=r'$\nbl_\+^2\Psi$', cmp='diverging', save=outdir+'jpa_anim.gif')
-  movie_3d(tt_fld, upe_r_z0, upe_r_y0, upe_r_x0, xx_fld, yy_fld, zz_fld, xlab=r'$x/\rho_\mathrm{H}$', ylab=r'$y/\rho_\mathrm{H}$', zlab='$'+zlab+'$', title=r'$|\bm{u}_\+|$', cmp='sequential', save=outdir+'upe_anim.gif')
-  movie_3d(tt_fld, bpe_r_z0, bpe_r_y0, bpe_r_x0, xx_fld, yy_fld, zz_fld, xlab=r'$x/\rho_\mathrm{H}$', ylab=r'$y/\rho_\mathrm{H}$', zlab='$'+zlab+'$', title=r'$|\delta\bm{B}_\+|$', cmp='sequential', save=outdir+'bpe_anim.gif')
+  movie_3d(tt_fld, phi_r_z0, phi_r_y0, phi_r_x0, xx_fld, yy_fld, zz_fld, xlab=r'$'+xlab+'$', ylab=r'$'+ylab+'$', zlab='$'+zlab+'$', title=r'$\Phi$', cmp='diverging', save=outdir+'phi_anim.gif')
+  movie_3d(tt_fld, omg_r_z0, omg_r_y0, omg_r_x0, xx_fld, yy_fld, zz_fld, xlab=r'$'+xlab+'$', ylab=r'$'+ylab+'$', zlab='$'+zlab+'$', title=r'$\nbl_\+^2\Phi$', cmp='diverging', save=outdir+'omg_anim.gif')
+  movie_3d(tt_fld, psi_r_z0, psi_r_y0, psi_r_x0, xx_fld, yy_fld, zz_fld, xlab=r'$'+xlab+'$', ylab=r'$'+ylab+'$', zlab='$'+zlab+'$', title=r'$\Psi$', cmp='diverging', save=outdir+'psi_anim.gif')
+  movie_3d(tt_fld, jpa_r_z0, jpa_r_y0, jpa_r_x0, xx_fld, yy_fld, zz_fld, xlab=r'$'+xlab+'$', ylab=r'$'+ylab+'$', zlab='$'+zlab+'$', title=r'$\nbl_\+^2\Psi$', cmp='diverging', save=outdir+'jpa_anim.gif')
+  movie_3d(tt_fld, upe_r_z0, upe_r_y0, upe_r_x0, xx_fld, yy_fld, zz_fld, xlab=r'$'+xlab+'$', ylab=r'$'+ylab+'$', zlab='$'+zlab+'$', title=r'$|\bm{u}_\+|$', cmp='sequential', save=outdir+'upe_anim.gif')
+  movie_3d(tt_fld, bpe_r_z0, bpe_r_y0, bpe_r_x0, xx_fld, yy_fld, zz_fld, xlab=r'$'+xlab+'$', ylab=r'$'+ylab+'$', zlab='$'+zlab+'$', title=r'$|\delta\bm{B}_\+|$', cmp='sequential', save=outdir+'bpe_anim.gif')
 
 #------------------#
 #   output data    #

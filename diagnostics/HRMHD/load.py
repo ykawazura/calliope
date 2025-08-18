@@ -27,6 +27,7 @@ ignored_points_fld = [0]
 ncfile = netcdf.netcdf_file(input_dir+runname+'.out.nc'+restart_num, 'r')   
 
 # Load parameters
+rho = np.copy(ncfile.variables['rho'].data)
 sgm = np.copy(ncfile.variables['sgm'].data)
 
 # Load coordinate
@@ -132,7 +133,10 @@ bpa2_ICW_bin    = np.copy(ncfile.variables['bpa2_ICW_bin'   ][:]); bpa2_ICW_bin 
 ncfile.close()
 
 tlab  = r'(v_\mathrm{A}/L_\|) t'
+xlab  = r'x/L_\+'
+ylab  = r'y/L_\+'
 zlab  = r'z/L_\|'
+kplab = r'k_\+ L_\+'
 kzlab = r'k_z L_\|'
 
 # Load series modes

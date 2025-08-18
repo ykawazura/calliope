@@ -190,7 +190,7 @@ def plot_log1d(x, y, xlab, title='', ylab='', ls='', term=True, save=False):
   return fig
 
 
-def plot_log1d_many(xs, ys, xlab, legends, ls, xmin='', xmax='', ymin='', ymax='', legendloc='upper left', title='', ylab='', term=True, save=False):
+def plot_log1d_many(xs, ys, xlab, legends, ls, xmin='', xmax='', ymin='', ymax='', legendloc='upper left', title='', ylab='', vline_at=None, term=True, save=False):
   fig = plt.figure(figsize=(9, 8))
 
   for i, y in enumerate(ys):
@@ -210,6 +210,8 @@ def plot_log1d_many(xs, ys, xlab, legends, ls, xmin='', xmax='', ymin='', ymax='
     plt.ylabel(ylab)
   if len(title) > 0:
     plt.title(title)
+  if vline_at != None:
+    plt.axvline(x=vline_at, color='k', linestyle='-', lw=1)
 
   # force exponential yticks
   ax = plt.gca()

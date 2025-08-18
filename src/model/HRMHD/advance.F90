@@ -643,7 +643,7 @@ contains
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use grid, only: nl_local_tot, nk_local_tot
-    use params, only: zi, sgm
+    use params, only: zi, rho, sgm
     use mp, only: proc0, max_allreduce, sum_allreduce
     use time, only: cfl, dt, tt, reset_method, increase_dt
     use time_stamp, only: put_time_stamp, timer_nonlinear_terms, timer_fft
@@ -685,8 +685,8 @@ contains
           w(i,k,j,idbpa_dy) = zi*ky(j)                  *bpa(i, k, j)
 
           v_KAW(i,k,j) = sqrt(0.5d0*( &
-                                    1.d0 + sgm**2 + kprp2(i,k,j) &
-                                  + sqrt( (kprp2(i,k,j) + (1.d0 + sgm)**2)*(kprp2(i,k,j) + (1.d0 - sgm)**2) ) &
+                                    1.d0 + sgm**2 + rho**2*kprp2(i,k,j) &
+                                  + sqrt( (rho**2*kprp2(i,k,j) + (1.d0 + sgm)**2)*(rho**2*kprp2(i,k,j) + (1.d0 - sgm)**2) ) &
                          ))
         enddo
       enddo
@@ -794,16 +794,16 @@ contains
                                  + w_r(j,k,i,idphi_dy)*w_r(j,k,i,idomg_dx) &
                                  + w_r(j,k,i,idpsi_dx)*w_r(j,k,i,idjpa_dy) &
                                  - w_r(j,k,i,idpsi_dy)*w_r(j,k,i,idjpa_dx)
-          nonlin_r(j,k,i,ipsi) =   w_r(j,k,i,idpsi_dx)*(w_r(j,k,i,idphi_dy) + w_r(j,k,i,idbpa_dy))&
-                                 - w_r(j,k,i,idpsi_dy)*(w_r(j,k,i,idphi_dx) + w_r(j,k,i,idbpa_dx))
+          nonlin_r(j,k,i,ipsi) =   w_r(j,k,i,idpsi_dx)*(w_r(j,k,i,idphi_dy) + rho*w_r(j,k,i,idbpa_dy))&
+                                 - w_r(j,k,i,idpsi_dy)*(w_r(j,k,i,idphi_dx) + rho*w_r(j,k,i,idbpa_dx))
           nonlin_r(j,k,i,iupa) = - w_r(j,k,i,idphi_dx)*w_r(j,k,i,idupa_dy) &
                                  + w_r(j,k,i,idphi_dy)*w_r(j,k,i,idupa_dx) &
                                  + w_r(j,k,i,idpsi_dx)*sgm*w_r(j,k,i,idbpa_dy) &
                                  - w_r(j,k,i,idpsi_dy)*sgm*w_r(j,k,i,idbpa_dx)
           nonlin_r(j,k,i,ibpa) = - w_r(j,k,i,idphi_dx)*w_r(j,k,i,idbpa_dy) &
                                  + w_r(j,k,i,idphi_dy)*w_r(j,k,i,idbpa_dx) &
-                                 + w_r(j,k,i,idpsi_dx)*(sgm*w_r(j,k,i,idupa_dy) - w_r(j,k,i,idjpa_dy))&
-                                 - w_r(j,k,i,idpsi_dy)*(sgm*w_r(j,k,i,idupa_dx) - w_r(j,k,i,idjpa_dx))
+                                 + w_r(j,k,i,idpsi_dx)*(sgm*w_r(j,k,i,idupa_dy) - rho*w_r(j,k,i,idjpa_dy))&
+                                 - w_r(j,k,i,idpsi_dy)*(sgm*w_r(j,k,i,idupa_dx) - rho*w_r(j,k,i,idjpa_dx))
         enddo
       enddo
     enddo
@@ -837,7 +837,7 @@ contains
                            nonlin, &
                            fphi, fpsi, fupa, fbpa, &
                            kz, kprp2)
-    use params, only: zi, sgm
+    use params, only: zi, rho, sgm
     implicit none
     complex(r8), intent(out) :: exp_terms(nfields)
     complex(r8), intent(in ) :: phi, psi, upa, bpa
@@ -846,9 +846,9 @@ contains
     real(r8)   , intent(in)  :: kz, kprp2
 
     exp_terms(iomg) = nonlin(iomg) - kprp2*fphi - zi*kz*kprp2*psi
-    exp_terms(ipsi) = nonlin(ipsi) + fpsi + zi*kz*(phi + bpa)
+    exp_terms(ipsi) = nonlin(ipsi) + fpsi + zi*kz*(phi + rho*bpa)
     exp_terms(iupa) = nonlin(iupa) + fupa + zi*kz*sgm*bpa
-    exp_terms(ibpa) = nonlin(ibpa) + fbpa + zi*kz*(sgm*upa + kprp2*psi)
+    exp_terms(ibpa) = nonlin(ibpa) + fbpa + zi*kz*(sgm*upa + rho*kprp2*psi)
 
   end subroutine get_ext_terms
 

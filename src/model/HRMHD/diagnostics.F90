@@ -585,7 +585,7 @@ contains
     use grid, only: nkx, nkz
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use grid, only: kprp2, kprp2inv
-    use params, only: zi, sgm
+    use params, only: zi, rho, sgm
     implicit none
     complex(r8), dimension (ikx_st:ikx_en, &
                             ikz_st:ikz_en, &
@@ -600,10 +600,10 @@ contains
     do j = iky_st, iky_en
       do k = ikz_st, ikz_en
         do i = ikx_st, ikx_en
-           bpa_KAW(i, k, j) = kprp2(i, k, j)*(bpa(i, k, j) + phi(i, k, j))/(1.d0 + kprp2(i, k, j))
-           psi_KAW(i, k, j) = (kprp2(i, k, j)*psi(i, k, j) + sgm*upa(i, k, j))/(sgm**2 + kprp2(i, k, j))
-           phi_KAW(i, k, j) = kprp2inv(i, k, j)*bpa_KAW(i, k, j)
-           upa_KAW(i, k, j) = sgm*psi_KAW(i, k, j)
+           bpa_KAW(i, k, j) = rho**2*kprp2(i, k, j)*(bpa(i, k, j) + rho*phi(i, k, j))/(1.d0 + rho**2*kprp2(i, k, j))
+           psi_KAW(i, k, j) = (rho**2*kprp2(i, k, j)*psi(i, k, j) + sgm*rho*upa(i, k, j))/(sgm**2 + rho**2*kprp2(i, k, j))
+           phi_KAW(i, k, j) = kprp2inv(i, k, j)*bpa_KAW(i, k, j)/rho
+           upa_KAW(i, k, j) = sgm*psi_KAW(i, k, j)/rho
 
            bpa_ICW(i, k, j) = bpa(i, k, j) - bpa_KAW(i, k, j)
            psi_ICW(i, k, j) = psi(i, k, j) - psi_KAW(i, k, j)

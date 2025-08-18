@@ -53,7 +53,7 @@ module io
   integer :: run_id
   integer (kind_nf) :: char10_dim
   ! parameter
-  integer :: sgm_id
+  integer :: rho_id, sgm_id
   integer :: nupe_x_id, nupe_x_exp_id, nupe_z_id, nupe_z_exp_id
   integer :: nupa_x_id, nupa_x_exp_id, nupa_z_id, nupa_z_exp_id
   integer :: etape_x_id, etape_x_exp_id, etape_z_id, etape_z_exp_id
@@ -211,7 +211,7 @@ contains
     use grid, only: nlx, nly, nlz
     use grid, only: xx, yy, zz, kx, ky, kz
     use mp, only: proc0
-    use params, only: runname, sgm, &
+    use params, only: runname, rho, sgm, &
                       nupe_x , nupe_x_exp , nupe_z , nupe_z_exp, &
                       nupa_x , nupa_x_exp , nupa_z , nupa_z_exp, &
                       etape_x, etape_x_exp, etape_z, etape_z_exp, &
@@ -242,6 +242,7 @@ contains
       status = nf90_def_dim (ncid, 'tt', NF90_UNLIMITED, tt_dim)
 
       status = nf90_def_var (ncid, 'sgm', NF90_DOUBLE, sgm_id)
+      status = nf90_def_var (ncid, 'rho', NF90_DOUBLE, rho_id)
       status = nf90_def_var (ncid, 'nupe_x', NF90_DOUBLE, nupe_x_id)
       status = nf90_def_var (ncid, 'nupe_x_exp', NF90_DOUBLE, nupe_x_exp_id)
       status = nf90_def_var (ncid, 'nupe_z', NF90_DOUBLE, nupe_z_id)
@@ -345,6 +346,7 @@ contains
       status = nf90_enddef (ncid)  ! out of definition mode
 
       status = nf90_put_var (ncid, sgm_id, sgm)
+      status = nf90_put_var (ncid, rho_id, rho)
       status = nf90_put_var (ncid, nupe_x_id, nupe_x)
       status = nf90_put_var (ncid, nupe_x_exp_id, dble(nupe_x_exp))
       status = nf90_put_var (ncid, nupe_z_id, nupe_z)

@@ -99,7 +99,7 @@ legends = [
             r'$E_{\delta B_\|}$',
             r'-5/3',
          ]
-plot_log1d_many(xs, ys, xlab=r'$k_\+ \rho_\mathrm{H}$', legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', term=True, save=outdir+'kprp_spectra.pdf')
+plot_log1d_many(xs, ys, xlab=r'$'+kplab+'$', legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', vline_at = 1./rho, term=True, save=outdir+'kprp_spectra.pdf')
 
 # kprp spectrum by components
 ys = [ 
@@ -138,7 +138,7 @@ legends = [
             r'$E_{\delta B_y}$',
             r'-5/3',
           ]
-plot_log1d_many(xs, ys, xlab=r'$k_\+ \rho_\mathrm{H}$', legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', term=True, save=outdir+'kprp_spectra_components.pdf')
+plot_log1d_many(xs, ys, xlab=r'$'+kplab+'$', legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', vline_at = 1./rho, term=True, save=outdir+'kprp_spectra_components.pdf')
 
 # kprp spectrum by MRI injection rate and nonlinear transfer rate
 ys = [ 
@@ -181,7 +181,7 @@ legends = [
             r'$\calN_\mr{compr}^{<k_\+}$', 
             r'$\calN_\mr{compr}^{>k_\+}$', 
           ]
-plot_log1d_many(xs, ys, xlab=r'$k_\+ \rho_\mathrm{H}$', legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', term=True, save=outdir+'kprp_spectra_flux.pdf')
+plot_log1d_many(xs, ys, xlab=r'$'+kplab+'$', legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', vline_at = 1./rho, term=True, save=outdir+'kprp_spectra_flux.pdf')
 
 # Elsasser fields
 ys = [ 
@@ -216,7 +216,7 @@ legends = [
             r'-5/3',
             r'-3/2',
           ]
-plot_log1d_many(xs, ys, xlab=r'$k_\+ \rho_\mathrm{H}$', legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', term=True, save=outdir+'kprp_spectra_ELS.pdf')
+plot_log1d_many(xs, ys, xlab=r'$'+kplab+'$', legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', vline_at = 1./rho, term=True, save=outdir+'kprp_spectra_ELS.pdf')
 
 # KAW and ICW decomposition
 ys = [ 
@@ -263,7 +263,7 @@ legends = [
             r'$E_{\overline{\delta B}_\|}$',
             r'-5/3',
          ]
-plot_log1d_many(xs, ys, xlab=r'$k_\+ \rho_\mathrm{H}$', legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', term=True, save=outdir+'kprp_KAW_ICW_spectra.pdf')
+plot_log1d_many(xs, ys, xlab=r'$'+kplab+'$', legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', vline_at = 1./rho, term=True, save=outdir+'kprp_KAW_ICW_spectra.pdf')
 
 # kz spectrum
 if not is2D:
@@ -367,13 +367,13 @@ if not is2D:
 #                      plot 2D spectra                   #
 #--------------------------------------------------------#
 if not is2D:
-  plot_log2d(upe2_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab=r'$k_\+ \rho_\mathrm{H}$', ylab='$'+kzlab+'$', 
+  plot_log2d(upe2_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab=r'$'+kplab+'$', ylab='$'+kzlab+'$', 
       title=r'$E_{u_{\+}}$' + ' $(t = $ %.2E' % tt[final_idx] + '$)$', save=outdir + 'upe2.pdf')
-  plot_log2d(bpe2_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab=r'$k_\+ \rho_\mathrm{H}$', ylab='$'+kzlab+'$', 
+  plot_log2d(bpe2_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab=r'$'+kplab+'$', ylab='$'+kzlab+'$', 
       title=r'$E_{\delta B_\+}$' + ' $(t = $ %.2E' % tt[final_idx] + '$)$', save=outdir + 'bpe2.pdf')
-  plot_log2d(dissip_KAW_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab=r'$k_\+ \rho_\mathrm{H}$', ylab='$'+kzlab+'$', 
+  plot_log2d(dissip_KAW_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab=r'$'+kplab+'$', ylab='$'+kzlab+'$', 
       title=r'$\calD_\mr{KAW}$' + ' $(t = $ %.2E' % tt[final_idx] + '$)$', save=outdir + 'dissip_KAW.pdf')
-  plot_log2d(dissip_ICW_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab=r'$k_\+ \rho_\mathrm{H}$', ylab='$'+kzlab+'$', 
+  plot_log2d(dissip_ICW_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab=r'$'+kplab+'$', ylab='$'+kzlab+'$', 
       title=r'$\calD_\mr{ICW}$' + ' $(t = $ %.2E' % tt[final_idx] + '$)$', save=outdir + 'dissip_ICW.pdf')
 
 #------------------#

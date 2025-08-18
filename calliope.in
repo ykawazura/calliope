@@ -10,13 +10,13 @@
 
 !==============================================================================
 &box_parameters
-  lx = 2.0 ! to be multiplied by 2pi
-  ly = 2.0 ! to be multiplied by 2pi
+  lx = 1.0 ! to be multiplied by 2pi
+  ly = 1.0 ! to be multiplied by 2pi
   lz = 1.0 ! to be multiplied by 2pi
 
-  nlx = 64
-  nly = 64
-  nlz = 64
+  nlx = 128
+  nly = 128
+  nlz = 128
 
   pruned = .true.
 /
@@ -24,7 +24,7 @@
 !==============================================================================
 &time_parameters
   dt    = 2.0d-3
-  nstep = 15000 
+  nstep = 200000 
   cfl   = 1.0d0
   reset_method = 'multiply'  !'multiply'  => multiply by a factor of 0.5
                              !'decrement' => decrement the top integer of dt
@@ -47,26 +47,27 @@
 
 !==============================================================================
 &physical_parameters
+  rho    = 1d-1
   sgm    = 1d+0
 
   ! hyper dissipation ~ nu*kperp^(2*nuexp)
-  nupe_x      = 4.00d+1  ! perp viscosity   for phi
+  nupe_x      = 8.00d+1  ! perp viscosity   for phi
   nupe_x_exp  = 3                               
-  etape_x     = 2.00d+2  ! perp resistivity for psi
+  etape_x     = 4.00d+2  ! perp resistivity for psi
   etape_x_exp = 3                               
-  nupa_x      = 4.00d+1  ! perp viscosity   for upa
+  nupa_x      = 8.00d+1  ! perp viscosity   for upa
   nupa_x_exp  = 3                               
-  etapa_x     = 2.00d+2  ! perp resistivity for bpa
+  etapa_x     = 4.00d+2  ! perp resistivity for bpa
   etapa_x_exp = 3
 
   ! hyper dissipation ~ nu*kz^(2*nuexp)
-  nupe_z      = 1.00d-0  ! para viscosity   for phi
+  nupe_z      = 1.00d+1  ! para viscosity   for phi
   nupe_z_exp  = 3                              
-  etape_z     = 1.00d-0  ! para resistivity for psi
+  etape_z     = 1.00d+1  ! para resistivity for psi
   etape_z_exp = 3                              
-  nupa_z      = 1.00d-0  ! para viscosity   for upa
+  nupa_z      = 1.00d+1  ! para viscosity   for upa
   nupa_z_exp  = 3                              
-  etapa_z     = 1.00d-0  ! para resistivity for bpa
+  etapa_z     = 1.00d+1  ! para resistivity for bpa
   etapa_z_exp = 3
 /
 
@@ -91,7 +92,7 @@
   elsasser = .true.
   fix_power = .true.
   ene_inj = 1.d0
-  xhl_inj = 0.0d0 ! 0 <= xhl_inj <= 1 ! helicity injection rate. only when elsasser = .true.
+  xhl_inj = 0.8d0 ! 0 <= xhl_inj <= 1 ! helicity injection rate. only when elsasser = .true.
 !  res_inj = 0.99d0 ! 0 <= res_inj <= 1 ! residual energy injection rate. only when elsasser = .false.
   kmin = 0.0d0  0.0d0  0.1d0
   kmax = 1.1d0  1.1d0  1.1d0
