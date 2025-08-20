@@ -28,6 +28,7 @@
   cfl   = 1.0d0
   reset_method = 'decrement'  !'multiply'  => multiply by a factor of 0.5
                              !'decrement' => decrement the top integer of dt
+                             !'stop'      => terminate the run
   increase_dt = 0e+0         !When max dt computed from the cfl condition is 
                              ! larger than this value, set dt = increase_dt.
 

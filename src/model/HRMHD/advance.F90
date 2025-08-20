@@ -645,7 +645,7 @@ contains
     use grid, only: nl_local_tot, nk_local_tot
     use params, only: zi, rho, sgm
     use mp, only: proc0, max_allreduce, sum_allreduce
-    use time, only: cfl, dt, tt, reset_method, increase_dt
+    use time, only: cfl, dt, tt, reset_dt
     use time_stamp, only: put_time_stamp, timer_nonlinear_terms, timer_fft
     use advance_common, only: dt_adjust_while_running 
     implicit none
@@ -657,7 +657,7 @@ contains
 
     integer :: i, j, k
     real   (r8), allocatable :: v_KAW(:,:,:)
-    real   (r8) :: max_vel_x, max_vel_y, max_vel_KAW, dt_cfl, dt_digit
+    real   (r8) :: max_vel_x, max_vel_y, max_vel_KAW, dt_cfl
     real   (r8) :: ux_rms, uy_rms, bx_rms, by_rms
 
     if (proc0) call put_time_stamp(timer_nonlinear_terms)
@@ -735,50 +735,8 @@ contains
         call flush(cfl_unit) 
       endif
 
-      if(dt_cfl < dt) then
-        if(proc0) then
-          print *
-          write (*, '("dt is decreased from ", es12.4e3)', advance='no') dt
-        endif
+      call reset_dt(dt_cfl, counter)
 
-        dt_digit = (log10(dt_cfl)/abs(log10(dt_cfl)))*ceiling(abs(log10(dt_cfl)))
-        ! dt = floor(dt_cfl*10.d0**(-dt_digit))*10.d0**dt_digit
-
-        if (reset_method == 'multiply') then
-          dt = 0.5d0*dt
-        elseif (reset_method == 'decrement') then
-          dt_digit = (log10(dt)/abs(log10(dt)))*ceiling(abs(log10(dt)))
-
-          ! when dt = 0.0**01***
-          if (dt*10.d0**(-dt_digit) - 1.0d0 < 1.0d0) then
-            dt = 0.9d0*10.d0**dt_digit
-          else
-            dt = (dt*10.d0**(-dt_digit) - 1.0d0)*10.d0**dt_digit
-          endif
-        endif
-
-        counter = 1
-
-        if(proc0) then
-          print '("  to ", es12.4e3)', dt
-          print *
-        endif
-      endif
-      if(dt_cfl > 0.d0 .and. dt_cfl > increase_dt .and. dt < increase_dt) then
-        if(proc0) then
-          print *
-          write (*, '("dt is increased from ", es12.4e3)', advance='no') dt
-        endif
-
-        dt = increase_dt
-
-        counter = 1
-
-        if(proc0) then
-          print '("  to ", es12.4e3)', dt
-          print *
-        endif
-      endif
     endif
 
     ! When the file 'dt_adjust' including a float number is created,

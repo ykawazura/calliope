@@ -23,10 +23,10 @@
 
 !==============================================================================
 &time_parameters
-  dt    = 2.0d-3
+  dt    = 3.0d-3
   nstep = 200000 
   cfl   = 1.0d0
-  reset_method = 'multiply'  !'multiply'  => multiply by a factor of 0.5
+  reset_method = 'stop'  !'multiply'  => multiply by a factor of 0.5
                              !'decrement' => decrement the top integer of dt
   increase_dt = 0e+0         !When max dt computed from the cfl condition is 
                              ! larger than this value, set dt = increase_dt.
@@ -47,7 +47,7 @@
 
 !==============================================================================
 &physical_parameters
-  rho    = 1d-1
+  rho    = 5d-2
   sgm    = 1d+0
 
   ! hyper dissipation ~ nu*kperp^(2*nuexp)
@@ -61,25 +61,25 @@
   etapa_x_exp = 3
 
   ! hyper dissipation ~ nu*kz^(2*nuexp)
-  nupe_z      = 1.00d+1  ! para viscosity   for phi
+  nupe_z      = 2.00d+1  ! para viscosity   for phi
   nupe_z_exp  = 3                              
-  etape_z     = 1.00d+1  ! para resistivity for psi
+  etape_z     = 2.00d+1  ! para resistivity for psi
   etape_z_exp = 3                              
-  nupa_z      = 1.00d+1  ! para viscosity   for upa
+  nupa_z      = 2.00d+1  ! para viscosity   for upa
   nupa_z_exp  = 3                              
-  etapa_z     = 1.00d+1  ! para resistivity for bpa
+  etapa_z     = 2.00d+1  ! para resistivity for bpa
   etapa_z_exp = 3
 /
 
 !==============================================================================
 &initial_condition
-  init_type = 'zero'
+  !init_type = 'zero'
   !init_type = 'test'
   !init_type = 'single_mode'
   !init_type = 'OT2'
   !init_type = 'OT3'
   !init_type = 'random'
-  !init_type = 'restart'
+  init_type = 'restart'
 /
 
 !==============================================================================
@@ -91,8 +91,8 @@
   driven = T
   elsasser = .true.
   fix_power = .true.
-  ene_inj = 1.d0
-  xhl_inj = 0.8d0 ! 0 <= xhl_inj <= 1 ! helicity injection rate. only when elsasser = .true.
+  ene_inj = 0.2d0
+  xhl_inj = 0.0d0 ! 0 <= xhl_inj <= 1 ! helicity injection rate. only when elsasser = .true.
 !  res_inj = 0.99d0 ! 0 <= res_inj <= 1 ! residual energy injection rate. only when elsasser = .false.
   kmin = 0.0d0  0.0d0  0.1d0
   kmax = 1.1d0  1.1d0  1.1d0
@@ -124,9 +124,9 @@
 !  write_intvl_SF2  = 0.2d0  ! output every this value.
   SF2_nsample = 100000 ! number of sample points for each separation
 
-  output_modes =   1   1   1
-                   2   2   2
-                   3   3   3
+!  output_modes =   1   1   1
+!                   2   2   2
+!                   3   3   3
 /
 
 !==============================================================================

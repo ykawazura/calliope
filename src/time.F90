@@ -11,6 +11,7 @@ module time
   public  tt, dt, cfl, reset_method, increase_dt
   public  nstep
   public  microsleep
+  public  reset_dt
   private read_parameters
 
   real(r8) :: tt, dt, cfl, increase_dt
@@ -80,6 +81,72 @@ contains
     close(unit)
 
   end subroutine read_parameters
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    20 Aug 2025
+!! @brief   Reset dt
+!-----------------------------------------------!
+  subroutine reset_dt(dt_cfl, counter)
+    use mp, only: proc0
+    implicit none
+    real(8), intent(in) :: dt_cfl
+    integer, intent(inout) :: counter
+    real   (r8) :: dt_digit
+
+    if(dt_cfl < dt) then
+      if(proc0) then
+        print *
+        write (*, '("dt is decreased from ", es12.4e3)', advance='no') dt
+      endif
+
+      dt_digit = (log10(dt_cfl)/abs(log10(dt_cfl)))*ceiling(abs(log10(dt_cfl)))
+      ! dt = floor(dt_cfl*10.d0**(-dt_digit))*10.d0**dt_digit
+
+      if (reset_method == 'multiply') then
+        dt = 0.5d0*dt
+      elseif (reset_method == 'decrement') then
+        dt_digit = (log10(dt)/abs(log10(dt)))*ceiling(abs(log10(dt)))
+
+        ! when dt = 0.0**01***
+        if (dt*10.d0**(-dt_digit) - 1.0d0 < 1.0d0) then
+          dt = 0.9d0*10.d0**dt_digit
+        else
+          dt = (dt*10.d0**(-dt_digit) - 1.0d0)*10.d0**dt_digit
+        endif
+      elseif (reset_method == 'stop') then
+        if(proc0) then
+          print *
+          print '("  This run is stopped...")'
+        endif
+        stop
+      endif
+
+      counter = 1
+
+      if(proc0) then
+        print '("  to ", es12.4e3)', dt
+        print *
+      endif
+    endif
+    if(dt_cfl > 0.d0 .and. dt_cfl > increase_dt .and. dt < increase_dt) then
+      if(proc0) then
+        print *
+        write (*, '("dt is increased from ", es12.4e3)', advance='no') dt
+      endif
+
+      dt = increase_dt
+
+      counter = 1
+
+      if(proc0) then
+        print '("  to ", es12.4e3)', dt
+        print *
+      endif
+    endif
+
+  end subroutine reset_dt
 
 
   subroutine microsleep(useconds)
