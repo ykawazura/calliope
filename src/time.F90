@@ -119,6 +119,7 @@ contains
         if(proc0) then
           print *
           print '("  This run is stopped...")'
+          print '("  Bye bye!")'
         endif
         stop
       endif

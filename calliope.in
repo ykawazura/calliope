@@ -73,13 +73,13 @@
 
 !==============================================================================
 &initial_condition
-  !init_type = 'zero'
+  init_type = 'zero'
   !init_type = 'test'
   !init_type = 'single_mode'
   !init_type = 'OT2'
   !init_type = 'OT3'
   !init_type = 'random'
-  init_type = 'restart'
+  !init_type = 'restart'
 /
 
 !==============================================================================
