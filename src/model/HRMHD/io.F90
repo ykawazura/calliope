@@ -68,6 +68,8 @@ module io
   integer :: zppe2_sum_id, zmpe2_sum_id, zppa2_sum_id, zmpa2_sum_id
   integer :: upe2_KAW_dissip_sum_id, bpe2_KAW_dissip_sum_id, upa2_KAW_dissip_sum_id, bpa2_KAW_dissip_sum_id
   integer :: upe2_ICW_dissip_sum_id, bpe2_ICW_dissip_sum_id, upa2_ICW_dissip_sum_id, bpa2_ICW_dissip_sum_id
+  integer :: KAW_dissip_prp_sum_id, KAW_dissip_par_sum_id
+  integer :: ICW_dissip_prp_sum_id, ICW_dissip_par_sum_id
   ! polar spectrum
   integer :: upe2_bin_id, bpe2_bin_id, upa2_bin_id, bpa2_bin_id
   integer :: ux2_bin_id , uy2_bin_id , bx2_bin_id , by2_bin_id
@@ -296,6 +298,10 @@ contains
       status = nf90_def_var (ncid, 'bpe2_ICW_dissip_sum', NF90_DOUBLE, tt_dim, bpe2_ICW_dissip_sum_id)
       status = nf90_def_var (ncid, 'upa2_ICW_dissip_sum', NF90_DOUBLE, tt_dim, upa2_ICW_dissip_sum_id)
       status = nf90_def_var (ncid, 'bpa2_ICW_dissip_sum', NF90_DOUBLE, tt_dim, bpa2_ICW_dissip_sum_id)
+      status = nf90_def_var (ncid, 'KAW_dissip_prp_sum', NF90_DOUBLE, tt_dim, KAW_dissip_prp_sum_id)
+      status = nf90_def_var (ncid, 'KAW_dissip_par_sum', NF90_DOUBLE, tt_dim, KAW_dissip_par_sum_id)
+      status = nf90_def_var (ncid, 'ICW_dissip_prp_sum', NF90_DOUBLE, tt_dim, ICW_dissip_prp_sum_id)
+      status = nf90_def_var (ncid, 'ICW_dissip_par_sum', NF90_DOUBLE, tt_dim, ICW_dissip_par_sum_id)
       ! polar spectrum
       bin_dim (1) = kpbin_dim
       bin_dim (2) = kz_dim
@@ -391,6 +397,8 @@ contains
                       zppe2_sum, zmpe2_sum, zppa2_sum, zmpa2_sum, &
                       upe2_KAW_dissip_sum, bpe2_KAW_dissip_sum, upa2_KAW_dissip_sum, bpa2_KAW_dissip_sum, &
                       upe2_ICW_dissip_sum, bpe2_ICW_dissip_sum, upa2_ICW_dissip_sum, bpa2_ICW_dissip_sum, &
+                      KAW_dissip_prp_sum, KAW_dissip_par_sum, &
+                      ICW_dissip_prp_sum, ICW_dissip_par_sum, &
                       !
                       nkpolar, &
                       upe2_bin, bpe2_bin, upa2_bin, bpa2_bin, &
@@ -414,6 +422,8 @@ contains
     real(r8), intent(in) :: upe2dissip_sum, bpe2dissip_sum, upa2dissip_sum, bpa2dissip_sum
     real(r8), intent(in) :: upe2_KAW_dissip_sum, bpe2_KAW_dissip_sum, upa2_KAW_dissip_sum, bpa2_KAW_dissip_sum
     real(r8), intent(in) :: upe2_ICW_dissip_sum, bpe2_ICW_dissip_sum, upa2_ICW_dissip_sum, bpa2_ICW_dissip_sum
+    real(r8), intent(in) :: KAW_dissip_prp_sum, KAW_dissip_par_sum
+    real(r8), intent(in) :: ICW_dissip_prp_sum, ICW_dissip_par_sum
     real(r8), intent(in) :: p_aw_sum, p_compr_sum, p_xhl_sum
     real(r8), intent(in) :: zppe2_sum, zmpe2_sum, zppa2_sum, zmpa2_sum
 
@@ -469,6 +479,10 @@ contains
       status = nf90_put_var (ncid, bpe2_ICW_dissip_sum_id, bpe2_ICW_dissip_sum, start=(/nout/))
       status = nf90_put_var (ncid, upa2_ICW_dissip_sum_id, upa2_ICW_dissip_sum, start=(/nout/))
       status = nf90_put_var (ncid, bpa2_ICW_dissip_sum_id, bpa2_ICW_dissip_sum, start=(/nout/))
+      status = nf90_put_var (ncid, KAW_dissip_prp_sum_id, KAW_dissip_prp_sum, start=(/nout/))
+      status = nf90_put_var (ncid, KAW_dissip_par_sum_id, KAW_dissip_par_sum, start=(/nout/))
+      status = nf90_put_var (ncid, ICW_dissip_prp_sum_id, ICW_dissip_prp_sum, start=(/nout/))
+      status = nf90_put_var (ncid, ICW_dissip_par_sum_id, ICW_dissip_par_sum, start=(/nout/))
       ! polar spectrum
       start3(1) = 1
       start3(2) = 1

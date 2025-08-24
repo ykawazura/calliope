@@ -95,6 +95,8 @@ contains
     real(r8) :: upe2_sum, bpe2_sum, upa2_sum, bpa2_sum
     real(r8) :: upe2dot_sum, bpe2dot_sum, upa2dot_sum, bpa2dot_sum
     real(r8) :: upe2dissip_sum, bpe2dissip_sum, upa2dissip_sum, bpa2dissip_sum
+    real(r8) :: KAW_dissip_prp_sum, KAW_dissip_par_sum
+    real(r8) :: ICW_dissip_prp_sum, ICW_dissip_par_sum
     real(r8) :: upe2_KAW_dissip_sum, bpe2_KAW_dissip_sum, upa2_KAW_dissip_sum, bpa2_KAW_dissip_sum
     real(r8) :: upe2_ICW_dissip_sum, bpe2_ICW_dissip_sum, upa2_ICW_dissip_sum, bpa2_ICW_dissip_sum
     real(r8) :: p_aw_sum, p_compr_sum, p_xhl_sum
@@ -416,6 +418,11 @@ contains
     bpe2_ICW_dissip_sum = sum(bpe2_ICW_dissip_x + bpe2_ICW_dissip_z); call sum_reduce(bpe2_ICW_dissip_sum, 0)
     upa2_ICW_dissip_sum = sum(upa2_ICW_dissip_x + upa2_ICW_dissip_z); call sum_reduce(upa2_ICW_dissip_sum, 0)
     bpa2_ICW_dissip_sum = sum(bpa2_ICW_dissip_x + bpa2_ICW_dissip_z); call sum_reduce(bpa2_ICW_dissip_sum, 0)
+
+    KAW_dissip_prp_sum = sum(upe2_KAW_dissip_x + bpe2_KAW_dissip_x + upa2_KAW_dissip_x + bpa2_KAW_dissip_x); call sum_reduce(KAW_dissip_prp_sum, 0)
+    KAW_dissip_par_sum = sum(upe2_KAW_dissip_z + bpe2_KAW_dissip_z + upa2_KAW_dissip_z + bpa2_KAW_dissip_z); call sum_reduce(KAW_dissip_par_sum, 0)
+    ICW_dissip_prp_sum = sum(upe2_ICW_dissip_x + bpe2_ICW_dissip_x + upa2_ICW_dissip_x + bpa2_ICW_dissip_x); call sum_reduce(ICW_dissip_prp_sum, 0)
+    ICW_dissip_par_sum = sum(upe2_ICW_dissip_z + bpe2_ICW_dissip_z + upa2_ICW_dissip_z + bpa2_ICW_dissip_z); call sum_reduce(ICW_dissip_par_sum, 0)
     !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
 
     !vvvvvvvvvvvvvvvvvv          bin over kprp           vvvvvvvvvvvvvvvvvv!
@@ -464,6 +471,8 @@ contains
                   zppe2_sum, zmpe2_sum, zppa2_sum, zmpa2_sum, &
                   upe2_KAW_dissip_sum, bpe2_KAW_dissip_sum, upa2_KAW_dissip_sum, bpa2_KAW_dissip_sum, &
                   upe2_ICW_dissip_sum, bpe2_ICW_dissip_sum, upa2_ICW_dissip_sum, bpa2_ICW_dissip_sum, &
+                  KAW_dissip_prp_sum, KAW_dissip_par_sum, &
+                  ICW_dissip_prp_sum, ICW_dissip_par_sum, &
                   !
                   nkpolar, &
                   upe2_bin, bpe2_bin, upa2_bin, bpa2_bin, &
