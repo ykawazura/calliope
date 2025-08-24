@@ -600,7 +600,7 @@ contains
     do j = iky_st, iky_en
       do k = ikz_st, ikz_en
         do i = ikx_st, ikx_en
-           bpa_KAW(i, k, j) = rho**2*kprp2(i, k, j)*(bpa(i, k, j) + rho*phi(i, k, j))/(1.d0 + rho**2*kprp2(i, k, j))
+           bpa_KAW(i, k, j) = rho**2*kprp2(i, k, j)*(bpa(i, k, j) + phi(i, k, j)/rho)/(1.d0 + rho**2*kprp2(i, k, j))
            psi_KAW(i, k, j) = (rho**2*kprp2(i, k, j)*psi(i, k, j) + sgm*rho*upa(i, k, j))/(sgm**2 + rho**2*kprp2(i, k, j))
            phi_KAW(i, k, j) = kprp2inv(i, k, j)*bpa_KAW(i, k, j)/rho
            upa_KAW(i, k, j) = sgm*psi_KAW(i, k, j)/rho
