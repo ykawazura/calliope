@@ -15,7 +15,7 @@ module params
 
   public  init_params
   public  nonlinear
-  public  beta   , gamma, va2cs2_plus_1
+  public  beta   , gamma, va2cs2_plus_1, cs2va2, kappa_b, kappa_p 
   public  nupe_x , nupe_x_exp , nupe_z , nupe_z_exp
   public  nupa_x , nupa_x_exp , nupa_z , nupa_z_exp
   public  etape_x, etape_x_exp, etape_z, etape_z_exp
@@ -24,7 +24,7 @@ module params
   private read_parameters
 
   logical  :: nonlinear
-  real(r8) :: beta   , gamma, va2cs2_plus_1
+  real(r8) :: beta   , gamma, va2cs2_plus_1, cs2va2, kappa_b, kappa_p
   real(r8) :: nupe_x , nupe_z
   real(r8) :: etape_x, etape_z
   real(r8) :: nupa_x , nupa_z
@@ -67,11 +67,11 @@ contains
     integer  :: unit, ierr
 
     namelist /operation_parameters/ nonlinear
-    namelist /physical_parameters/ beta, gamma, nupe_x , nupe_x_exp , nupe_z , nupe_z_exp , &
-                                                nupa_x , nupa_x_exp , nupa_z , nupa_z_exp , &
-                                                etape_x, etape_x_exp, etape_z, etape_z_exp, &
-                                                etapa_x, etapa_x_exp, etapa_z, etapa_z_exp, &
-                                   q
+    namelist /physical_parameters/ beta, gamma, q, kappa_b, kappa_p, &
+                                   nupe_x , nupe_x_exp , nupe_z , nupe_z_exp , &
+                                   nupa_x , nupa_x_exp , nupa_z , nupa_z_exp , &
+                                   etape_x, etape_x_exp, etape_z, etape_z_exp, &
+                                   etapa_x, etapa_x_exp, etapa_z, etapa_z_exp
 
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
     !v    used only when the corresponding value   v!
@@ -93,6 +93,9 @@ contains
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
     beta    = 1.d0
     gamma   = 5.d0/3.d0
+    q       = 0.d0
+    kappa_p = 0.d0
+    kappa_b = 0.d0
     nupe_x  = 0.d0
     nupe_z  = 0.d0
     etape_x = 0.d0
@@ -101,7 +104,6 @@ contains
     nupa_z  = 0.d0
     etapa_x = 0.d0
     etapa_z = 0.d0
-    q       = 0.d0
     !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
 
     call get_unused_unit (unit)
@@ -112,6 +114,7 @@ contains
     close(unit)
 
     va2cs2_plus_1 = 2.d0/(beta*gamma) + 1.d0
+    cs2va2 = (beta*gamma)/2.d0
 
   end subroutine read_parameters
 

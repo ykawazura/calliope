@@ -53,7 +53,7 @@ module io
   integer :: run_id
   integer (kind_nf) :: char10_dim
   ! parameter
-  integer :: beta_id, gamma_id, q_id
+  integer :: beta_id, gamma_id, q_id, kappa_b_id, kappa_p_id
   integer :: nupe_x_id, nupe_x_exp_id, nupe_z_id, nupe_z_exp_id
   integer :: nupa_x_id, nupa_x_exp_id, nupa_z_id, nupa_z_exp_id
   integer :: etape_x_id, etape_x_exp_id, etape_z_id, etape_z_exp_id
@@ -64,12 +64,14 @@ module io
   integer :: upe2_sum_id, bpe2_sum_id, upa2_sum_id, bpa2_sum_id
   integer :: upe2dot_sum_id, bpe2dot_sum_id, upa2dot_sum_id, bpa2dot_sum_id
   integer :: upe2dissip_sum_id, bpe2dissip_sum_id, upa2dissip_sum_id, bpa2dissip_sum_id
-  integer :: p_aw_sum_id, p_compr_sum_id
+  integer :: p_aw_rot_sum_id, p_compr_rot_sum_id
+  integer :: p_aw_grd_sum_id, p_compr_grd_sum_id
   integer :: zpep2_sum_id, zpem2_sum_id, zpap2_sum_id, zpam2_sum_id
   ! polar spectrum
   integer :: upe2_bin_id, bpe2_bin_id, upa2_bin_id, bpa2_bin_id
   integer :: ux2_bin_id , uy2_bin_id , bx2_bin_id , by2_bin_id
-  integer :: p_aw_bin_id, p_compr_bin_id
+  integer :: p_aw_rot_bin_id, p_compr_rot_bin_id
+  integer :: p_aw_grd_bin_id, p_compr_grd_bin_id
   integer :: ntrans_upe_upe_l_bin_id, ntrans_bpe_upe_l_bin_id, ntrans_bpe_bpe_l_bin_id, ntrans_upe_bpe_l_bin_id
   integer :: ntrans_upa_upa_l_bin_id, ntrans_bpa_upa_l_bin_id, ntrans_bpa_bpa_l_bin_id, ntrans_upa_bpa_l_bin_id
   integer :: ntrans_upe_upe_g_bin_id, ntrans_bpe_upe_g_bin_id, ntrans_bpe_bpe_g_bin_id, ntrans_upe_bpe_g_bin_id
@@ -206,7 +208,7 @@ contains
     use grid, only: nlx, nly, nlz
     use grid, only: xx, yy, zz, kx, ky, kz
     use mp, only: proc0
-    use params, only: runname, beta, gamma, q, &
+    use params, only: runname, beta, gamma, q, kappa_b, kappa_p, &
                       nupe_x , nupe_x_exp , nupe_z , nupe_z_exp, &
                       nupa_x , nupa_x_exp , nupa_z , nupa_z_exp, &
                       etape_x, etape_x_exp, etape_z, etape_z_exp, &
@@ -239,6 +241,8 @@ contains
       status = nf90_def_var (ncid, 'beta', NF90_DOUBLE, beta_id)
       status = nf90_def_var (ncid, 'gamma', NF90_DOUBLE, gamma_id)
       status = nf90_def_var (ncid, 'q', NF90_DOUBLE, q_id)
+      status = nf90_def_var (ncid, 'kappa_b', NF90_DOUBLE, kappa_b_id)
+      status = nf90_def_var (ncid, 'kappa_p', NF90_DOUBLE, kappa_p_id)
       status = nf90_def_var (ncid, 'nupe_x', NF90_DOUBLE, nupe_x_id)
       status = nf90_def_var (ncid, 'nupe_x_exp', NF90_DOUBLE, nupe_x_exp_id)
       status = nf90_def_var (ncid, 'nupe_z', NF90_DOUBLE, nupe_z_id)
@@ -277,8 +281,10 @@ contains
       status = nf90_def_var (ncid, 'bpe2dissip_sum', NF90_DOUBLE, tt_dim, bpe2dissip_sum_id)
       status = nf90_def_var (ncid, 'upa2dissip_sum', NF90_DOUBLE, tt_dim, upa2dissip_sum_id)
       status = nf90_def_var (ncid, 'bpa2dissip_sum', NF90_DOUBLE, tt_dim, bpa2dissip_sum_id)
-      status = nf90_def_var (ncid, 'p_aw_sum'   , NF90_DOUBLE, tt_dim, p_aw_sum_id   )
-      status = nf90_def_var (ncid, 'p_compr_sum', NF90_DOUBLE, tt_dim, p_compr_sum_id)
+      status = nf90_def_var (ncid, 'p_aw_rot_sum'   , NF90_DOUBLE, tt_dim, p_aw_rot_sum_id   )
+      status = nf90_def_var (ncid, 'p_compr_rot_sum', NF90_DOUBLE, tt_dim, p_compr_rot_sum_id)
+      status = nf90_def_var (ncid, 'p_aw_grd_sum'   , NF90_DOUBLE, tt_dim, p_aw_grd_sum_id   )
+      status = nf90_def_var (ncid, 'p_compr_grd_sum', NF90_DOUBLE, tt_dim, p_compr_grd_sum_id)
       status = nf90_def_var (ncid, 'zpep2_sum', NF90_DOUBLE, tt_dim, zpep2_sum_id)
       status = nf90_def_var (ncid, 'zpem2_sum', NF90_DOUBLE, tt_dim, zpem2_sum_id)
       status = nf90_def_var (ncid, 'zpap2_sum', NF90_DOUBLE, tt_dim, zpap2_sum_id)
@@ -295,8 +301,10 @@ contains
       status = nf90_def_var (ncid, 'uy2_bin' , NF90_DOUBLE, bin_dim, uy2_bin_id)
       status = nf90_def_var (ncid, 'bx2_bin' , NF90_DOUBLE, bin_dim, bx2_bin_id)
       status = nf90_def_var (ncid, 'by2_bin' , NF90_DOUBLE, bin_dim, by2_bin_id)
-      status = nf90_def_var (ncid, 'p_aw_bin'   , NF90_DOUBLE, bin_dim, p_aw_bin_id   )
-      status = nf90_def_var (ncid, 'p_compr_bin', NF90_DOUBLE, bin_dim, p_compr_bin_id)
+      status = nf90_def_var (ncid, 'p_aw_rot_bin'   , NF90_DOUBLE, bin_dim, p_aw_rot_bin_id   )
+      status = nf90_def_var (ncid, 'p_compr_rot_bin', NF90_DOUBLE, bin_dim, p_compr_rot_bin_id)
+      status = nf90_def_var (ncid, 'p_aw_grd_bin'   , NF90_DOUBLE, bin_dim, p_aw_grd_bin_id   )
+      status = nf90_def_var (ncid, 'p_compr_grd_bin', NF90_DOUBLE, bin_dim, p_compr_grd_bin_id)
       status = nf90_def_var (ncid, 'ntrans_upe_upe_l_bin', NF90_DOUBLE, bin_dim, ntrans_upe_upe_l_bin_id)
       status = nf90_def_var (ncid, 'ntrans_bpe_upe_l_bin', NF90_DOUBLE, bin_dim, ntrans_bpe_upe_l_bin_id)
       status = nf90_def_var (ncid, 'ntrans_bpe_bpe_l_bin', NF90_DOUBLE, bin_dim, ntrans_bpe_bpe_l_bin_id)
@@ -325,6 +333,8 @@ contains
       status = nf90_put_var (ncid, beta_id, beta)
       status = nf90_put_var (ncid, gamma_id, gamma)
       status = nf90_put_var (ncid, q_id, q)
+      status = nf90_put_var (ncid, kappa_b_id, kappa_b)
+      status = nf90_put_var (ncid, kappa_p_id, kappa_p)
       status = nf90_put_var (ncid, nupe_x_id, nupe_x)
       status = nf90_put_var (ncid, nupe_x_exp_id, dble(nupe_x_exp))
       status = nf90_put_var (ncid, nupe_z_id, nupe_z)
@@ -365,14 +375,16 @@ contains
                       upe2_sum, bpe2_sum, upa2_sum, bpa2_sum, &
                       upe2dot_sum, bpe2dot_sum, upa2dot_sum, bpa2dot_sum, &
                       upe2dissip_sum, bpe2dissip_sum, upa2dissip_sum, bpa2dissip_sum, &
-                      p_aw_sum, p_compr_sum, &
+                      p_aw_rot_sum, p_compr_rot_sum, &
+                      p_aw_grd_sum, p_compr_grd_sum, &
                       zpep2_sum, zpem2_sum, zpap2_sum, zpam2_sum, &
                       !
                       nkpolar, &
                       upe2_bin, bpe2_bin, upa2_bin, bpa2_bin, &
                       ux2_bin , uy2_bin , bx2_bin , by2_bin , &
                       zpep2_bin, zpem2_bin, zpap2_bin, zpam2_bin, &
-                      p_aw_bin, p_compr_bin, &
+                      p_aw_rot_bin, p_compr_rot_bin, &
+                      p_aw_grd_bin, p_compr_grd_bin, &
                       dissip_aw_bin, dissip_compr_bin, &
                       ntrans_aw_l_bin, ntrans_compr_l_bin, &
                       ntrans_aw_g_bin, ntrans_compr_g_bin  &
@@ -385,7 +397,8 @@ contains
     real(r8), intent(in) :: upe2_sum, bpe2_sum, upa2_sum, bpa2_sum
     real(r8), intent(in) :: upe2dot_sum, bpe2dot_sum, upa2dot_sum, bpa2dot_sum
     real(r8), intent(in) :: upe2dissip_sum, bpe2dissip_sum, upa2dissip_sum, bpa2dissip_sum
-    real(r8), intent(in) :: p_aw_sum, p_compr_sum
+    real(r8), intent(in) :: p_aw_rot_sum, p_compr_rot_sum
+    real(r8), intent(in) :: p_aw_grd_sum, p_compr_grd_sum
     real(r8), intent(in) :: zpep2_sum, zpem2_sum, zpap2_sum, zpam2_sum
 
     integer, intent(in) :: nkpolar
@@ -393,7 +406,8 @@ contains
     real(r8), intent(in) :: upa2_bin(1:nkpolar, nkz), bpa2_bin(1:nkpolar, nkz)
     real(r8), intent(in) :: ux2_bin (1:nkpolar, nkz), uy2_bin (1:nkpolar, nkz)
     real(r8), intent(in) :: bx2_bin (1:nkpolar, nkz), by2_bin (1:nkpolar, nkz)
-    real(r8), intent(in) :: p_aw_bin(1:nkpolar, nkz), p_compr_bin(1:nkpolar, nkz)
+    real(r8), intent(in) :: p_aw_rot_bin(1:nkpolar, nkz), p_compr_rot_bin(1:nkpolar, nkz)
+    real(r8), intent(in) :: p_aw_grd_bin(1:nkpolar, nkz), p_compr_grd_bin(1:nkpolar, nkz)
     real(r8), intent(in) :: ntrans_aw_l_bin(4,1:nkpolar, nkz), ntrans_compr_l_bin(4,1:nkpolar, nkz)
     real(r8), intent(in) :: ntrans_aw_g_bin(4,1:nkpolar, nkz), ntrans_compr_g_bin(4,1:nkpolar, nkz)
     real(r8), intent(in) :: dissip_aw_bin(1:nkpolar, nkz), dissip_compr_bin(1:nkpolar, nkz)
@@ -420,8 +434,10 @@ contains
       status = nf90_put_var (ncid, bpe2dissip_sum_id, bpe2dissip_sum, start=(/nout/))
       status = nf90_put_var (ncid, upa2dissip_sum_id, upa2dissip_sum, start=(/nout/))
       status = nf90_put_var (ncid, bpa2dissip_sum_id, bpa2dissip_sum, start=(/nout/))
-      status = nf90_put_var (ncid, p_aw_sum_id   , p_aw_sum   , start=(/nout/))
-      status = nf90_put_var (ncid, p_compr_sum_id, p_compr_sum, start=(/nout/))
+      status = nf90_put_var (ncid, p_aw_rot_sum_id   , p_aw_rot_sum   , start=(/nout/))
+      status = nf90_put_var (ncid, p_compr_rot_sum_id, p_compr_rot_sum, start=(/nout/))
+      status = nf90_put_var (ncid, p_aw_grd_sum_id   , p_aw_grd_sum   , start=(/nout/))
+      status = nf90_put_var (ncid, p_compr_grd_sum_id, p_compr_grd_sum, start=(/nout/))
       status = nf90_put_var (ncid, zpep2_sum_id, zpep2_sum, start=(/nout/))
       status = nf90_put_var (ncid, zpem2_sum_id, zpem2_sum, start=(/nout/))
       status = nf90_put_var (ncid, zpap2_sum_id, zpap2_sum, start=(/nout/))
@@ -442,8 +458,10 @@ contains
       status = nf90_put_var (ncid, uy2_bin_id , uy2_bin , start=start3, count=count3)
       status = nf90_put_var (ncid, bx2_bin_id , bx2_bin , start=start3, count=count3)
       status = nf90_put_var (ncid, by2_bin_id , by2_bin , start=start3, count=count3)
-      status = nf90_put_var (ncid, p_aw_bin_id   , p_aw_bin   , start=start3, count=count3)
-      status = nf90_put_var (ncid, p_compr_bin_id, p_compr_bin, start=start3, count=count3)
+      status = nf90_put_var (ncid, p_aw_rot_bin_id   , p_aw_rot_bin   , start=start3, count=count3)
+      status = nf90_put_var (ncid, p_compr_rot_bin_id, p_compr_rot_bin, start=start3, count=count3)
+      status = nf90_put_var (ncid, p_aw_grd_bin_id   , p_aw_grd_bin   , start=start3, count=count3)
+      status = nf90_put_var (ncid, p_compr_grd_bin_id, p_compr_grd_bin, start=start3, count=count3)
       status = nf90_put_var (ncid, ntrans_upe_upe_l_bin_id   , ntrans_aw_l_bin   (1,:,:), start=start3, count=count3)
       status = nf90_put_var (ncid, ntrans_bpe_upe_l_bin_id   , ntrans_aw_l_bin   (2,:,:), start=start3, count=count3)
       status = nf90_put_var (ncid, ntrans_bpe_bpe_l_bin_id   , ntrans_aw_l_bin   (3,:,:), start=start3, count=count3)

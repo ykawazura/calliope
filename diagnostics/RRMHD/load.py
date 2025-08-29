@@ -69,9 +69,10 @@ upe2dissip_sum  = np.copy(ncfile.variables['upe2dissip_sum' ][:]); upe2dissip_su
 bpe2dissip_sum  = np.copy(ncfile.variables['bpe2dissip_sum' ][:]); bpe2dissip_sum  = np.delete(bpe2dissip_sum , ignored_points, axis = 0)
 upa2dissip_sum  = np.copy(ncfile.variables['upa2dissip_sum' ][:]); upa2dissip_sum  = np.delete(upa2dissip_sum , ignored_points, axis = 0)
 bpa2dissip_sum  = np.copy(ncfile.variables['bpa2dissip_sum' ][:]); bpa2dissip_sum  = np.delete(bpa2dissip_sum , ignored_points, axis = 0)
-p_aw_sum        = np.copy(ncfile.variables['p_aw_sum'       ][:]); p_aw_sum        = np.delete(p_aw_sum       , ignored_points, axis = 0)
-p_compr_sum     = np.copy(ncfile.variables['p_compr_sum'    ][:]); p_compr_sum     = np.delete(p_compr_sum    , ignored_points, axis = 0)
-p_compr_sum     = np.copy(ncfile.variables['p_compr_sum'    ][:]); p_compr_sum     = np.delete(p_compr_sum    , ignored_points, axis = 0)
+p_aw_rot_sum    = np.copy(ncfile.variables['p_aw_rot_sum'   ][:]); p_aw_rot_sum    = np.delete(p_aw_rot_sum   , ignored_points, axis = 0)
+p_compr_rot_sum = np.copy(ncfile.variables['p_compr_rot_sum'][:]); p_compr_rot_sum = np.delete(p_compr_rot_sum, ignored_points, axis = 0)
+p_aw_grd_sum    = np.copy(ncfile.variables['p_aw_grd_sum'   ][:]); p_aw_grd_sum    = np.delete(p_aw_grd_sum   , ignored_points, axis = 0)
+p_compr_grd_sum = np.copy(ncfile.variables['p_compr_grd_sum'][:]); p_compr_grd_sum = np.delete(p_compr_grd_sum, ignored_points, axis = 0)
 zpep2_sum       = np.copy(ncfile.variables['zpep2_sum'      ][:]); zpep2_sum       = np.delete(zpep2_sum      , ignored_points, axis = 0)
 zpem2_sum       = np.copy(ncfile.variables['zpem2_sum'      ][:]); zpem2_sum       = np.delete(zpem2_sum      , ignored_points, axis = 0)
 zpap2_sum       = np.copy(ncfile.variables['zpap2_sum'      ][:]); zpap2_sum       = np.delete(zpap2_sum      , ignored_points, axis = 0)
@@ -86,8 +87,10 @@ ux2_bin         = np.copy(ncfile.variables['ux2_bin'        ][:]); ux2_bin      
 uy2_bin         = np.copy(ncfile.variables['uy2_bin'        ][:]); uy2_bin         = np.delete(uy2_bin        , ignored_points, axis = 0)
 bx2_bin         = np.copy(ncfile.variables['bx2_bin'        ][:]); bx2_bin         = np.delete(bx2_bin        , ignored_points, axis = 0)
 by2_bin         = np.copy(ncfile.variables['by2_bin'        ][:]); by2_bin         = np.delete(by2_bin        , ignored_points, axis = 0)
-p_aw_bin        = np.copy(ncfile.variables['p_aw_bin'       ][:]); p_aw_bin        = np.delete(p_aw_bin       , ignored_points, axis = 0)
-p_compr_bin     = np.copy(ncfile.variables['p_compr_bin'    ][:]); p_compr_bin     = np.delete(p_compr_bin    , ignored_points, axis = 0)
+p_aw_rot_bin    = np.copy(ncfile.variables['p_aw_rot_bin'   ][:]); p_aw_rot_bin    = np.delete(p_aw_rot_bin   , ignored_points, axis = 0)
+p_compr_rot_bin = np.copy(ncfile.variables['p_compr_rot_bin'][:]); p_compr_rot_bin = np.delete(p_compr_rot_bin, ignored_points, axis = 0)
+p_aw_grd_bin    = np.copy(ncfile.variables['p_aw_grd_bin'   ][:]); p_aw_grd_bin    = np.delete(p_aw_grd_bin   , ignored_points, axis = 0)
+p_compr_grd_bin = np.copy(ncfile.variables['p_compr_grd_bin'][:]); p_compr_grd_bin = np.delete(p_compr_grd_bin, ignored_points, axis = 0)
 dissip_aw_bin   = np.copy(ncfile.variables['dissip_aw_bin'   ][:]); dissip_aw_bin    = np.delete(dissip_aw_bin   , ignored_points, axis = 0)
 dissip_compr_bin= np.copy(ncfile.variables['dissip_compr_bin'][:]); dissip_compr_bin = np.delete(dissip_compr_bin, ignored_points, axis = 0)
 ntrans_upe_upe_l_bin = np.copy(ncfile.variables['ntrans_upe_upe_l_bin'][:]); ntrans_upe_upe_l_bin = np.delete(ntrans_upe_upe_l_bin, ignored_points, axis = 0)
@@ -115,5 +118,5 @@ zpam2_bin       = np.copy(ncfile.variables['zpam2_bin'      ][:]); zpam2_bin    
 ncfile.close()
 
 tlab  = r'\Omega t'
-zlab  = r'z\Omega/v_\rmA'
-kzlab = r'k_z v_\rmA /\Omega'
+zlab  = r'z\Omega/v_\mathrm{A}'
+kzlab = r'k_z v_\mathrm{A} /\Omega'

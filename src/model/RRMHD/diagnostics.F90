@@ -56,10 +56,11 @@ contains
     use time, only: dt
     use time_stamp, only: put_time_stamp, timer_diagnostics_total
     use params, only: zi, nonlinear, q, &
-                      va2cs2_plus_1, nupe_x , nupe_x_exp , nupe_z , nupe_z_exp , &
-                                     nupa_x , nupa_x_exp , nupa_z , nupa_z_exp , &
-                                     etape_x, etape_x_exp, etape_z, etape_z_exp, &
-                                     etapa_x, etapa_x_exp, etapa_z, etapa_z_exp
+                      va2cs2_plus_1, cs2va2, kappa_b, kappa_p, &
+                      nupe_x , nupe_x_exp , nupe_z , nupe_z_exp , &
+                      nupa_x , nupa_x_exp , nupa_z , nupa_z_exp , &
+                      etape_x, etape_x_exp, etape_z, etape_z_exp, &
+                      etapa_x, etapa_x_exp, etapa_z, etapa_z_exp
     implicit none
     integer :: i, j, k
 
@@ -69,19 +70,22 @@ contains
     real(r8), allocatable, dimension(:,:,:) :: bpe2dissip_x, bpe2dissip_z
     real(r8), allocatable, dimension(:,:,:) :: upa2dissip_x, upa2dissip_z
     real(r8), allocatable, dimension(:,:,:) :: bpa2dissip_x, bpa2dissip_z
-    real(r8), allocatable, dimension(:,:,:) :: p_aw, p_compr
+    real(r8), allocatable, dimension(:,:,:) :: p_aw_rot, p_compr_rot
+    real(r8), allocatable, dimension(:,:,:) :: p_aw_grd, p_compr_grd
     real(r8), allocatable, dimension(:,:,:) :: zpep2, zpem2, zpap2, zpam2
     real(r8), allocatable, dimension(:,:,:) :: src
 
     real(r8) :: upe2_sum, bpe2_sum, upa2_sum, bpa2_sum
     real(r8) :: upe2dot_sum, bpe2dot_sum, upa2dot_sum, bpa2dot_sum
     real(r8) :: upe2dissip_sum, bpe2dissip_sum, upa2dissip_sum, bpa2dissip_sum
-    real(r8) :: p_aw_sum, p_compr_sum
+    real(r8) :: p_aw_rot_sum, p_compr_rot_sum
+    real(r8) :: p_aw_grd_sum, p_compr_grd_sum
     real(r8) :: zpep2_sum, zpem2_sum, zpap2_sum, zpam2_sum
 
     real(r8), dimension(:, :), allocatable :: upe2_bin, bpe2_bin, upa2_bin, bpa2_bin          ! [kprp, kz]
     real(r8), dimension(:, :), allocatable :: ux2_bin , uy2_bin , bx2_bin , by2_bin           ! [kprp, kz]
-    real(r8), dimension(:, :), allocatable :: p_aw_bin, p_compr_bin                           ! [kprp, kz]
+    real(r8), dimension(:, :), allocatable :: p_aw_rot_bin, p_compr_rot_bin                   ! [kprp, kz]
+    real(r8), dimension(:, :), allocatable :: p_aw_grd_bin, p_compr_grd_bin                   ! [kprp, kz]
     real(r8), dimension(:, :, :), allocatable :: ntrans_aw_l_bin   , ntrans_aw_g_bin          ! [4, kprp, kz]
                                                                                               !   1 : -upe.(upe.grad upe) 
                                                                                               !   2 : +upe.(bpe.grad bpe) 
@@ -119,8 +123,10 @@ contains
     allocate(upa2dissip_z, source=src)
     allocate(bpa2dissip_x, source=src)
     allocate(bpa2dissip_z, source=src)
-    allocate(p_aw        , source=src)
-    allocate(p_compr     , source=src)
+    allocate(p_aw_rot    , source=src)
+    allocate(p_compr_rot , source=src)
+    allocate(p_aw_grd    , source=src)
+    allocate(p_compr_grd , source=src)
     allocate(zpep2       , source=src)
     allocate(zpem2       , source=src)
     allocate(zpap2       , source=src)
@@ -135,8 +141,10 @@ contains
     allocate (uy2_bin            (1:nkpolar, nkz)); uy2_bin               = 0.d0
     allocate (bx2_bin            (1:nkpolar, nkz)); bx2_bin               = 0.d0
     allocate (by2_bin            (1:nkpolar, nkz)); by2_bin               = 0.d0
-    allocate (p_aw_bin           (1:nkpolar, nkz)); p_aw_bin              = 0.d0
-    allocate (p_compr_bin        (1:nkpolar, nkz)); p_compr_bin           = 0.d0
+    allocate (p_aw_rot_bin       (1:nkpolar, nkz)); p_aw_rot_bin          = 0.d0
+    allocate (p_compr_rot_bin    (1:nkpolar, nkz)); p_compr_rot_bin       = 0.d0
+    allocate (p_aw_grd_bin       (1:nkpolar, nkz)); p_aw_grd_bin          = 0.d0
+    allocate (p_compr_grd_bin    (1:nkpolar, nkz)); p_compr_grd_bin       = 0.d0
     allocate (ntrans_aw_l_bin    (4, 1:nkpolar, nkz)); ntrans_aw_l_bin    = 0.d0
     allocate (ntrans_aw_g_bin    (4, 1:nkpolar, nkz)); ntrans_aw_g_bin    = 0.d0
     allocate (ntrans_compr_l_bin (4, 1:nkpolar, nkz)); ntrans_compr_l_bin = 0.d0
@@ -180,11 +188,16 @@ contains
           upa2dissip_z(i, k, j) =  nupa_z*(kz2(k)        /kz2_max  )** nupe_z_exp*abs(upa_mid)**2
           bpa2dissip_x(i, k, j) = etapa_x*(kprp2(i, k, j)/kprp2_max)**etape_x_exp*abs(bpa_mid)**2
           bpa2dissip_z(i, k, j) = etapa_z*(kz2(k)        /kz2_max  )**etape_z_exp*abs(bpa_mid)**2
-          p_aw        (i, k, j) = - 2.d0*zi*ky(j)*0.5d0*(phi_mid*conjg(upa_mid) - upa_mid*conjg(phi_mid))
-          p_compr     (i, k, j) = zi*ky(j)*( &
+          p_aw_rot    (i, k, j) = - 2.d0*zi*ky(j)*0.5d0*(phi_mid*conjg(upa_mid) - upa_mid*conjg(phi_mid))
+          p_compr_rot (i, k, j) = zi*ky(j)*( &
                                                        q *0.5d0*(psi_mid*conjg(bpa_mid) - bpa_mid*conjg(psi_mid)) &
                                              + (2.d0 - q)*0.5d0*(phi_mid*conjg(upa_mid) - upa_mid*conjg(phi_mid)) &
                                            )
+          p_aw_grd    (i, k, j) = zi*ky(j)*0.5d0*(kappa_b + cs2va2*kappa_p)*(phi_mid*conjg(bpa_mid) - bpa_mid*conjg(phi_mid))
+          p_compr_grd (i, k, j) = -zi*ky(j)*0.5d0*( &
+                                                    (2.d0*kappa_b + (cs2va2 - 1.d0)*kappa_p)*(phi_mid*conjg(bpa_mid) - bpa_mid*conjg(phi_mid)) &
+                                                  + cs2va2*kappa_p*(psi_mid*conjg(upa_mid) - upa_mid*conjg(psi_mid)) &
+                                                  )
 
           zpep2      (i, k, j) = abs(phi(i, k, j) + psi(i, k, j))**2*kprp2(i, k, j)
           zpem2      (i, k, j) = abs(phi(i, k, j) - psi(i, k, j))**2*kprp2(i, k, j)
@@ -224,8 +237,10 @@ contains
             bpa2dissip_x(i, k, j) = 2.0d0*bpa2dissip_x(i, k, j)
             bpa2dissip_z(i, k, j) = 2.0d0*bpa2dissip_z(i, k, j)
 
-            p_aw        (i, k, j) = 2.0d0*p_aw        (i, k, j)
-            p_compr     (i, k, j) = 2.0d0*p_compr     (i, k, j)
+            p_aw_rot    (i, k, j) = 2.0d0*p_aw_rot    (i, k, j)
+            p_compr_rot (i, k, j) = 2.0d0*p_compr_rot (i, k, j)
+            p_aw_grd    (i, k, j) = 2.0d0*p_aw_grd    (i, k, j)
+            p_compr_grd (i, k, j) = 2.0d0*p_compr_grd (i, k, j)
 
             zpep2    (i, k, j) = 2.0d0*zpep2(i, k, j)
             zpem2    (i, k, j) = 2.0d0*zpem2(i, k, j)
@@ -252,8 +267,10 @@ contains
     bpe2dissip_sum = sum(bpe2dissip_x + bpe2dissip_z); call sum_reduce(bpe2dissip_sum, 0)
     upa2dissip_sum = sum(upa2dissip_x + upa2dissip_z); call sum_reduce(upa2dissip_sum, 0)
     bpa2dissip_sum = sum(bpa2dissip_x + bpa2dissip_z); call sum_reduce(bpa2dissip_sum, 0)
-    p_aw_sum       = sum(p_aw   ); call sum_reduce(p_aw_sum   , 0)
-    p_compr_sum    = sum(p_compr); call sum_reduce(p_compr_sum, 0)
+    p_aw_rot_sum   = sum(p_aw_rot   ); call sum_reduce(p_aw_rot_sum   , 0)
+    p_compr_rot_sum= sum(p_compr_rot); call sum_reduce(p_compr_rot_sum, 0)
+    p_aw_grd_sum   = sum(p_aw_grd   ); call sum_reduce(p_aw_grd_sum   , 0)
+    p_compr_grd_sum= sum(p_compr_grd); call sum_reduce(p_compr_grd_sum, 0)
 
     zpep2_sum = sum(zpep2); call sum_reduce(zpep2_sum, 0)
     zpem2_sum = sum(zpem2); call sum_reduce(zpem2_sum, 0)
@@ -270,8 +287,10 @@ contains
     call get_polar_spectrum_2d(uy2 , uy2_bin)
     call get_polar_spectrum_2d(bx2 , bx2_bin)
     call get_polar_spectrum_2d(by2 , by2_bin)
-    call get_polar_spectrum_2d(dble(p_aw   ), p_aw_bin   )
-    call get_polar_spectrum_2d(dble(p_compr), p_compr_bin)
+    call get_polar_spectrum_2d(dble(p_aw_rot   ), p_aw_rot_bin   )
+    call get_polar_spectrum_2d(dble(p_compr_rot), p_compr_rot_bin)
+    call get_polar_spectrum_2d(dble(p_aw_grd   ), p_aw_grd_bin   )
+    call get_polar_spectrum_2d(dble(p_compr_grd), p_compr_grd_bin)
     call get_polar_spectrum_2d(upe2dissip_x + upe2dissip_z + bpe2dissip_x + bpe2dissip_z, dissip_aw_bin)
     call get_polar_spectrum_2d(upa2dissip_x + upa2dissip_z + bpa2dissip_x + bpa2dissip_z, dissip_compr_bin)
     call get_polar_spectrum_2d(zpep2, zpep2_bin)
@@ -287,14 +306,16 @@ contains
                   upe2_sum, bpe2_sum, upa2_sum, bpa2_sum, &
                   upe2dot_sum, bpe2dot_sum, upa2dot_sum, bpa2dot_sum, &
                   upe2dissip_sum, bpe2dissip_sum, upa2dissip_sum, bpa2dissip_sum, &
-                  p_aw_sum, p_compr_sum, &
+                  p_aw_rot_sum, p_compr_rot_sum, &
+                  p_aw_grd_sum, p_compr_grd_sum, &
                   zpep2_sum, zpem2_sum, zpap2_sum, zpam2_sum, &
                   !
                   nkpolar, &
                   upe2_bin, bpe2_bin, upa2_bin, bpa2_bin, &
                   ux2_bin , uy2_bin , bx2_bin , by2_bin , &
                   zpep2_bin, zpem2_bin, zpap2_bin, zpam2_bin, &
-                  p_aw_bin, p_compr_bin, &
+                  p_aw_rot_bin, p_compr_rot_bin, &
+                  p_aw_grd_bin, p_compr_grd_bin, &
                   dissip_aw_bin, dissip_compr_bin, &
                   ntrans_aw_l_bin, ntrans_compr_l_bin, &
                   ntrans_aw_g_bin, ntrans_compr_g_bin  &
@@ -316,15 +337,19 @@ contains
     deallocate(upa2dissip_z)
     deallocate(bpa2dissip_x)
     deallocate(bpa2dissip_z)
-    deallocate(p_aw)
-    deallocate(p_compr)
+    deallocate(p_aw_rot)
+    deallocate(p_compr_rot)
+    deallocate(p_aw_grd)
+    deallocate(p_compr_grd)
 
     deallocate (upe2_bin)
     deallocate (bpe2_bin)
     deallocate (upa2_bin)
     deallocate (bpa2_bin)
-    deallocate (p_aw_bin)
-    deallocate (p_compr_bin)
+    deallocate (p_aw_rot_bin)
+    deallocate (p_compr_rot_bin)
+    deallocate (p_aw_grd_bin)
+    deallocate (p_compr_grd_bin)
     deallocate (ntrans_aw_l_bin)
     deallocate (ntrans_aw_g_bin)
     deallocate (ntrans_compr_l_bin)

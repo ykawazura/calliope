@@ -13,9 +13,11 @@ ys = [
        upe2dot_sum + bpe2dot_sum + upa2dot_sum + bpa2dot_sum, 
        upe2dissip_sum + bpe2dissip_sum, 
        upa2dissip_sum + bpa2dissip_sum, 
-       -p_aw_sum, 
-       -p_compr_sum, 
-			 upe2dot_sum + bpe2dot_sum + upa2dot_sum + bpa2dot_sum + upe2dissip_sum + bpe2dissip_sum + upa2dissip_sum + bpa2dissip_sum - p_aw_sum - p_compr_sum,
+       -p_aw_rot_sum, 
+       -p_compr_rot_sum, 
+       -p_aw_grd_sum, 
+       -p_compr_grd_sum, 
+			 upe2dot_sum + bpe2dot_sum + upa2dot_sum + bpa2dot_sum + upe2dissip_sum + bpe2dissip_sum + upa2dissip_sum + bpa2dissip_sum - p_aw_rot_sum - p_compr_rot_sum - p_aw_grd_sum - p_compr_grd_sum,
      ]
 xs = [
        tt,
@@ -24,8 +26,12 @@ xs = [
        tt,
        tt,
        tt,
+       tt,
+       tt,
      ]
 ls = [ 
+        '', 
+        '', 
         '', 
         '', 
 				'', 
@@ -37,8 +43,10 @@ legends = [
        r'$\rmd W/\rmd t$', 
        r'$D_\mr{AW}$', 
        r'$D_\mr{compr}$', 
-       r'$-P_\mr{AW}$', 
-       r'$-P_\mr{compr}$', 
+       r'$-P_\mr{AW}^\mr{rot}$', 
+       r'$-P_\mr{compr}^\mr{rot}$', 
+       r'$-P_\mr{AW}^\mr{grad}$', 
+       r'$-P_\mr{compr}^\mr{grad}$', 
 			 r'balance', 
      ]
 plot_1d_many(xs, ys, xlab='$'+tlab+'$', legends=legends, ls=ls, legendloc='upper left', title='', ylab='', term=True, save=outdir + 'balance_all.pdf')
@@ -76,10 +84,11 @@ plot_1d_many(xs, ys, xlab='$'+tlab+'$', legends=legends, ls=ls, legendloc='upper
 np.savetxt(outdir + 'energies.txt' , np.column_stack((tt, upe2_sum, bpe2_sum, upa2_sum, bpa2_sum, 
 	                                                        upe2dot_sum, bpe2dot_sum, upa2dot_sum, bpa2dot_sum,
 	                                                        upe2dissip_sum, bpe2dissip_sum, upa2dissip_sum, bpa2dissip_sum,
-	                                                        p_aw_sum, p_compr_sum, 
+	                                                        p_aw_rot_sum, p_compr_rot_sum, 
+	                                                        p_aw_grd_sum, p_compr_grd_sum, 
                                                           zpep2_sum, zpem2_sum, zpap2_sum, zpam2_sum
 																													)), fmt='%E')
-np.savetxt(outdir + 'balance.txt' , np.column_stack((tt, upe2dot_sum + bpe2dot_sum + upa2dot_sum + bpa2dot_sum + upe2dissip_sum + bpe2dissip_sum + upa2dissip_sum + bpa2dissip_sum - p_aw_sum - p_compr_sum
+np.savetxt(outdir + 'balance.txt' , np.column_stack((tt, upe2dot_sum + bpe2dot_sum + upa2dot_sum + bpa2dot_sum + upe2dissip_sum + bpe2dissip_sum + upa2dissip_sum + bpa2dissip_sum - p_aw_rot_sum - p_compr_rot_sum - p_aw_grd_sum - p_compr_grd_sum
 																													)), fmt='%E')
 np.savetxt(outdir + 'energy_dot.txt' , np.column_stack((tt, upe2dot_sum + bpe2dot_sum + upa2dot_sum + bpa2dot_sum
 																													)), fmt='%E')
@@ -87,7 +96,7 @@ np.savetxt(outdir + 'energy_dot.txt' , np.column_stack((tt, upe2dot_sum + bpe2do
 
 
 # calculate balance
-balance = upe2dot_sum + bpe2dot_sum + upa2dot_sum + bpa2dot_sum + upe2dissip_sum + bpe2dissip_sum + upa2dissip_sum + bpa2dissip_sum - p_aw_sum - p_compr_sum
+balance = upe2dot_sum + bpe2dot_sum + upa2dot_sum + bpa2dot_sum + upe2dissip_sum + bpe2dissip_sum + upa2dissip_sum + bpa2dissip_sum - p_aw_rot_sum - p_compr_rot_sum - p_aw_grd_sum - p_compr_grd_sum
 
 print ('|balance| > 1e1 at')
 print (np.where(abs(balance) > 1e1)[0])

@@ -669,17 +669,17 @@ contains
                            phi, psi, upa, bpa, &
                            nonlin, &
                            ky, kz, kprp2)
-    use params, only: zi, va2cs2_plus_1, q
+    use params, only: zi, va2cs2_plus_1, cs2va2, kappa_b, kappa_p, q
     implicit none
     complex(r8), intent(out) :: exp_terms(nfields)
     complex(r8), intent(in ) :: phi, psi, upa, bpa
     complex(r8), intent(in ) :: nonlin(nfields)
     real(r8)   , intent(in)  :: ky, kz, kprp2
 
-    exp_terms(iomg) = nonlin(iomg) - zi*kz*kprp2*psi - 2.d0*zi*ky*upa
+    exp_terms(iomg) = nonlin(iomg) - zi*kz*kprp2*psi - 2.d0*zi*ky*upa + (kappa_b + cs2va2*kappa_p)*zi*ky*bpa
     exp_terms(ipsi) = nonlin(ipsi) + zi*kz*phi
-    exp_terms(iupa) = nonlin(iupa) + zi*kz*bpa + (2.d0 - q)*zi*ky*phi
-    exp_terms(ibpa) = ( nonlin(ibpa) + zi*kz*upa + q*zi*ky*psi )/va2cs2_plus_1
+    exp_terms(iupa) = nonlin(iupa) + zi*kz*bpa + (2.d0 - q)*zi*ky*phi - cs2va2*kappa_p*zi*ky*psi
+    exp_terms(ibpa) = ( nonlin(ibpa) + zi*kz*upa + q*zi*ky*psi - (2.d0*kappa_b + (cs2va2 - 1.d0)*kappa_p)*zi*ky*phi )/va2cs2_plus_1
 
   end subroutine get_ext_terms
 

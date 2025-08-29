@@ -20,8 +20,10 @@ zpep2_bin   = sum_negative_kz2d(zpep2_bin)
 zpem2_bin   = sum_negative_kz2d(zpem2_bin)
 zpap2_bin   = sum_negative_kz2d(zpap2_bin)
 zpam2_bin   = sum_negative_kz2d(zpam2_bin)
-p_aw_bin    = sum_negative_kz2d(p_aw_bin)
-p_compr_bin = sum_negative_kz2d(p_compr_bin)
+p_aw_rot_bin    = sum_negative_kz2d(p_aw_rot_bin)
+p_compr_rot_bin = sum_negative_kz2d(p_compr_rot_bin)
+p_aw_grd_bin    = sum_negative_kz2d(p_aw_grd_bin)
+p_compr_grd_bin = sum_negative_kz2d(p_compr_grd_bin)
 dissip_aw_bin    = sum_negative_kz2d(dissip_aw_bin)
 dissip_compr_bin = sum_negative_kz2d(dissip_compr_bin)
 ntrans_upe_upe_l_bin = sum_negative_kz2d(ntrans_upe_upe_l_bin)
@@ -129,8 +131,10 @@ plot_log1d_many(xs, ys, xlab='$k_\+ L_\+$', legends=legends, ls=ls, legendloc='l
 
 # kprp spectrum by MRI injection rate and nonlinear transfer rate
 ys = [ 
-       np.sum(p_aw_bin          [final_idx,:,1:kp_end], axis=0),
-       np.sum(p_compr_bin       [final_idx,:,1:kp_end], axis=0),
+       np.sum(p_aw_rot_bin      [final_idx,:,1:kp_end], axis=0),
+       np.sum(p_compr_rot_bin   [final_idx,:,1:kp_end], axis=0),
+       np.sum(p_aw_grd_bin      [final_idx,:,1:kp_end], axis=0),
+       np.sum(p_compr_grd_bin   [final_idx,:,1:kp_end], axis=0),
       -np.sum(dissip_aw_bin     [final_idx,:,1:kp_end], axis=0),
       -np.sum(dissip_compr_bin  [final_idx,:,1:kp_end], axis=0),
        np.sum(ntrans_aw_l_bin   [final_idx,:,1:kp_end], axis=0),
@@ -139,6 +143,8 @@ ys = [
        np.sum(ntrans_compr_g_bin[final_idx,:,1:kp_end], axis=0),
      ]
 xs = [ 
+      kpbin[1:kp_end],
+      kpbin[1:kp_end],
       kpbin[1:kp_end],
       kpbin[1:kp_end],
       kpbin[1:kp_end], 
@@ -157,10 +163,14 @@ ls = [
         '', 
         '', 
         '', 
+        '', 
+        '', 
      ]
 legends = [ 
-            r'$I_\mr{AW}$', 
-            r'$I_\mr{compr}$', 
+            r'$I_\mr{AW}^\mr{rot}$', 
+            r'$I_\mr{compr}^\mr{rot}$', 
+            r'$I_\mr{AW}^\mr{grad}$', 
+            r'$I_\mr{compr}^\mr{grad}$', 
             r'$-\calD_\mr{AW}$', 
             r'$-\calD_\mr{compr}$', 
             r'$\calN_\mr{AW}^{<k_\+}$', 
@@ -262,8 +272,10 @@ if not is2D:
 
   # MRI injection rate and nonlinear transfer rate
   ys = [ 
-          np.sum(p_aw_bin          [final_idx,1:kz_end,:kp_end], axis=1),
-          np.sum(p_compr_bin       [final_idx,1:kz_end,:kp_end], axis=1),
+          np.sum(p_aw_rot_bin      [final_idx,1:kz_end,:kp_end], axis=1),
+          np.sum(p_compr_rot_bin   [final_idx,1:kz_end,:kp_end], axis=1),
+          np.sum(p_aw_grd_bin      [final_idx,1:kz_end,:kp_end], axis=1),
+          np.sum(p_compr_grd_bin   [final_idx,1:kz_end,:kp_end], axis=1),
          -np.sum(dissip_aw_bin     [final_idx,1:kz_end,:kp_end], axis=1),
          -np.sum(dissip_compr_bin  [final_idx,1:kz_end,:kp_end], axis=1),
           np.sum(ntrans_aw_l_bin   [final_idx,1:kz_end,:kp_end], axis=1),
@@ -272,6 +284,8 @@ if not is2D:
           np.sum(ntrans_compr_g_bin[final_idx,1:kz_end,:kp_end], axis=1),
        ]
   xs = [ 
+          kz[1:kz_end], 
+          kz[1:kz_end], 
           kz[1:kz_end], 
           kz[1:kz_end], 
           kz[1:kz_end], 
@@ -290,10 +304,14 @@ if not is2D:
           '', 
           '', 
           '', 
+          '', 
+          '', 
        ]
   legends = [ 
-              r'$I_\mr{AW}$', 
-              r'$I_\mr{compr}$', 
+              r'$I_\mr{AW}^\mr{rot}$', 
+              r'$I_\mr{compr}^\mr{rot}$', 
+              r'$I_\mr{AW}^\mr{grad}$', 
+              r'$I_\mr{compr}^\mr{grad}$', 
               r'$-\calD_\mr{AW}$', 
               r'$-\calD_\mr{compr}$', 
               r'$\calN_\mr{AW}^{<k_\+}$', 
@@ -328,8 +346,10 @@ np.savetxt(outdir + 'Ekprp.txt'  , np.column_stack((kpbin[:kp_end],
                                                        np.sum(zpem2_bin           [final_idx,:kz_end,:kp_end], axis=0),
                                                        np.sum(zpap2_bin           [final_idx,:kz_end,:kp_end], axis=0),
                                                        np.sum(zpam2_bin           [final_idx,:kz_end,:kp_end], axis=0),
-                                                       np.sum(p_aw_bin            [final_idx,:kz_end,:kp_end], axis=0),
-                                                       np.sum(p_compr_bin         [final_idx,:kz_end,:kp_end], axis=0),
+                                                       np.sum(p_aw_rot_bin        [final_idx,:kz_end,:kp_end], axis=0),
+                                                       np.sum(p_compr_rot_bin     [final_idx,:kz_end,:kp_end], axis=0),
+                                                       np.sum(p_aw_grd_bin        [final_idx,:kz_end,:kp_end], axis=0),
+                                                       np.sum(p_compr_grd_bin     [final_idx,:kz_end,:kp_end], axis=0),
                                                        np.sum(dissip_aw_bin       [final_idx,:kz_end,:kp_end], axis=0),
                                                        np.sum(dissip_compr_bin    [final_idx,:kz_end,:kp_end], axis=0),
                                                        np.sum(ntrans_upe_upe_l_bin[final_idx,:kz_end,:kp_end], axis=0),
@@ -363,8 +383,10 @@ if not is2D:
                                                          np.sum(zpem2_bin           [final_idx,:kz_end,:kp_end], axis=1),
                                                          np.sum(zpap2_bin           [final_idx,:kz_end,:kp_end], axis=1),
                                                          np.sum(zpam2_bin           [final_idx,:kz_end,:kp_end], axis=1),
-                                                         np.sum(p_aw_bin            [final_idx,:kz_end,:kp_end], axis=1),
-                                                         np.sum(p_compr_bin         [final_idx,:kz_end,:kp_end], axis=1),
+                                                         np.sum(p_aw_rot_bin        [final_idx,:kz_end,:kp_end], axis=1),
+                                                         np.sum(p_compr_rot_bin     [final_idx,:kz_end,:kp_end], axis=1),
+                                                         np.sum(p_aw_grd_bin        [final_idx,:kz_end,:kp_end], axis=1),
+                                                         np.sum(p_compr_grd_bin     [final_idx,:kz_end,:kp_end], axis=1),
                                                          np.sum(dissip_aw_bin       [final_idx,:kz_end,:kp_end], axis=1),
                                                          np.sum(dissip_compr_bin    [final_idx,:kz_end,:kp_end], axis=1),
                                                          np.sum(ntrans_upe_upe_l_bin[final_idx,:kz_end,:kp_end], axis=1),
