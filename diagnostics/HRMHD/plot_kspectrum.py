@@ -414,6 +414,14 @@ np.savetxt(outdir + 'Ekprp.txt'  , np.column_stack((kpbin[:kp_end],
                                                        np.sum(ntrans_bpa_upa_g_bin[final_idx,:kz_end,:kp_end], axis=0),
                                                        np.sum(ntrans_bpa_bpa_g_bin[final_idx,:kz_end,:kp_end], axis=0),
                                                        np.sum(ntrans_upa_bpa_g_bin[final_idx,:kz_end,:kp_end], axis=0),
+                                                       np.sum(upe2_KAW_bin        [final_idx,:kz_end,:kp_end], axis=0), 
+                                                       np.sum(bpe2_KAW_bin        [final_idx,:kz_end,:kp_end], axis=0), 
+                                                       np.sum(upa2_KAW_bin        [final_idx,:kz_end,:kp_end], axis=0), 
+                                                       np.sum(bpa2_KAW_bin        [final_idx,:kz_end,:kp_end], axis=0),
+                                                       np.sum(upe2_ICW_bin        [final_idx,:kz_end,:kp_end], axis=0), 
+                                                       np.sum(bpe2_ICW_bin        [final_idx,:kz_end,:kp_end], axis=0), 
+                                                       np.sum(upa2_ICW_bin        [final_idx,:kz_end,:kp_end], axis=0), 
+                                                       np.sum(bpa2_ICW_bin        [final_idx,:kz_end,:kp_end], axis=0),
                                                      )), fmt='%E')
 if not is2D:
   np.savetxt(outdir + 'Ekz.txt'  , np.column_stack((kz[:kz_end], 
@@ -451,6 +459,14 @@ if not is2D:
                                                          np.sum(ntrans_bpa_upa_g_bin[final_idx,:kz_end,:kp_end], axis=1),
                                                          np.sum(ntrans_bpa_bpa_g_bin[final_idx,:kz_end,:kp_end], axis=1),
                                                          np.sum(ntrans_upa_bpa_g_bin[final_idx,:kz_end,:kp_end], axis=1),
+                                                         np.sum(upe2_KAW_bin        [final_idx,:kz_end,:kp_end], axis=1), 
+                                                         np.sum(bpe2_KAW_bin        [final_idx,:kz_end,:kp_end], axis=1), 
+                                                         np.sum(upa2_KAW_bin        [final_idx,:kz_end,:kp_end], axis=1), 
+                                                         np.sum(bpa2_KAW_bin        [final_idx,:kz_end,:kp_end], axis=1),
+                                                         np.sum(upe2_ICW_bin        [final_idx,:kz_end,:kp_end], axis=1), 
+                                                         np.sum(bpe2_ICW_bin        [final_idx,:kz_end,:kp_end], axis=1), 
+                                                         np.sum(upa2_ICW_bin        [final_idx,:kz_end,:kp_end], axis=1), 
+                                                         np.sum(bpa2_ICW_bin        [final_idx,:kz_end,:kp_end], axis=1),
                                                        )), fmt='%E')
 
 del upe2_bin

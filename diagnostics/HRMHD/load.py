@@ -49,6 +49,8 @@ nky = ky.size
 nkz = kz.size
 nkpolar = kpbin.size
 
+np.savetxt('params.txt', np.column_stack((nlx, nly, nlz, nkx, nky, nkz, nkpolar, rho, sgm)), fmt='%E')
+
 if nkz <= 2:
   is2D = True
 else:
@@ -83,6 +85,10 @@ upe2_ICW_dissip_sum  = np.copy(ncfile.variables['upe2_ICW_dissip_sum' ][:]); upe
 bpe2_ICW_dissip_sum  = np.copy(ncfile.variables['bpe2_ICW_dissip_sum' ][:]); bpe2_ICW_dissip_sum  = np.delete(bpe2_ICW_dissip_sum , ignored_points, axis = 0)
 upa2_ICW_dissip_sum  = np.copy(ncfile.variables['upa2_ICW_dissip_sum' ][:]); upa2_ICW_dissip_sum  = np.delete(upa2_ICW_dissip_sum , ignored_points, axis = 0)
 bpa2_ICW_dissip_sum  = np.copy(ncfile.variables['bpa2_ICW_dissip_sum' ][:]); bpa2_ICW_dissip_sum  = np.delete(bpa2_ICW_dissip_sum , ignored_points, axis = 0)
+KAW_dissip_prp_sum   = np.copy(ncfile.variables['KAW_dissip_prp_sum' ][:]); KAW_dissip_prp_sum   = np.delete(KAW_dissip_prp_sum , ignored_points, axis = 0)
+KAW_dissip_par_sum   = np.copy(ncfile.variables['KAW_dissip_par_sum' ][:]); KAW_dissip_par_sum   = np.delete(KAW_dissip_par_sum , ignored_points, axis = 0)
+ICW_dissip_prp_sum   = np.copy(ncfile.variables['ICW_dissip_prp_sum' ][:]); ICW_dissip_prp_sum   = np.delete(ICW_dissip_prp_sum , ignored_points, axis = 0)
+ICW_dissip_par_sum   = np.copy(ncfile.variables['ICW_dissip_par_sum' ][:]); ICW_dissip_par_sum   = np.delete(ICW_dissip_par_sum , ignored_points, axis = 0)
 
 # Load binned spectra
 upe2_bin        = np.copy(ncfile.variables['upe2_bin'       ][:]); upe2_bin        = np.delete(upe2_bin       , ignored_points, axis = 0)

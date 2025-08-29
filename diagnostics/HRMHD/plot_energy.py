@@ -107,6 +107,25 @@ legends = [
      ]
 plot_1d_many(xs, ys, xlab='$'+tlab+'$', legends=legends, ls=ls, legendloc='upper left', title='', ylab='', term=True, ymin=0.0, save=outdir + 'helicity_injection.pdf')
 
+# plot KAW, ICW dissipation perp and para
+ys = [ 
+       KAW_dissip_par_sum/(KAW_dissip_prp_sum+KAW_dissip_par_sum), 
+       ICW_dissip_par_sum/(ICW_dissip_prp_sum+ICW_dissip_par_sum), 
+     ]
+ls = [ 
+       '', 
+       '', 
+     ]
+xs = [
+       tt,
+       tt,
+     ]
+legends = [ 
+       'KAW', 
+       'ICW', 
+     ]
+plot_1d_many(xs, ys, xlab='$'+tlab+'$', legends=legends, ls=ls, legendloc='upper left', title='', ylab=r'$D_\|/(D_\|+D_\+)$', term=True, save=outdir + 'KAW-ICW_dissipation-perp-para.pdf')
+
 
 # ascii output
 np.savetxt(outdir + 'energies.txt' , np.column_stack((tt, upe2_sum, bpe2_sum, upa2_sum, bpa2_sum, 
@@ -122,6 +141,8 @@ np.savetxt(outdir + 'energy_dot.txt' , np.column_stack((tt, upe2dot_sum + bpe2do
 np.savetxt(outdir + 'KAW-ICW_dissipation.txt' , np.column_stack((tt, 
 	                                                        upe2_KAW_dissip_sum, bpe2_KAW_dissip_sum, upa2_KAW_dissip_sum, bpa2_KAW_dissip_sum,
 	                                                        upe2_ICW_dissip_sum, bpe2_ICW_dissip_sum, upa2_ICW_dissip_sum, bpa2_ICW_dissip_sum,
+                                                          KAW_dissip_prp_sum, KAW_dissip_par_sum, 
+                                                          ICW_dissip_prp_sum, ICW_dissip_par_sum, 
 																													)), fmt='%E')
 
 
