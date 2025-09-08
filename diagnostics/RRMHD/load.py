@@ -119,4 +119,5 @@ ncfile.close()
 
 tlab  = r'\Omega t'
 zlab  = r'z\Omega/v_\mathrm{A}'
+kplab = r'k_\+ L_\+'
 kzlab = r'k_z v_\mathrm{A} /\Omega'

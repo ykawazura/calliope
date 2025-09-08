@@ -676,7 +676,7 @@ contains
     complex(r8), intent(in ) :: nonlin(nfields)
     real(r8)   , intent(in)  :: ky, kz, kprp2
 
-    exp_terms(iomg) = nonlin(iomg) - zi*kz*kprp2*psi - 2.d0*zi*ky*upa + (kappa_b + cs2va2*kappa_p)*zi*ky*bpa
+    exp_terms(iomg) = nonlin(iomg) - zi*kz*kprp2*psi - 2.d0*zi*ky*upa + 2.d0*(kappa_b + cs2va2*kappa_p)*zi*ky*bpa
     exp_terms(ipsi) = nonlin(ipsi) + zi*kz*phi
     exp_terms(iupa) = nonlin(iupa) + zi*kz*bpa + (2.d0 - q)*zi*ky*phi - cs2va2*kappa_p*zi*ky*psi
     exp_terms(ibpa) = ( nonlin(ibpa) + zi*kz*upa + q*zi*ky*psi - (2.d0*kappa_b + (cs2va2 - 1.d0)*kappa_p)*zi*ky*phi )/va2cs2_plus_1

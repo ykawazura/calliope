@@ -88,7 +88,7 @@ legends = [
             r'$E_{\delta B_\|}$',
 						r'-5/3',
 					]
-plot_log1d_many(xs, ys, xlab='$k_\+ L_\+$', legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', term=True, save=outdir+'kprp_spectra.pdf')
+plot_log1d_many(xs, ys, xlab='$'+kplab+'$', legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', term=True, save=outdir+'kprp_spectra.pdf')
 
 # kprp spectrum by components
 ys = [ 
@@ -127,7 +127,7 @@ legends = [
             r'$E_{\delta B_y}$',
             r'-5/3',
           ]
-plot_log1d_many(xs, ys, xlab='$k_\+ L_\+$', legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', term=True, save=outdir+'kprp_spectra_components.pdf')
+plot_log1d_many(xs, ys, xlab='$'+kplab+'$', legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', term=True, save=outdir+'kprp_spectra_components.pdf')
 
 # kprp spectrum by MRI injection rate and nonlinear transfer rate
 ys = [ 
@@ -178,7 +178,7 @@ legends = [
             r'$\calN_\mr{compr}^{<k_\+}$', 
             r'$\calN_\mr{compr}^{>k_\+}$', 
           ]
-plot_log1d_many(xs, ys, xlab='$k_\+ L_\+$', legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', term=True, save=outdir+'kprp_spectra_flux.pdf')
+plot_log1d_many(xs, ys, xlab='$'+kplab+'$', legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', term=True, save=outdir+'kprp_spectra_flux.pdf')
 
 # Elsasser fields
 ys = [ 
@@ -213,7 +213,7 @@ legends = [
             r'-5/3',
             r'-3/2',
           ]
-plot_log1d_many(xs, ys, xlab='$k_\+ L_\+$', legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', term=True, save=outdir+'kprp_spectra_ELS.pdf')
+plot_log1d_many(xs, ys, xlab='$'+kplab+'$', legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', term=True, save=outdir+'kprp_spectra_ELS.pdf')
 
 # kz spectrum
 if not is2D:
@@ -325,10 +325,22 @@ if not is2D:
 #                      plot 2D spectra                   #
 #--------------------------------------------------------#
 if not is2D:
-  plot_log2d(upe2_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab='$k_\+ L_\+$', ylab='$'+kzlab+'$', 
+  plot_log2d(upe2_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab='$'+kplab+'$', ylab='$'+kzlab+'$', 
       title=r'$E_{u_{\+}}$' + ' $(t = $ %.2E' % tt[final_idx] + '$)$', save=outdir + 'upe2.pdf')
-  plot_log2d(bpe2_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab='$k_\+ L_\+$', ylab='$'+kzlab+'$', 
+  plot_log2d(bpe2_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab='$'+kplab+'$', ylab='$'+kzlab+'$', 
       title=r'$E_{\delta B_\+}$' + ' $(t = $ %.2E' % tt[final_idx] + '$)$', save=outdir + 'bpe2.pdf')
+  plot_log2d(upa2_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab='$'+kplab+'$', ylab='$'+kzlab+'$', 
+      title=r'$E_{u_{\|}}$' + ' $(t = $ %.2E' % tt[final_idx] + '$)$', save=outdir + 'upa2.pdf')
+  plot_log2d(bpa2_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab='$'+kplab+'$', ylab='$'+kzlab+'$', 
+      title=r'$E_{\delta B_\|}$' + ' $(t = $ %.2E' % tt[final_idx] + '$)$', save=outdir + 'bpa2.pdf')
+  plot_log2d(zpep2_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab='$'+kplab+'$', ylab='$'+kzlab+'$', 
+      title=r'$E_{Z_{\+}^+}$' + ' $(t = $ %.2E' % tt[final_idx] + '$)$', save=outdir + 'zpep2.pdf')
+  plot_log2d(zpem2_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab='$'+kplab+'$', ylab='$'+kzlab+'$', 
+      title=r'$E_{Z_{\+}^-}$' + ' $(t = $ %.2E' % tt[final_idx] + '$)$', save=outdir + 'zpem2.pdf')
+  plot_log2d(zpap2_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab='$'+kplab+'$', ylab='$'+kzlab+'$', 
+      title=r'$E_{Z_{\|}^+}$' + ' $(t = $ %.2E' % tt[final_idx] + '$)$', save=outdir + 'zpap2.pdf')
+  plot_log2d(zpam2_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab='$'+kplab+'$', ylab='$'+kzlab+'$', 
+      title=r'$E_{Z_{\|}^-}$' + ' $(t = $ %.2E' % tt[final_idx] + '$)$', save=outdir + 'zpam2.pdf')
 
 #------------------#
 #   output ascii   #

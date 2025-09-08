@@ -79,6 +79,23 @@ legends = [
      ]
 plot_1d_many(xs, ys, xlab='$'+tlab+'$', legends=legends, ls=ls, legendloc='upper left', title='', ylab='', term=True, save=outdir + 'energy_all.pdf')
 
+# plot helicity change
+ys = [ 
+       (zpep2_sum - zpem2_sum)/(zpep2_sum + zpem2_sum), 
+       (zpap2_sum - zpam2_sum)/(zpap2_sum + zpam2_sum), 
+     ]
+ls = [ 
+       '', '' 
+     ]
+xs = [
+       tt, tt
+     ]
+legends = [ 
+       r'$H_\+ := \f{\int\rmd^3\bm{x}[(Z_\+^+)^2 - (Z_\+^-)^2]}{\int\rmd^3\bm{x}[(Z_\+^+)^2 + (Z_\+^-)^2]}$', 
+       r'$H_\| := \f{\int\rmd^3\bm{x}[(Z_\|^+)^2 - (Z_\|^-)^2]}{\int\rmd^3\bm{x}[(Z_\|^+)^2 + (Z_\|^-)^2]}$', 
+     ]
+plot_1d_many(xs, ys, xlab='$'+tlab+'$', legends=legends, ls=ls, legendloc='upper left', title='', ylab='', term=True, save=outdir + 'helicity.pdf')
+
 
 # ascii output
 np.savetxt(outdir + 'energies.txt' , np.column_stack((tt, upe2_sum, bpe2_sum, upa2_sum, bpa2_sum, 

@@ -8,49 +8,49 @@ from plots import *
 print('\nplotting fields\n')
 outdir = './fig_fields/'
 
-tt_fld = np.loadtxt(input_dir+'out2d/time.dat'+restart_num)
+tt_fld = np.loadtxt(input_dir+'out2d'+restart_num+'/time.dat')
 nt_fld = tt_fld.size
 if nt_fld == 1 : tt_fld = [tt_fld]
 
-phi_r_z0 = np.transpose(np.fromfile(input_dir+'out2d/phi_r_z0.dat'+restart_num).reshape(nt_fld, nly, nlx)); phi_r_z0 = np.transpose(phi_r_z0, axes=(2, 1, 0))
-phi_r_x0 = np.transpose(np.fromfile(input_dir+'out2d/phi_r_x0.dat'+restart_num).reshape(nt_fld, nlz, nly)); phi_r_x0 = np.transpose(phi_r_x0, axes=(2, 1, 0))
-phi_r_y0 = np.transpose(np.fromfile(input_dir+'out2d/phi_r_y0.dat'+restart_num).reshape(nt_fld, nlz, nlx)); phi_r_y0 = np.transpose(phi_r_y0, axes=(2, 1, 0))
+phi_r_z0 = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/phi_r_z0.dat').reshape(nt_fld, nly, nlx)); phi_r_z0 = np.transpose(phi_r_z0, axes=(2, 1, 0))
+phi_r_x0 = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/phi_r_x0.dat').reshape(nt_fld, nlz, nly)); phi_r_x0 = np.transpose(phi_r_x0, axes=(2, 1, 0))
+phi_r_y0 = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/phi_r_y0.dat').reshape(nt_fld, nlz, nlx)); phi_r_y0 = np.transpose(phi_r_y0, axes=(2, 1, 0))
+                                                                   
+psi_r_z0 = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/psi_r_z0.dat').reshape(nt_fld, nly, nlx)); psi_r_z0 = np.transpose(psi_r_z0, axes=(2, 1, 0))
+psi_r_x0 = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/psi_r_x0.dat').reshape(nt_fld, nlz, nly)); psi_r_x0 = np.transpose(psi_r_x0, axes=(2, 1, 0))
+psi_r_y0 = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/psi_r_y0.dat').reshape(nt_fld, nlz, nlx)); psi_r_y0 = np.transpose(psi_r_y0, axes=(2, 1, 0))
+                                                                   
+omg_r_z0 = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/omg_r_z0.dat').reshape(nt_fld, nly, nlx)); omg_r_z0 = np.transpose(omg_r_z0, axes=(2, 1, 0))
+omg_r_x0 = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/omg_r_x0.dat').reshape(nt_fld, nlz, nly)); omg_r_x0 = np.transpose(omg_r_x0, axes=(2, 1, 0))
+omg_r_y0 = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/omg_r_y0.dat').reshape(nt_fld, nlz, nlx)); omg_r_y0 = np.transpose(omg_r_y0, axes=(2, 1, 0))
+                                                                   
+jpa_r_z0 = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/jpa_r_z0.dat').reshape(nt_fld, nly, nlx)); jpa_r_z0 = np.transpose(jpa_r_z0, axes=(2, 1, 0))
+jpa_r_x0 = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/jpa_r_x0.dat').reshape(nt_fld, nlz, nly)); jpa_r_x0 = np.transpose(jpa_r_x0, axes=(2, 1, 0))
+jpa_r_y0 = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/jpa_r_y0.dat').reshape(nt_fld, nlz, nlx)); jpa_r_y0 = np.transpose(jpa_r_y0, axes=(2, 1, 0))
+                                                                   
+upa_r_z0 = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/upa_r_z0.dat').reshape(nt_fld, nly, nlx)); upa_r_z0 = np.transpose(upa_r_z0, axes=(2, 1, 0))
+upa_r_x0 = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/upa_r_x0.dat').reshape(nt_fld, nlz, nly)); upa_r_x0 = np.transpose(upa_r_x0, axes=(2, 1, 0))
+upa_r_y0 = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/upa_r_y0.dat').reshape(nt_fld, nlz, nlx)); upa_r_y0 = np.transpose(upa_r_y0, axes=(2, 1, 0))
+                                                                   
+bpa_r_z0 = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/bpa_r_z0.dat').reshape(nt_fld, nly, nlx)); bpa_r_z0 = np.transpose(bpa_r_z0, axes=(2, 1, 0))
+bpa_r_x0 = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/bpa_r_x0.dat').reshape(nt_fld, nlz, nly)); bpa_r_x0 = np.transpose(bpa_r_x0, axes=(2, 1, 0))
+bpa_r_y0 = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/bpa_r_y0.dat').reshape(nt_fld, nlz, nlx)); bpa_r_y0 = np.transpose(bpa_r_y0, axes=(2, 1, 0))
 
-psi_r_z0 = np.transpose(np.fromfile(input_dir+'out2d/psi_r_z0.dat'+restart_num).reshape(nt_fld, nly, nlx)); psi_r_z0 = np.transpose(psi_r_z0, axes=(2, 1, 0))
-psi_r_x0 = np.transpose(np.fromfile(input_dir+'out2d/psi_r_x0.dat'+restart_num).reshape(nt_fld, nlz, nly)); psi_r_x0 = np.transpose(psi_r_x0, axes=(2, 1, 0))
-psi_r_y0 = np.transpose(np.fromfile(input_dir+'out2d/psi_r_y0.dat'+restart_num).reshape(nt_fld, nlz, nlx)); psi_r_y0 = np.transpose(psi_r_y0, axes=(2, 1, 0))
-
-omg_r_z0 = np.transpose(np.fromfile(input_dir+'out2d/omg_r_z0.dat'+restart_num).reshape(nt_fld, nly, nlx)); omg_r_z0 = np.transpose(omg_r_z0, axes=(2, 1, 0))
-omg_r_x0 = np.transpose(np.fromfile(input_dir+'out2d/omg_r_x0.dat'+restart_num).reshape(nt_fld, nlz, nly)); omg_r_x0 = np.transpose(omg_r_x0, axes=(2, 1, 0))
-omg_r_y0 = np.transpose(np.fromfile(input_dir+'out2d/omg_r_y0.dat'+restart_num).reshape(nt_fld, nlz, nlx)); omg_r_y0 = np.transpose(omg_r_y0, axes=(2, 1, 0))
-
-jpa_r_z0 = np.transpose(np.fromfile(input_dir+'out2d/jpa_r_z0.dat'+restart_num).reshape(nt_fld, nly, nlx)); jpa_r_z0 = np.transpose(jpa_r_z0, axes=(2, 1, 0))
-jpa_r_x0 = np.transpose(np.fromfile(input_dir+'out2d/jpa_r_x0.dat'+restart_num).reshape(nt_fld, nlz, nly)); jpa_r_x0 = np.transpose(jpa_r_x0, axes=(2, 1, 0))
-jpa_r_y0 = np.transpose(np.fromfile(input_dir+'out2d/jpa_r_y0.dat'+restart_num).reshape(nt_fld, nlz, nlx)); jpa_r_y0 = np.transpose(jpa_r_y0, axes=(2, 1, 0))
-
-upa_r_z0 = np.transpose(np.fromfile(input_dir+'out2d/upa_r_z0.dat'+restart_num).reshape(nt_fld, nly, nlx)); upa_r_z0 = np.transpose(upa_r_z0, axes=(2, 1, 0))
-upa_r_x0 = np.transpose(np.fromfile(input_dir+'out2d/upa_r_x0.dat'+restart_num).reshape(nt_fld, nlz, nly)); upa_r_x0 = np.transpose(upa_r_x0, axes=(2, 1, 0))
-upa_r_y0 = np.transpose(np.fromfile(input_dir+'out2d/upa_r_y0.dat'+restart_num).reshape(nt_fld, nlz, nlx)); upa_r_y0 = np.transpose(upa_r_y0, axes=(2, 1, 0))
-
-bpa_r_z0 = np.transpose(np.fromfile(input_dir+'out2d/bpa_r_z0.dat'+restart_num).reshape(nt_fld, nly, nlx)); bpa_r_z0 = np.transpose(bpa_r_z0, axes=(2, 1, 0))
-bpa_r_x0 = np.transpose(np.fromfile(input_dir+'out2d/bpa_r_x0.dat'+restart_num).reshape(nt_fld, nlz, nly)); bpa_r_x0 = np.transpose(bpa_r_x0, axes=(2, 1, 0))
-bpa_r_y0 = np.transpose(np.fromfile(input_dir+'out2d/bpa_r_y0.dat'+restart_num).reshape(nt_fld, nlz, nlx)); bpa_r_y0 = np.transpose(bpa_r_y0, axes=(2, 1, 0))
-
-ux_r_z0  = np.transpose(np.fromfile(input_dir+'out2d/ux_r_z0.dat' +restart_num).reshape(nt_fld, nly, nlx)); ux_r_z0  = np.transpose(ux_r_z0 , axes=(2, 1, 0))
-ux_r_x0  = np.transpose(np.fromfile(input_dir+'out2d/ux_r_x0.dat' +restart_num).reshape(nt_fld, nlz, nly)); ux_r_x0  = np.transpose(ux_r_x0 , axes=(2, 1, 0))
-ux_r_y0  = np.transpose(np.fromfile(input_dir+'out2d/ux_r_y0.dat' +restart_num).reshape(nt_fld, nlz, nlx)); ux_r_y0  = np.transpose(ux_r_y0 , axes=(2, 1, 0))
-                                                                                                                                            
-uy_r_z0  = np.transpose(np.fromfile(input_dir+'out2d/uy_r_z0.dat' +restart_num).reshape(nt_fld, nly, nlx)); uy_r_z0  = np.transpose(uy_r_z0 , axes=(2, 1, 0))
-uy_r_x0  = np.transpose(np.fromfile(input_dir+'out2d/uy_r_x0.dat' +restart_num).reshape(nt_fld, nlz, nly)); uy_r_x0  = np.transpose(uy_r_x0 , axes=(2, 1, 0))
-uy_r_y0  = np.transpose(np.fromfile(input_dir+'out2d/uy_r_y0.dat' +restart_num).reshape(nt_fld, nlz, nlx)); uy_r_y0  = np.transpose(uy_r_y0 , axes=(2, 1, 0))
-                                                                                                                                            
-bx_r_z0  = np.transpose(np.fromfile(input_dir+'out2d/bx_r_z0.dat' +restart_num).reshape(nt_fld, nly, nlx)); bx_r_z0  = np.transpose(bx_r_z0 , axes=(2, 1, 0))
-bx_r_x0  = np.transpose(np.fromfile(input_dir+'out2d/bx_r_x0.dat' +restart_num).reshape(nt_fld, nlz, nly)); bx_r_x0  = np.transpose(bx_r_x0 , axes=(2, 1, 0))
-bx_r_y0  = np.transpose(np.fromfile(input_dir+'out2d/bx_r_y0.dat' +restart_num).reshape(nt_fld, nlz, nlx)); bx_r_y0  = np.transpose(bx_r_y0 , axes=(2, 1, 0))
-                                                                                                                                                             
-by_r_z0  = np.transpose(np.fromfile(input_dir+'out2d/by_r_z0.dat' +restart_num).reshape(nt_fld, nly, nlx)); by_r_z0  = np.transpose(by_r_z0 , axes=(2, 1, 0))
-by_r_x0  = np.transpose(np.fromfile(input_dir+'out2d/by_r_x0.dat' +restart_num).reshape(nt_fld, nlz, nly)); by_r_x0  = np.transpose(by_r_x0 , axes=(2, 1, 0))
-by_r_y0  = np.transpose(np.fromfile(input_dir+'out2d/by_r_y0.dat' +restart_num).reshape(nt_fld, nlz, nlx)); by_r_y0  = np.transpose(by_r_y0 , axes=(2, 1, 0))
+ux_r_z0  = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/ux_r_z0.dat').reshape(nt_fld, nly, nlx)); ux_r_z0  = np.transpose(ux_r_z0 , axes=(2, 1, 0))
+ux_r_x0  = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/ux_r_x0.dat').reshape(nt_fld, nlz, nly)); ux_r_x0  = np.transpose(ux_r_x0 , axes=(2, 1, 0))
+ux_r_y0  = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/ux_r_y0.dat').reshape(nt_fld, nlz, nlx)); ux_r_y0  = np.transpose(ux_r_y0 , axes=(2, 1, 0))
+                                                                                                                                              
+uy_r_z0  = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/uy_r_z0.dat').reshape(nt_fld, nly, nlx)); uy_r_z0  = np.transpose(uy_r_z0 , axes=(2, 1, 0))
+uy_r_x0  = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/uy_r_x0.dat').reshape(nt_fld, nlz, nly)); uy_r_x0  = np.transpose(uy_r_x0 , axes=(2, 1, 0))
+uy_r_y0  = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/uy_r_y0.dat').reshape(nt_fld, nlz, nlx)); uy_r_y0  = np.transpose(uy_r_y0 , axes=(2, 1, 0))
+                                                                                                                                              
+bx_r_z0  = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/bx_r_z0.dat').reshape(nt_fld, nly, nlx)); bx_r_z0  = np.transpose(bx_r_z0 , axes=(2, 1, 0))
+bx_r_x0  = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/bx_r_x0.dat').reshape(nt_fld, nlz, nly)); bx_r_x0  = np.transpose(bx_r_x0 , axes=(2, 1, 0))
+bx_r_y0  = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/bx_r_y0.dat').reshape(nt_fld, nlz, nlx)); bx_r_y0  = np.transpose(bx_r_y0 , axes=(2, 1, 0))
+                                                                                                                                                               
+by_r_z0  = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/by_r_z0.dat').reshape(nt_fld, nly, nlx)); by_r_z0  = np.transpose(by_r_z0 , axes=(2, 1, 0))
+by_r_x0  = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/by_r_x0.dat').reshape(nt_fld, nlz, nly)); by_r_x0  = np.transpose(by_r_x0 , axes=(2, 1, 0))
+by_r_y0  = np.transpose(np.fromfile(input_dir+'out2d'+restart_num+'/by_r_y0.dat').reshape(nt_fld, nlz, nlx)); by_r_y0  = np.transpose(by_r_y0 , axes=(2, 1, 0))
 
 #--------------------------------------------------------#
 #                   plot final snapshot                  #

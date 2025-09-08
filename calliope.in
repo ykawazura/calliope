@@ -51,6 +51,13 @@
   beta    = 1d+1
   gamma   = 1.6666666667d+0
 
+  ! shear parameter
+  q = 1.5d0
+
+  ! curvature parameters
+  kappa_b = 0d+0
+  kappa_p = 1d+0
+
   ! hyper dissipation ~ nu*kperp^(2*nuexp)
   nupe_x      = 1d+3  ! perp viscosity   for phi
   nupe_x_exp  = 4                               
@@ -70,11 +77,6 @@
   nupa_z_exp  = 4                              
   etapa_z     = 1d+2  ! para resistivity for bpa
   etapa_z_exp = 4
-
-  ! shear parameters
-  q = 1.5d0
-  kappa_b = 0d+0
-  kappa_p = 1d+0
 /
 
 !==============================================================================

@@ -193,7 +193,7 @@ contains
                                                        q *0.5d0*(psi_mid*conjg(bpa_mid) - bpa_mid*conjg(psi_mid)) &
                                              + (2.d0 - q)*0.5d0*(phi_mid*conjg(upa_mid) - upa_mid*conjg(phi_mid)) &
                                            )
-          p_aw_grd    (i, k, j) = zi*ky(j)*0.5d0*(kappa_b + cs2va2*kappa_p)*(phi_mid*conjg(bpa_mid) - bpa_mid*conjg(phi_mid))
+          p_aw_grd    (i, k, j) = zi*ky(j)*0.5d0*2.d0*(kappa_b + cs2va2*kappa_p)*(phi_mid*conjg(bpa_mid) - bpa_mid*conjg(phi_mid))
           p_compr_grd (i, k, j) = -zi*ky(j)*0.5d0*( &
                                                     (2.d0*kappa_b + (cs2va2 - 1.d0)*kappa_p)*(phi_mid*conjg(bpa_mid) - bpa_mid*conjg(phi_mid)) &
                                                   + cs2va2*kappa_p*(psi_mid*conjg(upa_mid) - upa_mid*conjg(psi_mid)) &
