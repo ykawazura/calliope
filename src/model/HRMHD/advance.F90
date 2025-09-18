@@ -89,6 +89,7 @@ contains
     use force, only: fphi, fpsi, fupa, fbpa, fphi_old, fpsi_old, fupa_old, fbpa_old
     use force, only: driven, elsasser, update_force, get_force, normalize_force, get_force, normalize_force_els
     use force, only: fzppe, fzmpe, fzppa, fzmpa
+    use force, only: is_forced, zeroing_at_forcing_wavenumber
     use advance_common, only: eSSPIFRK1, eSSPIFRK2, eSSPIFRK3
     use advance_common, only: gear1, gear2, gear3
     use diagnostics_common, only: series_output
@@ -206,6 +207,22 @@ contains
         enddo
       enddo
 
+      ! Zeroing unforced fields at the forcing wavenumber
+      if (driven) then
+        if(elsasser) then
+          ! only if neither zppa nor zmpa is forced, upa and bpa is zeroed
+          if ((.not. is_forced('zppa')) .and. (.not. is_forced('zmpa'))) then
+            call zeroing_at_forcing_wavenumber(upa_tmp)
+            call zeroing_at_forcing_wavenumber(bpa_tmp)
+          endif
+        else
+          if (.not. is_forced('phi')) call zeroing_at_forcing_wavenumber(phi_tmp)
+          if (.not. is_forced('psi')) call zeroing_at_forcing_wavenumber(psi_tmp)
+          if (.not. is_forced('upa')) call zeroing_at_forcing_wavenumber(upa_tmp)
+          if (.not. is_forced('bpa')) call zeroing_at_forcing_wavenumber(bpa_tmp)
+        endif
+      endif
+
       !---------------  RK 2nd step  ---------------
       ! Calcualte force terms
       if (driven) then
@@ -302,6 +319,22 @@ contains
           enddo
         enddo
       enddo
+
+      ! Zeroing unforced fields at the forcing wavenumber
+      if (driven) then
+        if(elsasser) then
+          ! only if neither zppa nor zmpa is forced, upa and bpa is zeroed
+          if ((.not. is_forced('zppa')) .and. (.not. is_forced('zmpa'))) then
+            call zeroing_at_forcing_wavenumber(upa_tmp)
+            call zeroing_at_forcing_wavenumber(bpa_tmp)
+          endif
+        else
+          if (.not. is_forced('phi')) call zeroing_at_forcing_wavenumber(phi_tmp)
+          if (.not. is_forced('psi')) call zeroing_at_forcing_wavenumber(psi_tmp)
+          if (.not. is_forced('upa')) call zeroing_at_forcing_wavenumber(upa_tmp)
+          if (.not. is_forced('bpa')) call zeroing_at_forcing_wavenumber(bpa_tmp)
+        endif
+      endif
 
       !---------------  RK 3rd step  ---------------
       ! Calcualte nonlinear terms
@@ -401,6 +434,22 @@ contains
           enddo
         enddo
       enddo
+
+      ! Zeroing unforced fields at the forcing wavenumber
+      if (driven) then
+        if(elsasser) then
+          ! only if neither zppa nor zmpa is forced, upa and bpa is zeroed
+          if ((.not. is_forced('zppa')) .and. (.not. is_forced('zmpa'))) then
+            call zeroing_at_forcing_wavenumber(upa_new)
+            call zeroing_at_forcing_wavenumber(bpa_new)
+          endif
+        else
+          if (.not. is_forced('phi')) call zeroing_at_forcing_wavenumber(phi_new)
+          if (.not. is_forced('psi')) call zeroing_at_forcing_wavenumber(psi_new)
+          if (.not. is_forced('upa')) call zeroing_at_forcing_wavenumber(upa_new)
+          if (.not. is_forced('bpa')) call zeroing_at_forcing_wavenumber(bpa_new)
+        endif
+      endif
     endif
 
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
@@ -567,6 +616,23 @@ contains
           enddo
         enddo
       enddo
+
+      ! Zeroing unforced fields at the forcing wavenumber
+      if (driven) then
+        if(elsasser) then
+          ! only if neither zppa nor zmpa is forced, upa and bpa is zeroed
+          if ((.not. is_forced('zppa')) .and. (.not. is_forced('zmpa'))) then
+            call zeroing_at_forcing_wavenumber(upa)
+            call zeroing_at_forcing_wavenumber(bpa)
+          endif
+        else
+          if (.not. is_forced('phi')) call zeroing_at_forcing_wavenumber(phi)
+          if (.not. is_forced('psi')) call zeroing_at_forcing_wavenumber(psi)
+          if (.not. is_forced('upa')) call zeroing_at_forcing_wavenumber(upa)
+          if (.not. is_forced('bpa')) call zeroing_at_forcing_wavenumber(bpa)
+        endif
+      endif
+
     endif
 
     !$omp workshare

@@ -11,6 +11,7 @@ module force_common
   public driven
   public nk_stir, a_force, b_force
   public f_name, kx_stir, ky_stir, kz_stir
+  public is_forced, zeroing_at_forcing_wavenumber
 
   logical :: driven
   integer :: nk_stir
@@ -294,6 +295,78 @@ contains
     if (proc0) call put_time_stamp(timer_force)
 
   end subroutine get_force
+
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    19 Sep 2025
+!! @brief   Return whether the field `name` 
+!!          is forced or not
+!-----------------------------------------------!
+  function is_forced (name)
+    implicit none
+    logical :: is_forced
+    character(*) :: name
+    integer :: i
+
+    is_forced = .false.
+
+    do i = 1, nfields
+      if(trim(name) == field_names(i)) is_forced = .true.
+    enddo
+
+  end function is_forced
+
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    19 Sep 2025
+!! @brief   Enforce zero the field at the forcing
+!!          wavenumber (this field should be  
+!!          unforced one )
+!-----------------------------------------------!
+  subroutine zeroing_at_forcing_wavenumber (u)
+    use grid, only: nkx, nkz
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use mp, only: proc0
+    use time_stamp, only: put_time_stamp, timer_force
+    implicit none
+    complex(r8), dimension (ikx_st:ikx_en, &
+                            ikz_st:ikz_en, &
+                            iky_st:iky_en), intent(inout) :: u
+    integer :: i, j, k, ifield, istir
+
+    if (proc0) call put_time_stamp(timer_force)
+
+    do ifield = 1, nfields
+      do istir = 1, nk_stir
+        j = ky_stir(ifield, istir) + 1
+
+        if(kx_stir(ifield, istir) >= 0) then
+          i = kx_stir(ifield, istir) + 1
+        else
+          i = nkx + kx_stir(ifield, istir) + 1
+        endif
+
+        if(kz_stir(ifield, istir) >= 0) then
+          k = kz_stir(ifield, istir) + 1
+        else
+          k = nkz + kz_stir(ifield, istir) + 1
+        endif
+
+        if(      (i >= ikx_st .and. i <= ikx_en) &
+          .and. (j >= iky_st .and. j <= iky_en) &
+          .and. (k >= ikz_st .and. k <= ikz_en) ) then
+
+          u(i, k, j) = 0.d0
+        endif
+      end do
+    enddo
+
+    if (proc0) call put_time_stamp(timer_force)
+  end subroutine zeroing_at_forcing_wavenumber
 
 
   !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!

@@ -375,14 +375,14 @@ if not is2D:
       title=r'$E_{u_{\|}}$' + ' $(t = $ %.2E' % tt[final_idx] + '$)$', save=outdir + 'upa2.pdf')
   plot_log2d(bpa2_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab='$'+kplab+'$', ylab='$'+kzlab+'$', 
       title=r'$E_{\delta B_\|}$' + ' $(t = $ %.2E' % tt[final_idx] + '$)$', save=outdir + 'bpa2.pdf')
-  plot_log2d(zpep2_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab='$'+kplab+'$', ylab='$'+kzlab+'$', 
-      title=r'$E_{Z_{\+}^+}$' + ' $(t = $ %.2E' % tt[final_idx] + '$)$', save=outdir + 'zpep2.pdf')
-  plot_log2d(zpem2_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab='$'+kplab+'$', ylab='$'+kzlab+'$', 
-      title=r'$E_{Z_{\+}^-}$' + ' $(t = $ %.2E' % tt[final_idx] + '$)$', save=outdir + 'zpem2.pdf')
-  plot_log2d(zpap2_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab='$'+kplab+'$', ylab='$'+kzlab+'$', 
-      title=r'$E_{Z_{\|}^+}$' + ' $(t = $ %.2E' % tt[final_idx] + '$)$', save=outdir + 'zpap2.pdf')
-  plot_log2d(zpam2_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab='$'+kplab+'$', ylab='$'+kzlab+'$', 
-      title=r'$E_{Z_{\|}^-}$' + ' $(t = $ %.2E' % tt[final_idx] + '$)$', save=outdir + 'zpam2.pdf')
+  plot_log2d(zppe2_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab='$'+kplab+'$', ylab='$'+kzlab+'$', 
+      title=r'$E_{Z_{\+}^+}$' + ' $(t = $ %.2E' % tt[final_idx] + '$)$', save=outdir + 'zppe2.pdf')
+  plot_log2d(zmpe2_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab='$'+kplab+'$', ylab='$'+kzlab+'$', 
+      title=r'$E_{Z_{\+}^-}$' + ' $(t = $ %.2E' % tt[final_idx] + '$)$', save=outdir + 'zmpe2.pdf')
+  plot_log2d(zppa2_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab='$'+kplab+'$', ylab='$'+kzlab+'$', 
+      title=r'$E_{Z_{\|}^+}$' + ' $(t = $ %.2E' % tt[final_idx] + '$)$', save=outdir + 'zppa2.pdf')
+  plot_log2d(zmpa2_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab='$'+kplab+'$', ylab='$'+kzlab+'$', 
+      title=r'$E_{Z_{\|}^-}$' + ' $(t = $ %.2E' % tt[final_idx] + '$)$', save=outdir + 'zmpa2.pdf')
   plot_log2d(dissip_KAW_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab=r'$'+kplab+'$', ylab='$'+kzlab+'$', 
       title=r'$\calD_\mr{KAW}$' + ' $(t = $ %.2E' % tt[final_idx] + '$)$', save=outdir + 'dissip_KAW.pdf')
   plot_log2d(dissip_ICW_bin[final_idx, 1:kz_end, 1:kp_end], kpbin[1:kp_end], kz[1:kz_end], xlab=r'$'+kplab+'$', ylab='$'+kzlab+'$', 

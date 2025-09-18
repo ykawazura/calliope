@@ -8,9 +8,10 @@ FFTW3_HOME=/system/apps/rhel9/library/fftw/3.3.10/oneapi/2025.1
 FFTW3_INC=-I$(FFTW3_HOME)/include/
 FFTW3_LIB=-L$(FFTW3_HOME)/lib/ -lfftw3
 
-NETCDF_HOME=$(HOME)/work/.local/netcdf
-NETCDF_INC=-I$(NETCDF_HOME)/include/
-NETCDF_LIB=-L$(NETCDF_HOME)/lib -lnetcdf -lnetcdff
+NETCDF_C_HOME=/system/apps/rhel9/library/netcdf-c/4.9.3/oneapi2025.1
+NETCDF_F_HOME=/system/apps/rhel9/library/netcdf-fortran/4.6.2/oneapi2025.1
+NETCDF_INC=-I$(NETCDF_C_HOME)/include/ -I$(NETCDF_F_HOME)/include/
+NETCDF_LIB=-L$(NETCDF_C_HOME)/lib -L$(NETCDF_F_HOME)/lib -lnetcdf -lnetcdff
 
 F90FLAGS = -DINTEL -O3
 MPI_LIB = -lm -lmpi -lmpifort
