@@ -1241,16 +1241,17 @@ contains
     use fields, only: ibx, iby, ibz
     use fields, only: ux, uy, uz
     use fields, only: bx, by, bz
-    use params, only: zi
-    use grid, only: ky, kz
+    use params, only: zi, nu, nu_h, nu_h_exp, eta, eta_h, eta_h_exp, shear, q
+    use grid, only: ky, kz, k2_max
     use grid, only: nlx, nly, nlz
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use grid, only: nl_local_tot, nk_local_tot
     use mp, only: proc0, sum_reduce
-    use shearing_box, only: k2t, kxt
+    use shearing_box, only: shear_flg, k2t, kxt
     use io, only: loop_io_nltrans
     use time_stamp, only: put_time_stamp, timer_diagnostics_total, timer_diagnostics_nltrans
+    use utils, only: cabs2
     implicit none
 
 
@@ -1283,7 +1284,8 @@ contains
     real(r8) :: filter
 
     real   (r8), dimension(:,:), allocatable :: trans_uu, trans_bb, trans_ub, trans_bu
-    complex(r8), allocatable, dimension(:,:,:,:) :: w, wtmp 
+    real   (r8), dimension(:)  , allocatable :: u2dissip, b2dissip, p_re, p_ma
+    complex(r8), allocatable, dimension(:,:,:,:) :: w, wtmp
     complex(r8), allocatable, dimension(:,:,:,:) :: w_filtd
     complex(r8), allocatable, dimension(:,:,:,:) :: flx
     complex(r8), allocatable, dimension(:,:,:,:) :: nonlin
@@ -1299,6 +1301,10 @@ contains
     allocate(trans_bb (nkpolar_log, nkpolar_log), source=0.d0)
     allocate(trans_ub (nkpolar_log, nkpolar_log), source=0.d0)
     allocate(trans_bu (nkpolar_log, nkpolar_log), source=0.d0)
+    allocate(u2dissip (nkpolar_log), source=0.d0)
+    allocate(b2dissip (nkpolar_log), source=0.d0)
+    allocate(p_re     (nkpolar_log), source=0.d0)
+    allocate(p_ma     (nkpolar_log), source=0.d0)
 
     if(.not. allocated(w   )) allocate(w   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nfields), source=(0.d0,0.d0))
     if(.not. allocated(wtmp)) allocate(wtmp(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nfields), source=(0.d0,0.d0))
@@ -1324,10 +1330,10 @@ contains
     !call p3dfft_btran_c2r_many(w, nk_local_tot, w_r, nl_local_tot, nfields, 'tff')
     wtmp = w
     do i = 1, nfields
-      call p3dfft_btran_c2r(w(:,:,:,i), w_r(:,:,:,i), 'tff')
+      call p3dfft_btran_c2r(w    (:,:,:,i), w_r    (:,:,:,i), 'tff')
     enddo
     w = wtmp
-    if(allocated(wtmp)) deallocate(wtmp)
+    if(allocated(wtmp )) deallocate(wtmp )
 
 
     ! get nonlinear transfer for each kprp_log(ii)
@@ -1557,20 +1563,57 @@ contains
 
     enddo
 
+
+    ! get dissipation and injection for each kprp_log(ii)
+    do ii = 1, nkpolar_log
+      do j = iky_st, iky_en
+        do k = ikz_st, ikz_en
+          do i = ikx_st, ikx_en
+            if(k2t(i, k, j) >= (kpbin_log(ii))**2 .and. k2t(i, k, j) < (kpbin_log(ii + 1))**2) then
+              filter = 1.d0
+            else
+              filter = 0.d0
+            endif
+            if (j /= 1) filter = filter * 2
+
+            u2dissip(ii) = u2dissip(ii) + filter*(nu *(k2t(i, k, j)/k2_max) + nu_h *(k2t(i, k, j)/k2_max)**nu_h_exp )*dble( &
+                              cabs2(ux(i,k,j)) + cabs2(uy(i,k,j)) + cabs2(uz(i,k,j)) &
+                            )                                                                                                 
+            b2dissip(ii) = b2dissip(ii) + filter*(eta*(k2t(i, k, j)/k2_max) + eta_h*(k2t(i, k, j)/k2_max)**eta_h_exp)*dble( &
+                              cabs2(bx(i,k,j)) + cabs2(by(i,k,j)) + cabs2(bz(i,k,j)) &
+                            )                                                                                                 
+            p_re    (ii) = p_re    (ii) + filter*0.5d0*q*shear_flg*dble( &
+                                (ux(i,k,j)*conjg(uy(i,k,j)) + conjg(ux(i,k,j))*uy(i,k,j)) &
+                            )                                                                                                 
+            p_ma    (ii) = p_ma    (ii) - filter*0.5d0*q*shear_flg*dble( &
+                                (bx(i,k,j)*conjg(by(i,k,j)) + conjg(bx(i,k,j))*by(i,k,j)) &
+                            )                                                                                                 
+
+          enddo
+        enddo
+      enddo
+    enddo
+
     call sum_reduce(trans_uu, 0)
     call sum_reduce(trans_bb, 0)
     call sum_reduce(trans_ub, 0)
     call sum_reduce(trans_bu, 0)
+    call sum_reduce(b2dissip, 0)
+    call sum_reduce(u2dissip, 0)
 
     if (proc0) call put_time_stamp(timer_diagnostics_total)
     if (proc0) call put_time_stamp(timer_diagnostics_nltrans)
 
-    call loop_io_nltrans(nkpolar_log, trans_uu, trans_bb, trans_ub, trans_bu)
+    call loop_io_nltrans(nkpolar_log, trans_uu, trans_bb, trans_ub, trans_bu, u2dissip, b2dissip, p_re, p_ma)
 
-    deallocate(trans_uu )
-    deallocate(trans_bb )
-    deallocate(trans_ub )
-    deallocate(trans_bu )
+    deallocate(trans_uu)
+    deallocate(trans_bb)
+    deallocate(trans_ub)
+    deallocate(trans_bu)
+    deallocate(u2dissip)
+    deallocate(b2dissip)
+    deallocate(p_re    )
+    deallocate(p_ma    )
     if(allocated(w))   deallocate(w  )
     if(allocated(w_r)) deallocate(w_r)
 

@@ -2,7 +2,7 @@
 #------- qsub option -----------
 #PBS -P NIFS24KISC013
 #PBS -q A_S
-#PBS -l select=1:ncpus=64:mpiprocs=64:ompthreads=1
+#PBS -l select=1:ncpus=256:mem=100gb:mpiprocs=256:ompthreads=1
 #PBS -l walltime=24:00:00
 #PBS -m abe
 #PBS -M yohey.44@gmail.com
@@ -10,7 +10,8 @@
 #------- Program execution -----------
 module load intel/2025.1
 module load fftw/3.3.10/oneapi2025.1
-export LD_LIBRARY_PATH=/system/apps/rhel9/library/netcdf-c/4.9.3/oneapi2025.1/lib:$LD_LIBRARY_PATH
+module load hdf5/1.14.6/oneapi2025.1-parallel
+module load netcdf-fortran/4.6.2/oneapi2025.1-parallel
 export I_MPI_OFI_PROVIDER=psm3
 
 cd ${PBS_O_WORKDIR}

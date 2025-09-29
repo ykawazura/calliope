@@ -122,3 +122,22 @@ legends = [
           ]
 
 plot_semilogx1d_many(xs, ys, xlab=kplab, legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt_nltrans[final_nltrans_idx], ylab='', term=True, save=outdir+'flux.pdf')
+
+#------------------#
+#   output ascii   #
+#------------------#
+nl_uu = np.sum(trans_uu[final_nltrans_idx, :, :], axis=0)
+nl_bb = np.sum(trans_bb[final_nltrans_idx, :, :], axis=0)
+nl_ub = np.sum(trans_ub[final_nltrans_idx, :, :], axis=0)
+nl_bu = np.sum(trans_bu[final_nltrans_idx, :, :], axis=0)
+np.savetxt(outdir + 'terms.txt'  , np.column_stack((kp[:], 
+                                                  nl_uu[:],
+                                                  nl_bb[:],
+                                                  nl_ub[:],
+                                                  nl_bu[:],
+                                                  u2dissip[final_nltrans_idx,:],
+                                                  b2dissip[final_nltrans_idx,:],
+                                                  p_re    [final_nltrans_idx,:],
+                                                  p_ma    [final_nltrans_idx,:],
+                                                 )), fmt='%E')
+

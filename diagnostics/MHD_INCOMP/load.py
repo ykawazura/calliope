@@ -149,6 +149,10 @@ if os.path.exists(filename):
     trans_bb          = np.copy(ncfile.variables['trans_bb' ][:]); trans_bb          = np.delete(trans_bb         , ignored_points_nltrans, axis = 0)
     trans_ub          = np.copy(ncfile.variables['trans_ub' ][:]); trans_ub          = np.delete(trans_ub         , ignored_points_nltrans, axis = 0)
     trans_bu          = np.copy(ncfile.variables['trans_bu' ][:]); trans_bu          = np.delete(trans_bu         , ignored_points_nltrans, axis = 0)
+    u2dissip          = np.copy(ncfile.variables['u2dissip' ][:]); u2dissip          = np.delete(u2dissip         , ignored_points_nltrans, axis = 0)
+    b2dissip          = np.copy(ncfile.variables['b2dissip' ][:]); b2dissip          = np.delete(b2dissip         , ignored_points_nltrans, axis = 0)
+    p_re              = np.copy(ncfile.variables['p_re'     ][:]); p_re              = np.delete(p_re             , ignored_points_nltrans, axis = 0)
+    p_ma              = np.copy(ncfile.variables['p_ma'     ][:]); p_ma              = np.delete(p_ma             , ignored_points_nltrans, axis = 0)
   except KeyError:
     pass
   ncfile.close()

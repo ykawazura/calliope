@@ -116,9 +116,12 @@ module io
   integer :: tt_nltrans_id, kpbin_log_nltrans_id
 
   integer :: trans_uu_id, trans_bb_id, trans_ub_id, trans_bu_id
+  integer :: u2dissip_id, b2dissip_id
+  integer :: p_re_id, p_ma_id
 
   integer (kind_nf) :: tt_nltrans_dim, kpbin_log_nltrans_dim
   integer, dimension (3) :: nltrans_dim
+  integer, dimension (2) :: nltrans1d_dim
 
   integer :: nout_nltrans
 
@@ -469,10 +472,17 @@ contains
       nltrans_dim (2) = kpbin_log_nltrans_dim
       nltrans_dim (3) = tt_nltrans_dim
 
-      status = nf90_def_var (ncid_nltrans, 'trans_uu'   , NF90_DOUBLE, nltrans_dim, trans_uu_id)
-      status = nf90_def_var (ncid_nltrans, 'trans_bb'   , NF90_DOUBLE, nltrans_dim, trans_bb_id)
-      status = nf90_def_var (ncid_nltrans, 'trans_ub'   , NF90_DOUBLE, nltrans_dim, trans_ub_id)
-      status = nf90_def_var (ncid_nltrans, 'trans_bu'   , NF90_DOUBLE, nltrans_dim, trans_bu_id)
+      nltrans1d_dim (1) = kpbin_log_nltrans_dim
+      nltrans1d_dim (2) = tt_nltrans_dim
+
+      status = nf90_def_var (ncid_nltrans, 'trans_uu', NF90_DOUBLE, nltrans_dim, trans_uu_id)
+      status = nf90_def_var (ncid_nltrans, 'trans_bb', NF90_DOUBLE, nltrans_dim, trans_bb_id)
+      status = nf90_def_var (ncid_nltrans, 'trans_ub', NF90_DOUBLE, nltrans_dim, trans_ub_id)
+      status = nf90_def_var (ncid_nltrans, 'trans_bu', NF90_DOUBLE, nltrans_dim, trans_bu_id)
+      status = nf90_def_var (ncid_nltrans, 'u2dissip', NF90_DOUBLE, nltrans1d_dim, u2dissip_id)
+      status = nf90_def_var (ncid_nltrans, 'b2dissip', NF90_DOUBLE, nltrans1d_dim, b2dissip_id)
+      status = nf90_def_var (ncid_nltrans, 'p_re'    , NF90_DOUBLE, nltrans1d_dim, p_re_id)
+      status = nf90_def_var (ncid_nltrans, 'p_ma'    , NF90_DOUBLE, nltrans1d_dim, p_ma_id)
 
       status = nf90_enddef (ncid_nltrans)  ! out of definition mode
 
@@ -930,15 +940,17 @@ contains
 !! @brief   Append variables to NETCDF
 !           for shell-to-shell transfer function
 !-----------------------------------------------!
-  subroutine loop_io_nltrans(nkpolar_log, trans_uu, trans_bb, trans_ub, trans_bu)
+  subroutine loop_io_nltrans(nkpolar_log, trans_uu, trans_bb, trans_ub, trans_bu, u2dissip, b2dissip, p_re, p_ma)
     use time, only: tt
     use mp, only: proc0
     implicit none
     integer , intent(in) :: nkpolar_log
     real(r8), intent(in) :: trans_uu(1:nkpolar_log, 1:nkpolar_log), trans_bb(1:nkpolar_log, 1:nkpolar_log), &
-                            trans_ub(1:nkpolar_log, 1:nkpolar_log), trans_bu(1:nkpolar_log, 1:nkpolar_log)
+                            trans_ub(1:nkpolar_log, 1:nkpolar_log), trans_bu(1:nkpolar_log, 1:nkpolar_log), &
+                            u2dissip(1:nkpolar_log), b2dissip(1:nkpolar_log), p_re(1:nkpolar_log), p_ma(1:nkpolar_log)
 
     integer, dimension (3) :: start3, count3
+    integer, dimension (2) :: start2, count2
 
     ! output via NETCDF
     if(proc0) then
@@ -954,6 +966,17 @@ contains
       status = nf90_put_var (ncid_nltrans, trans_bb_id, trans_bb, start=start3, count=count3)
       status = nf90_put_var (ncid_nltrans, trans_ub_id, trans_ub, start=start3, count=count3)
       status = nf90_put_var (ncid_nltrans, trans_bu_id, trans_bu, start=start3, count=count3)
+
+      start2(1) = 1
+      start2(2) = nout_nltrans
+
+      count2(1) = nkpolar_log
+      count2(2) = 1
+      status = nf90_put_var (ncid_nltrans, u2dissip_id, u2dissip, start=start2, count=count2)
+      status = nf90_put_var (ncid_nltrans, b2dissip_id, b2dissip, start=start2, count=count2)
+      status = nf90_put_var (ncid_nltrans, p_re_id    , p_re    , start=start2, count=count2)
+      status = nf90_put_var (ncid_nltrans, p_ma_id    , p_ma    , start=start2, count=count2)
+
 
       status = nf90_sync (ncid_nltrans)
 
