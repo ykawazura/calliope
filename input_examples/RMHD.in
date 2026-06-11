@@ -85,7 +85,7 @@
   xhl_inj = 0.8d0 ! 0 <= xhl_inj <= 1 ! helicity injection rate. only when elsasser = .true.
 !  res_inj = 0.99d0 ! 0 <= res_inj <= 1 ! residual energy injection rate. only when elsasser = .false.
   kmin = 0.d0  0.d0  1.d0
-  kmax = 0.1d0  0.1d0  2.d0
+  kmax = 2.0d0  2.0d0  2.d0
   nfields = 2
 /
 &forced_fields

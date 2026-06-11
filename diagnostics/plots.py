@@ -289,7 +289,7 @@ def movie_log1d_many(t, xs, ys, legends, ls, legendloc, xlab='', title='', save=
   # plt.show()
 
 
-def plot_2d(u, xin, yin, umin=None, umax=None, xlab='', ylab='', title='', cmp=default_colormap_seq, save=False):
+def plot_2d(u, xin, yin, umin=None, umax=None, xlab='', ylab='', title='', cmp=default_colormap_seq, contour=False, aspect='equal', save=False):
   if umin is None:
     umin = u.min()
   if umax is None:
@@ -476,7 +476,7 @@ def plot_symlog2d(u, xin, yin, umin=None, umax=None, xlab='', ylab='', title='',
   return fig
 
 
-def plot_3d(u_z0, u_y0, u_x0, xin, yin, zin, xlab='', ylab='', zlab='', title='', cmp=default_colormap_seq, save=False):
+def plot_3d(u_z0, u_y0, u_x0, xin, yin, zin, u_z0_vec=None, u_y0_vec=None, u_x0_vec=None, xlab='', ylab='', zlab='', title='', cmp=default_colormap_seq, streamline_density=1, streamline_width=0.5, streamline_color='w', save=False):
 
   if cmp == 'sequential':
     cmp = default_colormap_seq

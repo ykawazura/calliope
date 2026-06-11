@@ -112,7 +112,7 @@ contains
     !v                For eSSPIFRK3                v!
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
     if(time_step_scheme == 'eSSPIFRK3') then
-      ! Calcualte force terms
+      ! Calculate force terms
       if (driven) then
         ! at n
         if(elsasser) then
@@ -145,7 +145,7 @@ contains
       endif
 
       !---------------  RK 1st step  ---------------
-      ! Calcualte nonlinear terms
+      ! Calculate nonlinear terms
       if(nonlinear) call get_nonlinear_terms(ux, uy, uz, bx, by, bz, .true.)
 
       !$omp parallel do private(j, k, i, imp_terms_tintg0, imp_terms_tintg1)
@@ -231,7 +231,7 @@ contains
       !$omp end parallel do
 
       !---------------  RK 2nd step  ---------------
-      ! Calcualte force terms
+      ! Calculate force terms
       if (driven) then
         ! at n + 2/3
         call update_force(2.d0/3.d0*dt)
@@ -268,7 +268,7 @@ contains
         call update_force(1.d0/3.d0*dt)
       endif
 
-      ! Calcualte kxt at n + 2/3
+      ! Calculate kxt at n + 2/3
       if(shear) then
         !$omp parallel do private(i, k) schedule(static)
         do j = iky_st, iky_en
@@ -288,7 +288,7 @@ contains
         !$omp end parallel do
       endif
 
-      ! Calcualte nonlinear terms
+      ! Calculate nonlinear terms
       if(nonlinear) call get_nonlinear_terms(ux_tmp, uy_tmp, uz_tmp, bx_tmp, by_tmp, bz_tmp, .false.)
 
       !$omp parallel do private(j, k, i, imp_terms_tintg0, imp_terms_tintg2)
@@ -368,7 +368,7 @@ contains
       !$omp end parallel do
 
       !---------------  RK 3rd step  ---------------
-      ! Calcualte nonlinear terms
+      ! Calculate nonlinear terms
       if(nonlinear) call get_nonlinear_terms(ux_tmp, uy_tmp, uz_tmp, bx_tmp, by_tmp, bz_tmp, .false.)
 
       !$omp parallel do private(j, k, i, imp_terms_tintg0, imp_terms_tintg2, imp_terms_tintg3)
@@ -480,7 +480,7 @@ contains
     !v                  For Gear3                  v!
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
     if(time_step_scheme == 'gear3') then
-      ! Calcualte force terms
+      ! Calculate force terms
       if (driven) then
         call update_force(dt)
 
@@ -513,7 +513,7 @@ contains
         endif
       endif
 
-      ! Calcualte nonlinear terms
+      ! Calculate nonlinear terms
       if(nonlinear) call get_nonlinear_terms(ux, uy, uz, bx, by, bz, .true.)
 
       !$omp parallel do private(j, k, i)
