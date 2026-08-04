@@ -1,0 +1,390 @@
+############ nstep=1  gallope(4 GPU) vs calliope
+model RMHD, grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = run_n1_g4  [gallope]
+B = run_n1_c16  [calliope]
+
+-- restart time (tt, tsc) --
+  A: [0.001, 0.0]
+  B: [0.001]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- omg + kprp^2*phi on the reconstructed cube --
+   (must be at roundoff; kprp^2 mixes kx and ky, so an O(1) value means the axis mapping is wrong)
+  A: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 1.557e-19
+  B: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 1.917e-20
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  phi: L2 2.526848e-16   max|df|/max|f| 1.109732e-16
+  omg: L2 2.213552e-13   max|df|/max|f| 9.700610e-14
+  psi: L2 2.261577e-16   max|df|/max|f| 7.853939e-17
+  all 3 fields combined: 1.366424e-13
+
+-- energy W = 0.5<|grad_perp phi|^2+|grad_perp psi|^2> from the spectral fields --
+  A: 9.999999999985406e-01
+  B: 9.999999999985406e-01
+  relative difference: 0.000000e+00
+
+############ nstep=1  gallope 1 GPU vs 4 GPU [control]
+model RMHD, grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = run_n1_g1  [gallope]
+B = run_n1_g4  [gallope]
+
+-- restart time (tt, tsc) --
+  A: [0.001, 0.0]
+  B: [0.001, 0.0]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- omg + kprp^2*phi on the reconstructed cube --
+   (must be at roundoff; kprp^2 mixes kx and ky, so an O(1) value means the axis mapping is wrong)
+  A: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 1.557e-19
+  B: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 1.557e-19
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  phi: L2 0.000000e+00   max|df|/max|f| 0.000000e+00
+  omg: L2 0.000000e+00   max|df|/max|f| 0.000000e+00
+  psi: L2 0.000000e+00   max|df|/max|f| 0.000000e+00
+  all 3 fields combined: 0.000000e+00
+
+-- energy W = 0.5<|grad_perp phi|^2+|grad_perp psi|^2> from the spectral fields --
+  A: 9.999999999985406e-01
+  B: 9.999999999985406e-01
+  relative difference: 0.000000e+00
+
+############ nstep=10  gallope(4 GPU) vs calliope
+model RMHD, grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = run_n10_g4  [gallope]
+B = run_n10_c16  [calliope]
+
+-- restart time (tt, tsc) --
+  A: [0.010000000000000002, 0.0]
+  B: [0.010000000000000002]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- omg + kprp^2*phi on the reconstructed cube --
+   (must be at roundoff; kprp^2 mixes kx and ky, so an O(1) value means the axis mapping is wrong)
+  A: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 2.164e-19
+  B: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 1.224e-18
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  phi: L2 2.338826e-16   max|df|/max|f| 8.660194e-17
+  omg: L2 2.156074e-13   max|df|/max|f| 9.430952e-14
+  psi: L2 2.887404e-16   max|df|/max|f| 2.010419e-16
+  all 3 fields combined: 1.332721e-13
+
+-- energy W = 0.5<|grad_perp phi|^2+|grad_perp psi|^2> from the spectral fields --
+  A: 9.999999999853979e-01
+  B: 9.999999999853977e-01
+  relative difference: 2.220446e-16
+
+############ nstep=10  gallope 1 GPU vs 4 GPU [control]
+model RMHD, grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = run_n10_g1  [gallope]
+B = run_n10_g4  [gallope]
+
+-- restart time (tt, tsc) --
+  A: [0.010000000000000002, 0.0]
+  B: [0.010000000000000002, 0.0]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- omg + kprp^2*phi on the reconstructed cube --
+   (must be at roundoff; kprp^2 mixes kx and ky, so an O(1) value means the axis mapping is wrong)
+  A: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 2.164e-19
+  B: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 2.164e-19
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  phi: L2 0.000000e+00   max|df|/max|f| 0.000000e+00
+  omg: L2 0.000000e+00   max|df|/max|f| 0.000000e+00
+  psi: L2 0.000000e+00   max|df|/max|f| 0.000000e+00
+  all 3 fields combined: 0.000000e+00
+
+-- energy W = 0.5<|grad_perp phi|^2+|grad_perp psi|^2> from the spectral fields --
+  A: 9.999999999853979e-01
+  B: 9.999999999853979e-01
+  relative difference: 0.000000e+00
+
+############ nstep=100  gallope(4 GPU) vs calliope
+model RMHD, grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = run_n100_g4  [gallope]
+B = run_n100_c16  [calliope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.0]
+  B: [0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- omg + kprp^2*phi on the reconstructed cube --
+   (must be at roundoff; kprp^2 mixes kx and ky, so an O(1) value means the axis mapping is wrong)
+  A: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 2.530e-19
+  B: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 6.691e-19
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  phi: L2 2.327280e-16   max|df|/max|f| 1.067011e-16
+  omg: L2 1.861568e-13   max|df|/max|f| 6.547702e-14
+  psi: L2 1.215532e-15   max|df|/max|f| 1.243773e-15
+  all 3 fields combined: 1.176018e-13
+
+-- energy W = 0.5<|grad_perp phi|^2+|grad_perp psi|^2> from the spectral fields --
+  A: 9.999999998537008e-01
+  B: 9.999999998537000e-01
+  relative difference: 7.771561e-16
+
+############ nstep=100  gallope 1 GPU vs 4 GPU [control]
+model RMHD, grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = run_n100_g1  [gallope]
+B = run_n100_g4  [gallope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.0]
+  B: [0.10000000000000007, 0.0]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- omg + kprp^2*phi on the reconstructed cube --
+   (must be at roundoff; kprp^2 mixes kx and ky, so an O(1) value means the axis mapping is wrong)
+  A: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 2.530e-19
+  B: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 2.530e-19
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  phi: L2 0.000000e+00   max|df|/max|f| 0.000000e+00
+  omg: L2 0.000000e+00   max|df|/max|f| 0.000000e+00
+  psi: L2 0.000000e+00   max|df|/max|f| 0.000000e+00
+  all 3 fields combined: 0.000000e+00
+
+-- energy W = 0.5<|grad_perp phi|^2+|grad_perp psi|^2> from the spectral fields --
+  A: 9.999999998537008e-01
+  B: 9.999999998537008e-01
+  relative difference: 0.000000e+00
+
+############ nstep=1000  gallope(4 GPU) vs calliope
+model RMHD, grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = run_n1000_g4  [gallope]
+B = run_n1000_c16  [calliope]
+
+-- restart time (tt, tsc) --
+  A: [1.0000000000000007, 0.0]
+  B: [1.0000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- omg + kprp^2*phi on the reconstructed cube --
+   (must be at roundoff; kprp^2 mixes kx and ky, so an O(1) value means the axis mapping is wrong)
+  A: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 6.960e-17
+  B: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 5.408e-17
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  phi: L2 5.101415e-15   max|df|/max|f| 5.490376e-15
+  omg: L2 8.781541e-14   max|df|/max|f| 2.730397e-14
+  psi: L2 6.856897e-15   max|df|/max|f| 7.280148e-15
+  all 3 fields combined: 7.203904e-14
+
+-- energy W = 0.5<|grad_perp phi|^2+|grad_perp psi|^2> from the spectral fields --
+  A: 9.999999804677115e-01
+  B: 9.999999804677148e-01
+  relative difference: 3.219647e-15
+
+############ nstep=1000  gallope 1 GPU vs 4 GPU [control]
+model RMHD, grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = run_n1000_g1  [gallope]
+B = run_n1000_g4  [gallope]
+
+-- restart time (tt, tsc) --
+  A: [1.0000000000000007, 0.0]
+  B: [1.0000000000000007, 0.0]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- omg + kprp^2*phi on the reconstructed cube --
+   (must be at roundoff; kprp^2 mixes kx and ky, so an O(1) value means the axis mapping is wrong)
+  A: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 6.960e-17
+  B: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 6.960e-17
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  phi: L2 0.000000e+00   max|df|/max|f| 0.000000e+00
+  omg: L2 0.000000e+00   max|df|/max|f| 0.000000e+00
+  psi: L2 0.000000e+00   max|df|/max|f| 0.000000e+00
+  all 3 fields combined: 0.000000e+00
+
+-- energy W = 0.5<|grad_perp phi|^2+|grad_perp psi|^2> from the spectral fields --
+  A: 9.999999804677115e-01
+  B: 9.999999804677115e-01
+  relative difference: 0.000000e+00
+
+############ gallope self-convergence, dt1e3 vs dt5e4
+model RMHD, grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = probe_dt1e3_gallope  [gallope]
+B = probe_dt5e4_gallope  [gallope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.0]
+  B: [0.10000000000000007, 0.0]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- omg + kprp^2*phi on the reconstructed cube --
+   (must be at roundoff; kprp^2 mixes kx and ky, so an O(1) value means the axis mapping is wrong)
+  A: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 2.530e-19
+  B: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 2.448e-18
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  phi: L2 1.349242e-10   max|df|/max|f| 1.036079e-10
+  omg: L2 9.086527e-10   max|df|/max|f| 6.143743e-10
+  psi: L2 1.880275e-10   max|df|/max|f| 1.057059e-10
+  all 3 fields combined: 5.866494e-10
+
+-- energy W = 0.5<|grad_perp phi|^2+|grad_perp psi|^2> from the spectral fields --
+  A: 9.999999998537008e-01
+  B: 9.999999999814474e-01
+  relative difference: 1.277466e-10
+
+############ gallope self-convergence, dt5e4 vs dt25e5
+model RMHD, grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = probe_dt5e4_gallope  [gallope]
+B = probe_dt25e5_gallope  [gallope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.0]
+  B: [0.10000000000000007, 0.0]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- omg + kprp^2*phi on the reconstructed cube --
+   (must be at roundoff; kprp^2 mixes kx and ky, so an O(1) value means the axis mapping is wrong)
+  A: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 2.448e-18
+  B: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 6.519e-19
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  phi: L2 1.686224e-11   max|df|/max|f| 1.294675e-11
+  omg: L2 1.135999e-10   max|df|/max|f| 7.680269e-11
+  psi: L2 2.350052e-11   max|df|/max|f| 1.320384e-11
+  all 3 fields combined: 7.334202e-11
+
+-- energy W = 0.5<|grad_perp phi|^2+|grad_perp psi|^2> from the spectral fields --
+  A: 9.999999999814474e-01
+  B: 9.999999999974023e-01
+  relative difference: 1.595490e-11
+
+############ calliope self-convergence, dt1e3 vs dt5e4
+model RMHD, grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = probe_dt1e3_calliope  [calliope]
+B = probe_dt5e4_calliope  [calliope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007]
+  B: [0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- omg + kprp^2*phi on the reconstructed cube --
+   (must be at roundoff; kprp^2 mixes kx and ky, so an O(1) value means the axis mapping is wrong)
+  A: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 6.691e-19
+  B: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 2.382e-19
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  phi: L2 1.349241e-10   max|df|/max|f| 1.036078e-10
+  omg: L2 9.086523e-10   max|df|/max|f| 6.143743e-10
+  psi: L2 1.880278e-10   max|df|/max|f| 1.057068e-10
+  all 3 fields combined: 5.866492e-10
+
+-- energy W = 0.5<|grad_perp phi|^2+|grad_perp psi|^2> from the spectral fields --
+  A: 9.999999998537000e-01
+  B: 9.999999999814461e-01
+  relative difference: 1.277460e-10
+
+############ calliope self-convergence, dt5e4 vs dt25e5
+model RMHD, grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = probe_dt5e4_calliope  [calliope]
+B = probe_dt25e5_calliope  [calliope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007]
+  B: [0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- omg + kprp^2*phi on the reconstructed cube --
+   (must be at roundoff; kprp^2 mixes kx and ky, so an O(1) value means the axis mapping is wrong)
+  A: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 2.382e-19
+  B: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 2.461e-18
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  phi: L2 1.686190e-11   max|df|/max|f| 1.294670e-11
+  omg: L2 1.135998e-10   max|df|/max|f| 7.680267e-11
+  psi: L2 2.350248e-11   max|df|/max|f| 1.320830e-11
+  all 3 fields combined: 7.334204e-11
+
+-- energy W = 0.5<|grad_perp phi|^2+|grad_perp psi|^2> from the spectral fields --
+  A: 9.999999999814461e-01
+  B: 9.999999999974029e-01
+  relative difference: 1.595679e-11
+
+############ gallope vs calliope at dt1e3
+model RMHD, grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = probe_dt1e3_gallope  [gallope]
+B = probe_dt1e3_calliope  [calliope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.0]
+  B: [0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- omg + kprp^2*phi on the reconstructed cube --
+   (must be at roundoff; kprp^2 mixes kx and ky, so an O(1) value means the axis mapping is wrong)
+  A: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 2.530e-19
+  B: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 6.691e-19
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  phi: L2 2.327280e-16   max|df|/max|f| 1.067011e-16
+  omg: L2 1.861568e-13   max|df|/max|f| 6.547702e-14
+  psi: L2 1.215532e-15   max|df|/max|f| 1.243773e-15
+  all 3 fields combined: 1.176018e-13
+
+-- energy W = 0.5<|grad_perp phi|^2+|grad_perp psi|^2> from the spectral fields --
+  A: 9.999999998537008e-01
+  B: 9.999999998537000e-01
+  relative difference: 7.771561e-16
+
+############ gallope vs calliope at dt5e4
+model RMHD, grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = probe_dt5e4_gallope  [gallope]
+B = probe_dt5e4_calliope  [calliope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.0]
+  B: [0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- omg + kprp^2*phi on the reconstructed cube --
+   (must be at roundoff; kprp^2 mixes kx and ky, so an O(1) value means the axis mapping is wrong)
+  A: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 2.448e-18
+  B: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 2.382e-19
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  phi: L2 3.208378e-16   max|df|/max|f| 2.460243e-16
+  omg: L2 1.861657e-13   max|df|/max|f| 6.552119e-14
+  psi: L2 3.060964e-15   max|df|/max|f| 3.312756e-15
+  all 3 fields combined: 1.176148e-13
+
+-- energy W = 0.5<|grad_perp phi|^2+|grad_perp psi|^2> from the spectral fields --
+  A: 9.999999999814474e-01
+  B: 9.999999999814461e-01
+  relative difference: 1.332268e-15
+
+############ gallope vs calliope at dt25e5
+model RMHD, grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = probe_dt25e5_gallope  [gallope]
+B = probe_dt25e5_calliope  [calliope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.0]
+  B: [0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- omg + kprp^2*phi on the reconstructed cube --
+   (must be at roundoff; kprp^2 mixes kx and ky, so an O(1) value means the axis mapping is wrong)
+  A: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 6.519e-19
+  B: ||omg + kprp^2 phi|| / ||kprp^2 phi|| = 2.461e-18
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  phi: L2 2.196026e-15   max|df|/max|f| 2.669661e-15
+  omg: L2 1.861804e-13   max|df|/max|f| 6.550414e-14
+  psi: L2 5.719158e-15   max|df|/max|f| 6.166662e-15
+  all 3 fields combined: 1.176533e-13
+
+-- energy W = 0.5<|grad_perp phi|^2+|grad_perp psi|^2> from the spectral fields --
+  A: 9.999999999974023e-01
+  B: 9.999999999974029e-01
+  relative difference: 5.551115e-16
+

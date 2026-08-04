@@ -1,0 +1,67 @@
+#!/bin/sh -l
+#PBS -q short-g
+#PBS -l select=1:mpiprocs=16:ompthreads=1
+#PBS -l walltime=02:00:00
+#PBS -W group_list=gr96
+#PBS -j oe
+#PBS -N det-shearprobe
+#=====================================================================
+#  Follow-up to the main comparison, which found that the two codes
+#  agree to machine precision without shear but differ by ~nstep*dt^2
+#  with shear on.  Two probes, run for BOTH codes from this one script
+#  (Gallope on 1 GPU of the same node, Calliope on 16 Grace cores):
+#
+#  A. order in dt.  Fixed final time t = 0.1, dt halved twice.  If the
+#     difference at fixed t falls by 2 each time, the two shearing-box
+#     discretizations differ at FIRST ORDER in dt and converge to one
+#     another as dt -> 0 --- a discretization difference, not an error.
+#     If it does not fall, one of them is wrong.
+#
+#  B. linear vs nonlinear.  nonlinear = F with shear on.  If the
+#     difference survives, it is in the linear shear/Coriolis terms or
+#     the integrating factor; if it vanishes, it is in the nonlinear
+#     term evaluated on the sheared grid.
+#=====================================================================
+module load nvidia
+module load nv-hpcx
+module load hdf5
+module load netcdf
+module load netcdf-fortran
+
+set -u
+cd ${PBS_O_WORKDIR}
+
+NP=16
+
+# $1 tag  $2 nstep  $3 dt  $4 nonlinear
+probe() {
+  tag=$1; nstep=$2; dt=$3; nlin=$4
+  for code in gallope calliope; do
+    d="probe_${tag}_${code}"
+    rm -rf "${d}"
+    mkdir -p "${d}/restart" "${d}/out2d" "${d}/out3d"
+    sed -e "s/^  nstep = .*/  nstep = ${nstep}/" \
+        -e "s/^  dt    = .*/  dt    = ${dt}/" \
+        -e "s/^  nonlinear = .*/  nonlinear = ${nlin}/" \
+        -e "s/^  shear  = .*/  shear  = .true./" \
+        -e "s/^  q      = .*/  q      = 1.5d0/" \
+        ${code}.in > "${d}/${code}.in"
+    ln -sf ../${code} "${d}/${code}"
+    if [ ${code} = gallope ]; then
+      ( cd "${d}" && mpirun -n 1 ./gallope <gallope.in >out.std 2>&1 )
+    else
+      ( cd "${d}" && mpirun -n ${NP} ./calliope <calliope.in >out.std 2>&1 )
+    fi
+    echo "[probe] ${d} rc=$? time.dat: $(tail -1 ${d}/restart/time.dat 2>/dev/null || echo MISSING)"
+  done
+}
+
+# A. order in dt, all reaching t = 0.1
+probe dt1e3 100  "1.0d-3"  "T"
+probe dt5e4 200  "5.0d-4"  "T"
+probe dt25e5 400 "2.5d-4"  "T"
+
+# B. linear only, t = 0.1
+probe lin   100  "1.0d-3"  "F"
+
+echo "DET_SHEARPROBE_DONE"

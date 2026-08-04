@@ -1,0 +1,75 @@
+#!/bin/sh -l
+#PBS -q debug-g
+#PBS -l select=4:mpiprocs=1
+#PBS -l walltime=00:30:00
+#PBS -W group_list=gr96
+#PBS -j oe
+#PBS -N rmhd-gallope
+#=====================================================================
+#  Deterministic Gallope <-> Calliope comparison for RMHD: Gallope side.
+#
+#  RMHD has no shearing box, so there is one series instead of two, and
+#  the dt-refinement probe folds into the same job rather than needing
+#  its own.  Two blocks:
+#
+#    run_n<nstep>_g<ngpu>   fixed dt = 1e-3, terminal restart at
+#                           nstep = 1, 10, 100, 1000, on 1 and 4 GPUs
+#    probe_<tag>_gallope    fixed final time t = 0.1 at
+#                           dt = 1e-3, 5e-4, 2.5e-4, on 1 GPU
+#
+#  The first measures how the code-to-code difference grows with step
+#  count; the second measures each code's own temporal order, which is
+#  the diagnostic that found the shearing-box pressure bug in the
+#  MHD_INCOMP comparison one directory up.
+#
+#  Self-contained: the binary ./gallope and gallope.in live in this dir.
+#  gallope.in is the single source of truth; the variants below are
+#  derived from it by sed, so the two never drift apart.
+#=====================================================================
+module load nvidia
+module load nv-hpcx
+module load hdf5
+module load netcdf
+module load netcdf-fortran
+
+set -u
+cd ${PBS_O_WORKDIR}
+
+# $1 dir  $2 nstep  $3 dt  $4 ngpu
+run_one() {
+  d=$1; nstep=$2; dt=$3; ngpu=$4
+  rm -rf "${d}"
+  mkdir -p "${d}/restart" "${d}/out2d" "${d}/out3d"
+  sed -e "s/^  nstep = .*/  nstep = ${nstep}/" \
+      -e "s/^  dt    = .*/  dt    = ${dt}/" \
+      gallope.in > "${d}/gallope.in"
+  cp gallope "${d}/" 2>/dev/null || ln -sf ../gallope "${d}/gallope"
+
+  t0=$(date +%s)
+  ( cd "${d}" && mpirun -n ${ngpu} ./gallope <gallope.in >out.std 2>&1 )
+  rc=$?
+  t1=$(date +%s)
+  echo "[rmhd] ${d} rc=${rc} wall=$((t1 - t0))s"
+  # The gate for the whole comparison: tt must equal nstep*dt exactly.
+  # Any deviation means the adaptive step fired and the run is unusable.
+  echo "       time.dat: $(tail -1 ${d}/restart/time.dat 2>/dev/null || echo MISSING)"
+  echo "       expected tt = ${nstep} * ${dt}"
+  if [ ${rc} -ne 0 ]; then
+    echo "----- tail out.std -----"
+    tail -30 "${d}/out.std"
+  fi
+}
+
+for ngpu in 1 4; do
+  for nstep in 1 10 100 1000; do
+    run_one "run_n${nstep}_g${ngpu}" ${nstep} "1.0d-3" ${ngpu}
+  done
+done
+
+run_one probe_dt1e3_gallope  100 "1.0d-3" 1
+run_one probe_dt5e4_gallope  200 "5.0d-4" 1
+run_one probe_dt25e5_gallope 400 "2.5d-4" 1
+
+echo "----- dt history (must be constant at 1e-3) -----"
+awk 'NR<=2 || NR%200==0' run_n1000_g4/cfl.dat 2>/dev/null | head -10
+echo "RMHD_GALLOPE_DONE"

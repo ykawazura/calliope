@@ -1,0 +1,18 @@
+# Calliope half of the nonlinear MRI production run behind Fig. 4 of
+# COMPHY-D-26-00110.  The Gallope half is in
+# gallope_dev/tests/MHD_INCOMP(MRI-production)/.
+#
+# Tracked: the run definition, the job script, the stdout log and this README.
+# Untracked but present in the directory (Dropbox-backed): rms.dat, cfl.dat,
+# the NetCDF diagnostics output and the figures generated from it.
+#
+# Deliberately not copied from Miyabi at all: restart/ (930 MB), out2d/
+# (4.2 GB) and calliope.modes.out (1.2 GB).
+*
+!*/
+__pycache__/
+!.gitignore
+!README.md
+!*.in
+!job.pbs-*
+!out.std

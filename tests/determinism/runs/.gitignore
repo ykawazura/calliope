@@ -1,0 +1,30 @@
+# Archive of the Calliope half of the Gallope/Calliope determinism
+# comparison, copied from Miyabi-G (~/work/determinism) before the machine
+# was decommissioned.  The Gallope half, and the protocol document that
+# explains what the numbers mean, live in gallope_dev/tests/determinism/.
+#
+# Tracked here: the run definitions, the job scripts, the PBS/stdout logs,
+# the comparison results, and the analysis scripts that produced them.
+#
+# Not tracked: rms.dat and cfl.dat.  They are kept in this directory (and so
+# are backed up by Dropbox) but they are bulk time series, not evidence.
+# restart/*.dat -- the field data the comparison actually reads -- was
+# deliberately not copied from Miyabi; the verdicts it produced are in
+# compare_all_fixed.out, probe_all_fixed.out and rmhd/compare_rmhd.out.
+#
+# The comparison results are re-included by name, not as *.out, so that
+# <code>.modes.out -- a 3 MB per-step mode dump that no script here reads --
+# cannot be pulled back in by the pattern.
+*
+!*/
+__pycache__/
+!.gitignore
+!README.md
+!*.in
+!job.pbs-*
+!out.std
+!compare_*.out
+!probe_*.out
+!*.o[0-9]*
+!*.py
+!*.sh

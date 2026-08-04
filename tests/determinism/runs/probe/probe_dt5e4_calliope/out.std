@@ -1,0 +1,79 @@
+ 
+  -------------------------------------------------------------------- 
+ |       _____          _      _      _____ ____  _____  ______       |
+ |      / ____|   /   | |    | |    |_   _/ __ |  __ |  ____|      |
+ |     | |       /    | |    | |      | || |  | | |__) | |__         |
+ |     | |      / /  | |    | |      | || |  | |  ___/|  __|        |
+ |     | |____ / ____ | |____| |____ _| || |__| | |    | |____       |
+ |      _____/_/    _______|______|_________/|_|    |______|      |
+ |                                                                    |
+ |                                     executed on 2026- 8- 4  4: 3   |
+  -------------------------------------------------------------------- 
+ 
+ This run will be terminated when the wall time exceeds 24.00 hours.
+ This run will be terminated when a file named {terminate} is created in the root directory.
+ 
+nproc  =     16,  iproc  =      4,  jproc  =      4
+  nlx  =    128,    nly  =    128,    nlz  =    128
+  nlxc =    128,    nlyc =    128,    nlzc =    128
+ Using stride-1 layout
+ Using loop block sizes             8           64            8            1
+ Running on             1 threads
+ 
+P3DFFT initialization is done.
+Keep in mind that the array layouts are
+  u (*ily, ilz, ilx) for the real space,
+  uk(*ikx, ikz, iky) for the Fourier space.
+* means that the slot is local in each MPI proc.
+ 
+Solving MHD_INCOMP
+ OT3 initialization
+<|k. u|>/(<|k|><| u|>) =  0.000E+00
+<|k. b|>/(<|k|><| b|>) =  0.000E+00
+shear is on; tremap = 0.667
+----------------------------------------------------------------------------
+kx0*vA_x/Omega =  0.00,  ky0*vA_y/Omega =  0.00,  kz0*vA_z/Omega =  0.00
+  (vA is computed by the initial mean magnetic fields.)
+ Lx/lmd_MRI =   Inf,   Ly/lmd_MRI =   Inf,   Lz/lmd_MRI =   Inf
+  (lmd_MRI = 2pi*vA_z/Omega.)
+----------------------------------------------------------------------------
+Initialization done
+Starting the main loop...
+step =         19/       200,  time =      0.00950000
+step =         39/       200,  time =      0.01950000
+step =         59/       200,  time =      0.02950000
+step =         79/       200,  time =      0.03950000
+step =         99/       200,  time =      0.04950000
+step =        119/       200,  time =      0.05950000
+step =        139/       200,  time =      0.06950000
+step =        159/       200,  time =      0.07950000
+step =        179/       200,  time =      0.08950000
+step =        199/       200,  time =      0.09950000
+Finished the main loop :)
+ Finish save_restart
+ Finish loop_diagnostics
+ Finish loop_diagnostics_2D
+ Finish loop_diagnostics_3D
+ Finish loop_diagnostics_kpar
+ Finish loop_diagnostics_SF2
+ Finish loop_diagnostics_nltrans
+
+ Initialization             0.012 min    2.2 %
+ Advance steps              0.524 min   95.1 %
+    nonlinear terms         0.338 min   61.3 %  (64.4% in Advance steps)
+    FFT                     0.257 min   46.7 %  (49.1% in Advance steps)
+    force                   0.000 min    0.0 %  ( 0.0% in Advance steps)
+ Diagnostics                0.012 min    2.2 %
+    SF2                     0.000 min    0.0 %
+    kpar                    0.000 min    0.0 %
+    shell-to-shell trans    0.000 min    0.0 %
+ IO                         0.000 min    0.0 %
+    2D                      0.000 min    0.0 %
+    3D                      0.000 min    0.0 %
+ Save restart               0.001 min    0.3 %
+
+ total from timer is:       0.551 min
+ (init + adv + diag + io + restart:     99.7 %)
+
+ # of steps advanced          200
+            Final dt      5.000E-04

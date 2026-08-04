@@ -1,0 +1,609 @@
+############ probe: gallope self-convergence, dt1e3 vs dt5e4
+grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = probe_dt1e3_gallope  [gallope]
+B = probe_dt5e4_gallope  [gallope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.10000000000000007]
+  B: [0.10000000000000007, 0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- solenoidal error on the reconstructed cube --
+   (must be at roundoff; an O(1) value means the axis mapping is wrong)
+  A: <|k.u|>/(<|k|><|u|>) = 1.540e-25   <|k.b|>/(<|k|><|b|>) = 1.239e-25  [kx(t) = kx + 1.5*0.1*ky]
+  B: <|k.u|>/(<|k|><|u|>) = 8.096e-26   <|k.b|>/(<|k|><|b|>) = 1.207e-25  [kx(t) = kx + 1.5*0.1*ky]
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  ux: L2 1.472500e-10   max|df|/max|f| 7.415048e-11
+  uy: L2 2.690843e-10   max|df|/max|f| 1.521322e-10
+  uz: L2 1.151203e-09   max|df|/max|f| 8.823609e-10
+  bx: L2 1.590067e-10   max|df|/max|f| 8.169608e-11
+  by: L2 3.073313e-10   max|df|/max|f| 1.476994e-10
+  bz: L2 1.786962e-08   max|df|/max|f| 2.383163e-08
+  all six fields combined: 2.471032e-10
+
+-- energy W = 0.5<|u|^2+|b|^2> from the spectral fields --
+  A: 1.005787203142701e+00
+  B: 1.005787203259124e+00
+  relative difference: 1.157528e-10
+
+############ probe: gallope self-convergence, dt5e4 vs dt25e5
+grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = probe_dt5e4_gallope  [gallope]
+B = probe_dt25e5_gallope  [gallope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.10000000000000007]
+  B: [0.10000000000000007, 0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- solenoidal error on the reconstructed cube --
+   (must be at roundoff; an O(1) value means the axis mapping is wrong)
+  A: <|k.u|>/(<|k|><|u|>) = 8.096e-26   <|k.b|>/(<|k|><|b|>) = 1.207e-25  [kx(t) = kx + 1.5*0.1*ky]
+  B: <|k.u|>/(<|k|><|u|>) = 1.317e-25   <|k.b|>/(<|k|><|b|>) = 3.394e-26  [kx(t) = kx + 1.5*0.1*ky]
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  ux: L2 1.840585e-11   max|df|/max|f| 9.262225e-12
+  uy: L2 3.363437e-11   max|df|/max|f| 1.899995e-11
+  uz: L2 1.439423e-10   max|df|/max|f| 1.102705e-10
+  bx: L2 1.987336e-11   max|df|/max|f| 1.019462e-11
+  by: L2 3.841926e-11   max|df|/max|f| 1.845790e-11
+  bz: L2 2.233921e-09   max|df|/max|f| 2.977712e-09
+  all six fields combined: 3.088888e-11
+
+-- energy W = 0.5<|u|^2+|b|^2> from the spectral fields --
+  A: 1.005787203259124e+00
+  B: 1.005787203273677e+00
+  relative difference: 1.447017e-11
+
+############ probe: calliope self-convergence, dt1e3 vs dt5e4
+grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = probe_dt1e3_calliope  [calliope]
+B = probe_dt5e4_calliope  [calliope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.10000000000000007]
+  B: [0.10000000000000007, 0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- solenoidal error on the reconstructed cube --
+   (must be at roundoff; an O(1) value means the axis mapping is wrong)
+  A: <|k.u|>/(<|k|><|u|>) = 1.455e-25   <|k.b|>/(<|k|><|b|>) = 1.394e-25  [kx(t) = kx + 1.5*0.1*ky]
+  B: <|k.u|>/(<|k|><|u|>) = 4.135e-26   <|k.b|>/(<|k|><|b|>) = 1.271e-25  [kx(t) = kx + 1.5*0.1*ky]
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  ux: L2 1.472500e-10   max|df|/max|f| 7.415048e-11
+  uy: L2 2.690843e-10   max|df|/max|f| 1.521322e-10
+  uz: L2 1.151203e-09   max|df|/max|f| 8.823608e-10
+  bx: L2 1.590067e-10   max|df|/max|f| 8.169608e-11
+  by: L2 3.073313e-10   max|df|/max|f| 1.476994e-10
+  bz: L2 1.786962e-08   max|df|/max|f| 2.383163e-08
+  all six fields combined: 2.471032e-10
+
+-- energy W = 0.5<|u|^2+|b|^2> from the spectral fields --
+  A: 1.005787203142701e+00
+  B: 1.005787203259124e+00
+  relative difference: 1.157528e-10
+
+############ probe: calliope self-convergence, dt5e4 vs dt25e5
+grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = probe_dt5e4_calliope  [calliope]
+B = probe_dt25e5_calliope  [calliope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.10000000000000007]
+  B: [0.10000000000000007, 0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- solenoidal error on the reconstructed cube --
+   (must be at roundoff; an O(1) value means the axis mapping is wrong)
+  A: <|k.u|>/(<|k|><|u|>) = 4.135e-26   <|k.b|>/(<|k|><|b|>) = 1.271e-25  [kx(t) = kx + 1.5*0.1*ky]
+  B: <|k.u|>/(<|k|><|u|>) = 1.292e-25   <|k.b|>/(<|k|><|b|>) = 7.480e-26  [kx(t) = kx + 1.5*0.1*ky]
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  ux: L2 1.840586e-11   max|df|/max|f| 9.262225e-12
+  uy: L2 3.363440e-11   max|df|/max|f| 1.899995e-11
+  uz: L2 1.439423e-10   max|df|/max|f| 1.102705e-10
+  bx: L2 1.987334e-11   max|df|/max|f| 1.019463e-11
+  by: L2 3.841923e-11   max|df|/max|f| 1.845790e-11
+  bz: L2 2.233921e-09   max|df|/max|f| 2.977712e-09
+  all six fields combined: 3.088887e-11
+
+-- energy W = 0.5<|u|^2+|b|^2> from the spectral fields --
+  A: 1.005787203259124e+00
+  B: 1.005787203273677e+00
+  relative difference: 1.447017e-11
+
+############ probe: gallope vs calliope at dt1e3
+grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = probe_dt1e3_gallope  [gallope]
+B = probe_dt1e3_calliope  [calliope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.10000000000000007]
+  B: [0.10000000000000007, 0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- solenoidal error on the reconstructed cube --
+   (must be at roundoff; an O(1) value means the axis mapping is wrong)
+  A: <|k.u|>/(<|k|><|u|>) = 1.540e-25   <|k.b|>/(<|k|><|b|>) = 1.239e-25  [kx(t) = kx + 1.5*0.1*ky]
+  B: <|k.u|>/(<|k|><|u|>) = 1.455e-25   <|k.b|>/(<|k|><|b|>) = 1.394e-25  [kx(t) = kx + 1.5*0.1*ky]
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  ux: L2 2.618465e-16   max|df|/max|f| 5.788808e-17
+  uy: L2 2.571048e-16   max|df|/max|f| 6.085668e-17
+  uz: L2 3.386765e-16   max|df|/max|f| 2.807608e-16
+  bx: L2 2.644516e-16   max|df|/max|f| 6.039933e-17
+  by: L2 2.563604e-16   max|df|/max|f| 6.159811e-17
+  bz: L2 3.968443e-15   max|df|/max|f| 1.235068e-15
+  all six fields combined: 2.605155e-16
+
+-- energy W = 0.5<|u|^2+|b|^2> from the spectral fields --
+  A: 1.005787203142701e+00
+  B: 1.005787203142701e+00
+  relative difference: 0.000000e+00
+
+############ probe: gallope vs calliope at dt5e4
+grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = probe_dt5e4_gallope  [gallope]
+B = probe_dt5e4_calliope  [calliope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.10000000000000007]
+  B: [0.10000000000000007, 0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- solenoidal error on the reconstructed cube --
+   (must be at roundoff; an O(1) value means the axis mapping is wrong)
+  A: <|k.u|>/(<|k|><|u|>) = 8.096e-26   <|k.b|>/(<|k|><|b|>) = 1.207e-25  [kx(t) = kx + 1.5*0.1*ky]
+  B: <|k.u|>/(<|k|><|u|>) = 4.135e-26   <|k.b|>/(<|k|><|b|>) = 1.271e-25  [kx(t) = kx + 1.5*0.1*ky]
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  ux: L2 2.627638e-16   max|df|/max|f| 5.799656e-17
+  uy: L2 2.569603e-16   max|df|/max|f| 6.085159e-17
+  uz: L2 2.674010e-16   max|df|/max|f| 1.460932e-16
+  bx: L2 2.623143e-16   max|df|/max|f| 6.051211e-17
+  by: L2 2.541983e-16   max|df|/max|f| 6.160543e-17
+  bz: L2 4.245692e-15   max|df|/max|f| 5.072022e-15
+  all six fields combined: 2.593413e-16
+
+-- energy W = 0.5<|u|^2+|b|^2> from the spectral fields --
+  A: 1.005787203259124e+00
+  B: 1.005787203259124e+00
+  relative difference: 0.000000e+00
+
+############ probe: gallope vs calliope at dt25e5
+grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = probe_dt25e5_gallope  [gallope]
+B = probe_dt25e5_calliope  [calliope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.10000000000000007]
+  B: [0.10000000000000007, 0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- solenoidal error on the reconstructed cube --
+   (must be at roundoff; an O(1) value means the axis mapping is wrong)
+  A: <|k.u|>/(<|k|><|u|>) = 1.317e-25   <|k.b|>/(<|k|><|b|>) = 3.394e-26  [kx(t) = kx + 1.5*0.1*ky]
+  B: <|k.u|>/(<|k|><|u|>) = 1.292e-25   <|k.b|>/(<|k|><|b|>) = 7.480e-26  [kx(t) = kx + 1.5*0.1*ky]
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  ux: L2 2.657143e-16   max|df|/max|f| 5.770240e-17
+  uy: L2 2.704161e-16   max|df|/max|f| 9.770601e-17
+  uz: L2 2.912251e-16   max|df|/max|f| 2.143913e-16
+  bx: L2 2.672789e-16   max|df|/max|f| 6.021881e-17
+  by: L2 2.704667e-16   max|df|/max|f| 9.958970e-17
+  bz: L2 5.236888e-15   max|df|/max|f| 7.296590e-15
+  all six fields combined: 2.689747e-16
+
+-- energy W = 0.5<|u|^2+|b|^2> from the spectral fields --
+  A: 1.005787203273677e+00
+  B: 1.005787203273677e+00
+  relative difference: 0.000000e+00
+
+############ order: gallope self-convergence, dt1e3 vs dt5e4
+grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = order_dt1e3_gallope  [gallope]
+B = order_dt5e4_gallope  [gallope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.10000000000000007]
+  B: [0.10000000000000007, 0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- solenoidal error on the reconstructed cube --
+   (must be at roundoff; an O(1) value means the axis mapping is wrong)
+  A: <|k.u|>/(<|k|><|u|>) = 5.528e-26   <|k.b|>/(<|k|><|b|>) = 1.428e-26
+  B: <|k.u|>/(<|k|><|u|>) = 5.395e-27   <|k.b|>/(<|k|><|b|>) = 4.613e-26
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  ux: L2 1.026339e-10   max|df|/max|f| 6.007583e-11
+  uy: L2 2.558638e-10   max|df|/max|f| 1.370644e-10
+  uz: L2 1.992719e-09   max|df|/max|f| 1.447901e-09
+  bx: L2 1.503354e-10   max|df|/max|f| 8.734855e-11
+  by: L2 2.983707e-10   max|df|/max|f| 1.387088e-10
+  bz: L2 2.184977e-08   max|df|/max|f| 2.121376e-08
+  all six fields combined: 2.272099e-10
+
+-- energy W = 0.5<|u|^2+|b|^2> from the spectral fields --
+  A: 9.999999999054061e-01
+  B: 9.999999999880415e-01
+  relative difference: 8.263534e-11
+
+############ order: gallope self-convergence, dt5e4 vs dt25e5
+grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = order_dt5e4_gallope  [gallope]
+B = order_dt25e5_gallope  [gallope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.10000000000000007]
+  B: [0.10000000000000007, 0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- solenoidal error on the reconstructed cube --
+   (must be at roundoff; an O(1) value means the axis mapping is wrong)
+  A: <|k.u|>/(<|k|><|u|>) = 5.395e-27   <|k.b|>/(<|k|><|b|>) = 4.613e-26
+  B: <|k.u|>/(<|k|><|u|>) = 9.865e-27   <|k.b|>/(<|k|><|b|>) = 2.842e-26
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  ux: L2 1.282832e-11   max|df|/max|f| 7.497819e-12
+  uy: L2 3.198358e-11   max|df|/max|f| 1.712119e-11
+  uz: L2 2.491243e-10   max|df|/max|f| 1.807692e-10
+  bx: L2 1.879308e-11   max|df|/max|f| 1.090651e-11
+  by: L2 3.730297e-11   max|df|/max|f| 1.734240e-11
+  bz: L2 2.731194e-09   max|df|/max|f| 2.647883e-09
+  all six fields combined: 2.840388e-11
+
+-- energy W = 0.5<|u|^2+|b|^2> from the spectral fields --
+  A: 9.999999999880415e-01
+  B: 9.999999999983724e-01
+  relative difference: 1.033096e-11
+
+############ order: calliope self-convergence, dt1e3 vs dt5e4
+grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = order_dt1e3_calliope  [calliope]
+B = order_dt5e4_calliope  [calliope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.10000000000000007]
+  B: [0.10000000000000007, 0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- solenoidal error on the reconstructed cube --
+   (must be at roundoff; an O(1) value means the axis mapping is wrong)
+  A: <|k.u|>/(<|k|><|u|>) = 5.704e-26   <|k.b|>/(<|k|><|b|>) = 2.058e-26
+  B: <|k.u|>/(<|k|><|u|>) = 1.090e-26   <|k.b|>/(<|k|><|b|>) = 4.299e-26
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  ux: L2 1.026339e-10   max|df|/max|f| 6.007583e-11
+  uy: L2 2.558638e-10   max|df|/max|f| 1.370644e-10
+  uz: L2 1.992719e-09   max|df|/max|f| 1.447901e-09
+  bx: L2 1.503354e-10   max|df|/max|f| 8.734856e-11
+  by: L2 2.983707e-10   max|df|/max|f| 1.387088e-10
+  bz: L2 2.184977e-08   max|df|/max|f| 2.121375e-08
+  all six fields combined: 2.272099e-10
+
+-- energy W = 0.5<|u|^2+|b|^2> from the spectral fields --
+  A: 9.999999999054061e-01
+  B: 9.999999999880415e-01
+  relative difference: 8.263534e-11
+
+############ order: calliope self-convergence, dt5e4 vs dt25e5
+grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = order_dt5e4_calliope  [calliope]
+B = order_dt25e5_calliope  [calliope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.10000000000000007]
+  B: [0.10000000000000007, 0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- solenoidal error on the reconstructed cube --
+   (must be at roundoff; an O(1) value means the axis mapping is wrong)
+  A: <|k.u|>/(<|k|><|u|>) = 1.090e-26   <|k.b|>/(<|k|><|b|>) = 4.299e-26
+  B: <|k.u|>/(<|k|><|u|>) = 1.157e-26   <|k.b|>/(<|k|><|b|>) = 1.721e-26
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  ux: L2 1.282833e-11   max|df|/max|f| 7.497819e-12
+  uy: L2 3.198358e-11   max|df|/max|f| 1.712118e-11
+  uz: L2 2.491242e-10   max|df|/max|f| 1.807692e-10
+  bx: L2 1.879308e-11   max|df|/max|f| 1.090650e-11
+  by: L2 3.730298e-11   max|df|/max|f| 1.734240e-11
+  bz: L2 2.731195e-09   max|df|/max|f| 2.647884e-09
+  all six fields combined: 2.840388e-11
+
+-- energy W = 0.5<|u|^2+|b|^2> from the spectral fields --
+  A: 9.999999999880415e-01
+  B: 9.999999999983724e-01
+  relative difference: 1.033096e-11
+
+############ order: gallope vs calliope at dt1e3
+grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = order_dt1e3_gallope  [gallope]
+B = order_dt1e3_calliope  [calliope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.10000000000000007]
+  B: [0.10000000000000007, 0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- solenoidal error on the reconstructed cube --
+   (must be at roundoff; an O(1) value means the axis mapping is wrong)
+  A: <|k.u|>/(<|k|><|u|>) = 5.528e-26   <|k.b|>/(<|k|><|b|>) = 1.428e-26
+  B: <|k.u|>/(<|k|><|u|>) = 5.704e-26   <|k.b|>/(<|k|><|b|>) = 2.058e-26
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  ux: L2 2.647181e-16   max|df|/max|f| 5.802120e-17
+  uy: L2 2.573392e-16   max|df|/max|f| 6.190574e-17
+  uz: L2 9.085144e-16   max|df|/max|f| 9.537681e-16
+  bx: L2 2.630122e-16   max|df|/max|f| 5.940922e-17
+  by: L2 2.661250e-16   max|df|/max|f| 8.468612e-17
+  bz: L2 8.758024e-15   max|df|/max|f| 1.262926e-14
+  all six fields combined: 2.644458e-16
+
+-- energy W = 0.5<|u|^2+|b|^2> from the spectral fields --
+  A: 9.999999999054061e-01
+  B: 9.999999999054061e-01
+  relative difference: 0.000000e+00
+
+############ order: gallope vs calliope at dt5e4
+grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = order_dt5e4_gallope  [gallope]
+B = order_dt5e4_calliope  [calliope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.10000000000000007]
+  B: [0.10000000000000007, 0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- solenoidal error on the reconstructed cube --
+   (must be at roundoff; an O(1) value means the axis mapping is wrong)
+  A: <|k.u|>/(<|k|><|u|>) = 5.395e-27   <|k.b|>/(<|k|><|b|>) = 4.613e-26
+  B: <|k.u|>/(<|k|><|u|>) = 1.090e-26   <|k.b|>/(<|k|><|b|>) = 4.299e-26
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  ux: L2 2.612499e-16   max|df|/max|f| 5.886966e-17
+  uy: L2 2.557843e-16   max|df|/max|f| 6.190288e-17
+  uz: L2 7.057586e-16   max|df|/max|f| 4.847607e-16
+  bx: L2 2.686695e-16   max|df|/max|f| 5.988368e-17
+  by: L2 2.671028e-16   max|df|/max|f| 8.578341e-17
+  bz: L2 4.318562e-15   max|df|/max|f| 1.585115e-15
+  all six fields combined: 2.639996e-16
+
+-- energy W = 0.5<|u|^2+|b|^2> from the spectral fields --
+  A: 9.999999999880415e-01
+  B: 9.999999999880415e-01
+  relative difference: 0.000000e+00
+
+############ order: gallope vs calliope at dt25e5
+grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = order_dt25e5_gallope  [gallope]
+B = order_dt25e5_calliope  [calliope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.10000000000000007]
+  B: [0.10000000000000007, 0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- solenoidal error on the reconstructed cube --
+   (must be at roundoff; an O(1) value means the axis mapping is wrong)
+  A: <|k.u|>/(<|k|><|u|>) = 9.865e-27   <|k.b|>/(<|k|><|b|>) = 2.842e-26
+  B: <|k.u|>/(<|k|><|u|>) = 1.157e-26   <|k.b|>/(<|k|><|b|>) = 1.721e-26
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  ux: L2 2.659935e-16   max|df|/max|f| 5.827289e-17
+  uy: L2 2.505991e-16   max|df|/max|f| 6.191040e-17
+  uz: L2 1.030855e-15   max|df|/max|f| 1.112742e-15
+  bx: L2 2.614972e-16   max|df|/max|f| 5.988109e-17
+  by: L2 2.502781e-16   max|df|/max|f| 6.294695e-17
+  bz: L2 4.330298e-15   max|df|/max|f| 2.203937e-15
+  all six fields combined: 2.587997e-16
+
+-- energy W = 0.5<|u|^2+|b|^2> from the spectral fields --
+  A: 9.999999999983724e-01
+  B: 9.999999999983724e-01
+  relative difference: 0.000000e+00
+
+############ lin: gallope self-convergence, dt1e3 vs dt5e4
+grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = lin_dt1e3_gallope  [gallope]
+B = lin_dt5e4_gallope  [gallope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.10000000000000007]
+  B: [0.10000000000000007, 0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- solenoidal error on the reconstructed cube --
+   (must be at roundoff; an O(1) value means the axis mapping is wrong)
+  A: <|k.u|>/(<|k|><|u|>) = 1.361e-38   <|k.b|>/(<|k|><|b|>) = 3.456e-26  [kx(t) = kx + 1.5*0.1*ky]
+  B: <|k.u|>/(<|k|><|u|>) = 1.407e-38   <|k.b|>/(<|k|><|b|>) = 5.099e-26  [kx(t) = kx + 1.5*0.1*ky]
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  ux: L2 1.923441e-11   max|df|/max|f| 1.933261e-11
+  uy: L2 2.229913e-12   max|df|/max|f| 2.043017e-12
+  uz: L2 7.433700e-12   max|df|/max|f| 8.232362e-12
+  bx: L2 6.661338e-16   max|df|/max|f| 6.661338e-16
+  by: L2 6.678508e-16   max|df|/max|f| 6.661338e-16
+  bz: L2 8.009646e+00   max|df|/max|f| 8.009646e+00
+  all six fields combined: 9.582121e-12
+
+-- energy W = 0.5<|u|^2+|b|^2> from the spectral fields --
+  A: 1.005665468271660e+00
+  B: 1.005665468281653e+00
+  relative difference: 9.937483e-12
+
+############ lin: gallope self-convergence, dt5e4 vs dt25e5
+grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = lin_dt5e4_gallope  [gallope]
+B = lin_dt25e5_gallope  [gallope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.10000000000000007]
+  B: [0.10000000000000007, 0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- solenoidal error on the reconstructed cube --
+   (must be at roundoff; an O(1) value means the axis mapping is wrong)
+  A: <|k.u|>/(<|k|><|u|>) = 1.407e-38   <|k.b|>/(<|k|><|b|>) = 5.099e-26  [kx(t) = kx + 1.5*0.1*ky]
+  B: <|k.u|>/(<|k|><|u|>) = 1.290e-38   <|k.b|>/(<|k|><|b|>) = 1.601e-26  [kx(t) = kx + 1.5*0.1*ky]
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  ux: L2 2.404999e-12   max|df|/max|f| 2.417280e-12
+  uy: L2 2.769439e-13   max|df|/max|f| 2.554623e-13
+  uz: L2 9.290828e-13   max|df|/max|f| 1.029479e-12
+  bx: L2 2.196806e-30   max|df|/max|f| 9.244703e-31
+  by: L2 9.883327e-15   max|df|/max|f| 9.992007e-15
+  bz: L2 1.510881e+00   max|df|/max|f| 1.510881e+00
+  all six fields combined: 1.198013e-12
+
+-- energy W = 0.5<|u|^2+|b|^2> from the spectral fields --
+  A: 1.005665468281653e+00
+  B: 1.005665468282905e+00
+  relative difference: 1.244835e-12
+
+############ lin: calliope self-convergence, dt1e3 vs dt5e4
+grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = lin_dt1e3_calliope  [calliope]
+B = lin_dt5e4_calliope  [calliope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.10000000000000007]
+  B: [0.10000000000000007, 0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- solenoidal error on the reconstructed cube --
+   (must be at roundoff; an O(1) value means the axis mapping is wrong)
+  A: <|k.u|>/(<|k|><|u|>) = 1.337e-38   <|k.b|>/(<|k|><|b|>) = 3.456e-26  [kx(t) = kx + 1.5*0.1*ky]
+  B: <|k.u|>/(<|k|><|u|>) = 1.416e-38   <|k.b|>/(<|k|><|b|>) = 5.099e-26  [kx(t) = kx + 1.5*0.1*ky]
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  ux: L2 1.923441e-11   max|df|/max|f| 1.933261e-11
+  uy: L2 2.229913e-12   max|df|/max|f| 2.043017e-12
+  uz: L2 7.433700e-12   max|df|/max|f| 8.232362e-12
+  bx: L2 6.661338e-16   max|df|/max|f| 6.661338e-16
+  by: L2 6.678508e-16   max|df|/max|f| 6.661338e-16
+  bz: L2 8.009646e+00   max|df|/max|f| 8.009646e+00
+  all six fields combined: 9.582121e-12
+
+-- energy W = 0.5<|u|^2+|b|^2> from the spectral fields --
+  A: 1.005665468271660e+00
+  B: 1.005665468281653e+00
+  relative difference: 9.937483e-12
+
+############ lin: calliope self-convergence, dt5e4 vs dt25e5
+grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = lin_dt5e4_calliope  [calliope]
+B = lin_dt25e5_calliope  [calliope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.10000000000000007]
+  B: [0.10000000000000007, 0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- solenoidal error on the reconstructed cube --
+   (must be at roundoff; an O(1) value means the axis mapping is wrong)
+  A: <|k.u|>/(<|k|><|u|>) = 1.416e-38   <|k.b|>/(<|k|><|b|>) = 5.099e-26  [kx(t) = kx + 1.5*0.1*ky]
+  B: <|k.u|>/(<|k|><|u|>) = 1.266e-38   <|k.b|>/(<|k|><|b|>) = 1.601e-26  [kx(t) = kx + 1.5*0.1*ky]
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  ux: L2 2.404999e-12   max|df|/max|f| 2.417280e-12
+  uy: L2 2.769439e-13   max|df|/max|f| 2.554623e-13
+  uz: L2 9.290828e-13   max|df|/max|f| 1.029479e-12
+  bx: L2 2.251839e-30   max|df|/max|f| 1.355939e-30
+  by: L2 9.883327e-15   max|df|/max|f| 9.992007e-15
+  bz: L2 1.510881e+00   max|df|/max|f| 1.510881e+00
+  all six fields combined: 1.198013e-12
+
+-- energy W = 0.5<|u|^2+|b|^2> from the spectral fields --
+  A: 1.005665468281653e+00
+  B: 1.005665468282905e+00
+  relative difference: 1.244835e-12
+
+############ lin: gallope vs calliope at dt1e3
+grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = lin_dt1e3_gallope  [gallope]
+B = lin_dt1e3_calliope  [calliope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.10000000000000007]
+  B: [0.10000000000000007, 0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- solenoidal error on the reconstructed cube --
+   (must be at roundoff; an O(1) value means the axis mapping is wrong)
+  A: <|k.u|>/(<|k|><|u|>) = 1.361e-38   <|k.b|>/(<|k|><|b|>) = 3.456e-26  [kx(t) = kx + 1.5*0.1*ky]
+  B: <|k.u|>/(<|k|><|u|>) = 1.337e-38   <|k.b|>/(<|k|><|b|>) = 3.456e-26  [kx(t) = kx + 1.5*0.1*ky]
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  ux: L2 1.991774e-16   max|df|/max|f| 5.050116e-17
+  uy: L2 1.976195e-16   max|df|/max|f| 6.232175e-17
+  uz: L2 9.486166e-17   max|df|/max|f| 2.383551e-17
+  bx: L2 1.985478e-16   max|df|/max|f| 5.009852e-17
+  by: L2 1.873455e-16   max|df|/max|f| 6.598277e-17
+  bz: L2 3.527533e-17   max|df|/max|f| 1.976507e-17
+  all six fields combined: 1.954431e-16
+
+-- energy W = 0.5<|u|^2+|b|^2> from the spectral fields --
+  A: 1.005665468271660e+00
+  B: 1.005665468271660e+00
+  relative difference: 0.000000e+00
+
+############ lin: gallope vs calliope at dt5e4
+grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = lin_dt5e4_gallope  [gallope]
+B = lin_dt5e4_calliope  [calliope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.10000000000000007]
+  B: [0.10000000000000007, 0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- solenoidal error on the reconstructed cube --
+   (must be at roundoff; an O(1) value means the axis mapping is wrong)
+  A: <|k.u|>/(<|k|><|u|>) = 1.407e-38   <|k.b|>/(<|k|><|b|>) = 5.099e-26  [kx(t) = kx + 1.5*0.1*ky]
+  B: <|k.u|>/(<|k|><|u|>) = 1.416e-38   <|k.b|>/(<|k|><|b|>) = 5.099e-26  [kx(t) = kx + 1.5*0.1*ky]
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  ux: L2 1.991774e-16   max|df|/max|f| 5.050116e-17
+  uy: L2 1.976195e-16   max|df|/max|f| 6.232175e-17
+  uz: L2 9.486166e-17   max|df|/max|f| 2.383551e-17
+  bx: L2 1.985478e-16   max|df|/max|f| 5.009852e-17
+  by: L2 1.873455e-16   max|df|/max|f| 6.598277e-17
+  bz: L2 1.353444e-15   max|df|/max|f| 1.297334e-15
+  all six fields combined: 1.954431e-16
+
+-- energy W = 0.5<|u|^2+|b|^2> from the spectral fields --
+  A: 1.005665468281653e+00
+  B: 1.005665468281653e+00
+  relative difference: 0.000000e+00
+
+############ lin: gallope vs calliope at dt25e5
+grid 128 x 128 x 128, box (2pi*1.0, 2pi*1.0, 2pi*1.0)
+A = lin_dt25e5_gallope  [gallope]
+B = lin_dt25e5_calliope  [calliope]
+
+-- restart time (tt, tsc) --
+  A: [0.10000000000000007, 0.10000000000000007]
+  B: [0.10000000000000007, 0.10000000000000007]
+  |tt_A - tt_B| = 0.000e+00  (OK)
+
+-- solenoidal error on the reconstructed cube --
+   (must be at roundoff; an O(1) value means the axis mapping is wrong)
+  A: <|k.u|>/(<|k|><|u|>) = 1.290e-38   <|k.b|>/(<|k|><|b|>) = 1.601e-26  [kx(t) = kx + 1.5*0.1*ky]
+  B: <|k.u|>/(<|k|><|u|>) = 1.266e-38   <|k.b|>/(<|k|><|b|>) = 1.601e-26  [kx(t) = kx + 1.5*0.1*ky]
+
+-- relative field difference, ||f_A - f_B||_2 / ||f_B||_2 --
+  ux: L2 1.991774e-16   max|df|/max|f| 5.050116e-17
+  uy: L2 1.976195e-16   max|df|/max|f| 6.232175e-17
+  uz: L2 9.486166e-17   max|df|/max|f| 2.383551e-17
+  bx: L2 1.985478e-16   max|df|/max|f| 5.009852e-17
+  by: L2 1.873455e-16   max|df|/max|f| 6.598277e-17
+  bz: L2 2.470965e-15   max|df|/max|f| 2.432234e-15
+  all six fields combined: 1.954431e-16
+
+-- energy W = 0.5<|u|^2+|b|^2> from the spectral fields --
+  A: 1.005665468282905e+00
+  B: 1.005665468282905e+00
+  relative difference: 0.000000e+00
+

@@ -1,0 +1,110 @@
+!--------------------------------------------------!
+!   Nonlinear MRI benchmark, post-fix rerun          !
+!   MHD_INCOMP, shearing box, 512 x 512 x 256        !
+!--------------------------------------------------!
+!  Paired with gallope.in in this directory.  Every physical and numerical
+!  parameter is identical to that file; the only intended differences are
+!  the &mpi_settings group below and the empty &forced_fields.
+!
+!  `pruned` is left at its default (.true.) here, unlike the deterministic
+!  OT3 comparison in tests/determinism: this is a statistical benchmark, not
+!  a mode-for-mode comparison, and pruning only removes modes the 2/3 rule
+!  zeroes anyway.
+!--------------------------------------------------!
+&mpi_settings
+  dim_decomp = 2
+/
+
+!==============================================================================
+&box_parameters
+  lx = 2.0 ! to be multiplied by 2pi
+  ly = 4.0 ! to be multiplied by 2pi
+  lz = 1.0 ! to be multiplied by 2pi
+
+  nlx = 512
+  nly = 512
+  nlz = 256
+/
+
+!==============================================================================
+&time_parameters
+  dt    = 1.0d-2
+  nstep = 100000000
+  cfl   = 2.0d0
+  reset_method = 'decrement'
+  increase_dt = 1e+0
+/
+
+!==============================================================================
+&scheme_parameters
+  time_step_scheme = 'eSSPIFRK3'
+/
+
+!==============================================================================
+&operation_parameters
+  nonlinear = T
+/
+
+!==============================================================================
+&physical_parameters
+  ! damping rate = nu*(k^2/k2_max) + nu_h*(k^2/k2_max)^nu_h_exp
+  nu        = 0d+0
+  nu_h      = 2.00d+2
+  nu_h_exp  = 2
+  eta       = 0d+0
+  eta_h     = 2.00d+2
+  eta_h_exp = 2
+
+  ! shear parameters
+  shear  = .true.
+  q      = 1.5d0
+/
+
+!==============================================================================
+&initial_condition
+  init_type = 'random'
+/
+
+&initial_condition_params
+  kmin = 0.d0   0.d0   0.d0
+  kmax = 3.d0   3.d0   3.d0
+  b0   = 0.d0   0.d0   5.d-2
+  b1   = 5.d-2  5.d-2  5.d-2
+  u1   = 5.d-2  5.d-2  5.d-2
+  nf_or_znf = 'nf'
+/
+
+!==============================================================================
+&force
+  driven = F
+  nfields = 0
+/
+&forced_fields
+/
+
+!==============================================================================
+&terminate
+  max_wall_time   = 47.0
+  terminate_file_name = 'terminate'
+/
+
+!==============================================================================
+&diagnostics_parameters
+  write_intvl         = 0.5d0
+  write_intvl_2D      = 5.0d0
+  write_intvl_3D      = 0.0d0
+  write_intvl_kpar    = 0.0d0
+  write_intvl_SF2     = 0.0d0
+  write_intvl_nltrans = 0.0d0
+  SF2_nsample = 100000
+
+  output_modes =   3   1   2
+                   5   1   3
+                   7   1   4
+/
+
+!==============================================================================
+&restart_parameters
+  save_restart_intvl = 10.0d0
+  restart_dir = './restart/'
+/

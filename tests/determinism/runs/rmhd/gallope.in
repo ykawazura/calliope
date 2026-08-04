@@ -1,0 +1,113 @@
+!--------------------------------------------------!
+!   Deterministic Gallope <-> Calliope comparison   !
+!   RMHD, 3D Orszag-Tang (analytic IC)              !
+!--------------------------------------------------!
+!  Paired with calliope.in in this directory. Every physical and numerical
+!  parameter below must be kept identical in the two files; the only
+!  intentional differences are Calliope's &mpi_settings, its
+!  `pruned = .false.`, and its empty &forced_fields.
+!
+!  RMHD has no shearing box, so there is a single series here, unlike the
+!  MHD_INCOMP comparison one directory up.
+!
+!  lx = ly is not incidental. Calliope's RMHD init_OT3 divides yy(j) by x0
+!  rather than y0 in the second psi term; the routine was transcribed into
+!  Gallope verbatim so that the two codes start from bit-identical fields,
+!  and lx = ly makes x0 = y0, so the discrepancy has no effect on what is
+!  simulated. See README.md.
+!--------------------------------------------------!
+&box_parameters
+  lx = 1.0 ! to be multiplied by 2pi
+  ly = 1.0 ! to be multiplied by 2pi
+  lz = 1.0 ! to be multiplied by 2pi
+
+  nlx = 128
+  nly = 128
+  nlz = 128
+/
+
+!==============================================================================
+&time_parameters
+  dt    = 1.0d-3
+  nstep = 1000
+  cfl   = 2.0d0             ! |u_perp| ~ 2 from the OT3 potentials, so
+                            ! dt_cfl ~ 2*(2pi/128)/2 ~ 5d-2 >> dt and the
+                            ! adaptive reset never fires. dt stays fixed at
+                            ! 1.0d-3, which is what makes the comparison
+                            ! step-by-step meaningful; verified from cfl.dat.
+  reset_method = 'multiply'
+  increase_dt = 0e+0
+/
+
+!==============================================================================
+&scheme_parameters
+  time_step_scheme = 'eSSPIFRK3'
+/
+
+!==============================================================================
+&operation_parameters
+  nonlinear = T
+/
+
+!==============================================================================
+&physical_parameters
+  ! damping rate = nupe_x*(kprp^2/kprp2_max)^nupe_x_exp
+  !              + nupe_z*(kz^2  /kz2_max  )^nupe_z_exp
+  ! (advance.F90:get_imp_terms_tintg, identical in the two codes), i.e. the
+  ! coefficients are damping RATES AT THE GRID SCALE, not coefficients
+  ! multiplying k^(2*nexp).
+  nupe_x      = 1d+2  ! perp viscosity   for phi
+  nupe_x_exp  = 4
+  etape_x     = 1d+2  ! perp resistivity for psi
+  etape_x_exp = 4
+
+  nupe_z      = 1d+1  ! para viscosity   for phi
+  nupe_z_exp  = 4
+  etape_z     = 1d+1  ! para resistivity for psi
+  etape_z_exp = 4
+/
+
+!==============================================================================
+&initial_condition
+  init_type = 'OT3'   ! phi = -(cos(x + 1.4 + z) + cos(y + 0.5 + z))
+                      ! psi = -(0.5*cos(2x + 2.3 + z) + cos(y + 4.1 + z))
+                      ! omg = -kprp^2 phi.  Fully three dimensional, so the
+                      ! kz != 0 dynamics is exercised; OT2 is z independent
+                      ! and would not be.
+/
+
+!==============================================================================
+&force
+  driven = F
+  nfields = 0
+/
+! force_common.F90 reads &forced_fields unconditionally; with nfields = 0 the
+! three arrays are zero-size, so the group is empty but must be present or the
+! read reports a failure.
+&forced_fields
+/
+
+!==============================================================================
+&terminate
+  max_wall_time   = 24.
+  terminate_file_name = 'terminate'
+/
+
+!==============================================================================
+&diagnostics_parameters
+  write_intvl         = 1.0d-2  ! every 10 steps
+  write_intvl_2D      = 0.0d0
+  write_intvl_3D      = 0.0d0
+  write_intvl_kpar    = 0.0d0
+  write_intvl_SF2     = 0.0d0
+  write_intvl_nltrans = 0.0d0
+  SF2_nsample = 100000
+/
+
+!==============================================================================
+&restart_parameters
+  save_restart_intvl = 0.0d0      ! 0 => no periodic save; the unconditional
+                                  ! save_restart at the end of the main loop
+                                  ! still writes restart/ at exactly nstep.
+  restart_dir = './restart/'
+/

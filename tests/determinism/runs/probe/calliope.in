@@ -1,0 +1,110 @@
+!--------------------------------------------------!
+!   Deterministic Gallope <-> Calliope comparison   !
+!   MHD_INCOMP, 3D Orszag-Tang (analytic IC)        !
+!--------------------------------------------------!
+!  Paired with gallope.in in this directory. Every physical and numerical
+!  parameter is identical to that file. The two intentional differences are
+!  the &mpi_settings group, which has no Gallope counterpart, and
+!  `pruned = .false.`, which is REQUIRED: with the default `pruned = .true.`
+!  Calliope transforms on a reduced spectral grid of size int(2*nl/3)+2, so
+!  its arrays would not be mode-for-mode comparable with Gallope's full
+!  nlx x nly x (nlz/2+1). See README.md.
+!--------------------------------------------------!
+&mpi_settings
+  dim_decomp = 2
+/
+
+!==============================================================================
+&box_parameters
+  lx = 1.0 ! to be multiplied by 2pi
+  ly = 1.0 ! to be multiplied by 2pi
+  lz = 1.0 ! to be multiplied by 2pi
+
+  nlx = 128
+  nly = 128
+  nlz = 128
+
+  pruned = .false.
+/
+
+!==============================================================================
+&time_parameters
+  dt    = 1.0d-3
+  nstep = 1000
+  cfl   = 2.0d0
+  reset_method = 'multiply'
+  increase_dt = 0e+0
+/
+
+!==============================================================================
+&scheme_parameters
+  time_step_scheme = 'eSSPIFRK3'
+/
+
+!==============================================================================
+&operation_parameters
+  nonlinear = T
+/
+
+!==============================================================================
+&physical_parameters
+  ! damping rate = nu*(k^2/k2_max) + nu_h*(k^2/k2_max)^nu_h_exp
+  nu        = 0d+0
+  nu_h      = 1d+2
+  nu_h_exp  = 4
+  eta       = 0d+0
+  eta_h     = 1d+2
+  eta_h_exp = 4
+
+  shear  = .false.
+  q      = 0.d0
+/
+
+!==============================================================================
+&initial_condition
+  init_type = 'OT3'
+/
+
+&initial_condition_params
+  kmin = 0.d0   0.d0   0.d0
+  kmax = 3.d0   3.d0   3.d0
+  b0   = 0.d0   0.d0   0.d0
+  b1   = 0.d0   0.d0   0.d0
+  u1   = 0.d0   0.d0   0.d0
+  nf_or_znf = 'nf'
+/
+
+!==============================================================================
+&force
+  driven = F
+  nfields = 0
+/
+&forced_fields
+/
+
+!==============================================================================
+&terminate
+  max_wall_time   = 24.
+  terminate_file_name = 'terminate'
+/
+
+!==============================================================================
+&diagnostics_parameters
+  write_intvl         = 1.0d-2  ! every 10 steps
+  write_intvl_2D      = 0.0d0
+  write_intvl_3D      = 0.0d0
+  write_intvl_kpar    = 0.0d0
+  write_intvl_SF2     = 0.0d0
+  write_intvl_nltrans = 0.0d0
+  SF2_nsample = 100000
+
+  output_modes =   3   1   2
+                   5   1   3
+                   7   1   4
+/
+
+!==============================================================================
+&restart_parameters
+  save_restart_intvl = 0.0d0
+  restart_dir = './restart/'
+/

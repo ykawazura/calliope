@@ -1,0 +1,61 @@
+#!/bin/sh -l
+#PBS -q regular-g
+#PBS -l select=16:mpiprocs=72:ompthreads=1
+#PBS -l walltime=48:00:00
+#PBS -W group_list=gr96
+#PBS -j oe
+#PBS -N mri-prod-c
+#=====================================================================
+#  Nonlinear MRI production run, Calliope half.  Same grid, box, shear,
+#  dissipation and seed statistics as job.pbs-prod-gallope; the only
+#  differences between the two inputs are Calliope's &mpi_settings and
+#  its empty &forced_fields.  Post-fix code (calliope 92f4047).
+#
+#  Placement: 72 MPI ranks per node, 1152 total -- the configuration
+#  measured in the smoke test (job 2487543), 0.149 s/step at this grid,
+#  i.e. 1.7x the cost of Gallope on the same 16 nodes.  47 h buys about
+#  1.1e6 steps.
+#
+#  Wall-time bounded, resubmittable and leg-archiving in exactly the
+#  same way as the Gallope job; see the header there for why the
+#  archiving is necessary.
+#=====================================================================
+module load nvidia
+module load nv-hpcx
+module load hdf5
+module load netcdf
+module load netcdf-fortran
+
+set -u
+cd ${PBS_O_WORKDIR}
+
+d="prod_calliope"
+mkdir -p "${d}/restart" "${d}/out2d" "${d}/out3d" "${d}/legs"
+ln -sf ../calliope "${d}/calliope"
+
+narch=$(ls -d ${d}/legs/leg* 2>/dev/null | wc -l | tr -d ' ')
+
+if [ -s "${d}/restart/ux.dat" ]; then
+  leg=$((narch + 2))
+  a="${d}/legs/leg$((narch + 1))"
+  mkdir -p "${a}"
+  for f in ${d}/calliope.out*.nc ${d}/calliope.modes.out ${d}/cfl.dat ${d}/rms.dat ${d}/out.std; do
+    [ -e "${f}" ] && mv "${f}" "${a}/"
+  done
+  [ -d "${d}/out2d" ] && mv "${d}/out2d" "${a}/out2d" && mkdir -p "${d}/out2d"
+  sed -e "s/^  init_type = .*/  init_type = 'restart'/" calliope.in > "${d}/calliope.in"
+  echo "[prod-c] leg ${leg}: continuing from restart, previous leg archived in ${a}"
+else
+  leg=1
+  cp calliope.in "${d}/calliope.in"
+  echo "[prod-c] leg ${leg}: fresh start"
+fi
+
+( cd "${d}" && mpirun -n 1152 ./calliope <calliope.in >out.std 2>&1 )
+rc=$?
+
+echo "[prod-c] leg ${leg} rc=${rc}"
+echo "[prod-c] reached t = $(cat ${d}/restart/time.dat 2>/dev/null | tr -d ' ' || echo MISSING)"
+echo "[prod-c] last cfl.dat: $(tail -1 ${d}/cfl.dat 2>/dev/null || echo MISSING)"
+grep -E "Advance steps|# of steps advanced|Final dt|wall time" "${d}/out.std" | head -6
+echo "MRI_PROD_C_DONE"

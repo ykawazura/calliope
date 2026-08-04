@@ -1,0 +1,29 @@
+[rmhd] run_n1_c16 rc=0 wall=3s
+       time.dat:    1.000000000000000020817E-03
+       expected tt = 1 * 1.0d-3
+-rw-r----- 1 o07001 gr96 17039360 Aug  4 08:22 run_n1_c16/restart/phi.dat
+[rmhd] run_n10_c16 rc=0 wall=3s
+       time.dat:    1.000000000000000194289E-02
+       expected tt = 10 * 1.0d-3
+-rw-r----- 1 o07001 gr96 17039360 Aug  4 08:22 run_n10_c16/restart/phi.dat
+[rmhd] run_n100_c16 rc=0 wall=13s
+       time.dat:    1.000000000000000749401E-01
+       expected tt = 100 * 1.0d-3
+-rw-r----- 1 o07001 gr96 17039360 Aug  4 08:22 run_n100_c16/restart/phi.dat
+[rmhd] run_n1000_c16 rc=0 wall=108s
+       time.dat:    1.000000000000000666134E+00
+       expected tt = 1000 * 1.0d-3
+-rw-r----- 1 o07001 gr96 17039360 Aug  4 08:24 run_n1000_c16/restart/phi.dat
+[rmhd] probe_dt1e3_calliope rc=0 wall=12s
+       time.dat:    1.000000000000000749401E-01
+       expected tt = 100 * 1.0d-3
+-rw-r----- 1 o07001 gr96 17039360 Aug  4 08:24 probe_dt1e3_calliope/restart/phi.dat
+[rmhd] probe_dt5e4_calliope rc=0 wall=22s
+       time.dat:    1.000000000000000749401E-01
+       expected tt = 200 * 5.0d-4
+-rw-r----- 1 o07001 gr96 17039360 Aug  4 08:24 probe_dt5e4_calliope/restart/phi.dat
+[rmhd] probe_dt25e5_calliope rc=0 wall=41s
+       time.dat:    1.000000000000000749401E-01
+       expected tt = 400 * 2.5d-4
+-rw-r----- 1 o07001 gr96 17039360 Aug  4 08:25 probe_dt25e5_calliope/restart/phi.dat
+RMHD_CALLIOPE_DONE

@@ -1,0 +1,71 @@
+#!/bin/sh -l
+#PBS -q short-g
+#PBS -l select=1:mpiprocs=16:ompthreads=1
+#PBS -l walltime=02:00:00
+#PBS -W group_list=gr96
+#PBS -j oe
+#PBS -N det-calliope
+#=====================================================================
+#  Deterministic Gallope <-> Calliope comparison: the Calliope side.
+#
+#  Mirrors job.pbs-gallope run for run.  Calliope is CPU-only (FFTW3
+#  through P3DFFT), so it runs on the node's Grace cores rather than on
+#  the GPU; the queue is the same only because the nodes are.
+#
+#  NP must factorize for dim_decomp = 2 (P3DFFT uses a p1 x p2 pencil
+#  decomposition).  16 = 4 x 4 at 128^3 is comfortable.
+#
+#  Self-contained: the binary ./calliope and calliope.in live in this
+#  dir.  calliope.in is the single source of truth; the variants are
+#  derived from it by sed, so it cannot drift from gallope.in silently
+#  --- diff the two after editing either.
+#=====================================================================
+module load nvidia
+module load nv-hpcx
+module load hdf5
+module load netcdf
+module load netcdf-fortran
+
+set -u
+cd ${PBS_O_WORKDIR}
+
+NP=16
+
+run_one() {
+  series=$1; nstep=$2; shear=$3; q=$4
+  d="run_${series}_n${nstep}_c${NP}"
+  rm -rf "${d}"
+  mkdir -p "${d}/restart" "${d}/out2d" "${d}/out3d"
+  sed -e "s/^  nstep = .*/  nstep = ${nstep}/" \
+      -e "s/^  shear  = .*/  shear  = ${shear}/" \
+      -e "s/^  q      = .*/  q      = ${q}/" \
+      calliope.in > "${d}/calliope.in"
+  cp calliope "${d}/" 2>/dev/null || ln -sf ../calliope "${d}/calliope"
+
+  t0=$(date +%s)
+  ( cd "${d}" && mpirun -n ${NP} ./calliope <calliope.in >out.std 2>&1 )
+  rc=$?
+  t1=$(date +%s)
+  echo "[det] ${d} rc=${rc} wall=$((t1 - t0))s"
+  echo "      time.dat: $(tail -1 ${d}/restart/time.dat 2>/dev/null || echo MISSING)"
+  echo "      expected tt = ${nstep} * dt"
+  # pruned = .false. is required: with the default the spectral arrays are
+  # int(2*nl/3)+2 on a side and compare.py's size check will reject them.
+  ls -l "${d}/restart/ux.dat" 2>/dev/null \
+    || echo "      WARNING: no restart written"
+  if [ ${rc} -ne 0 ]; then
+    echo "----- tail out.std -----"
+    tail -30 "${d}/out.std"
+  fi
+}
+
+for nstep in 1 10 100 1000; do
+  run_one noshear ${nstep} ".false." "0.d0"
+done
+for nstep in 1 10 100 1000 2000; do
+  run_one shear ${nstep} ".true." "1.5d0"
+done
+
+echo "----- is_div_free as printed by the code (nstep=1000) -----"
+grep -i "div" run_noshear_n1000_c${NP}/out.std 2>/dev/null | head -10
+echo "DET_CALLIOPE_DONE"
