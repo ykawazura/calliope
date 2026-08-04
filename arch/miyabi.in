@@ -1,0 +1,52 @@
+#=======================================================================
+# Miyabi-G (JCAHPC).  NVIDIA Grace CPU (aarch64), NVIDIA HPC SDK.
+#
+# Calliope is CPU-only, so this builds for the Grace cores of the same
+# nodes Gallope runs on.  Written for the deterministic Gallope <->
+# Calliope comparison in gallope_dev/tests/determinism/.
+#
+#   module load nvidia nv-hpcx hdf5 netcdf netcdf-fortran
+#
+# NOTE: -DINTEL in the other arch files is vestigial; no source file
+# tests it (only DEBG and STRIDE1 are used, and src/Makefile sets
+# STRIDE1 itself).
+#
+# P3DFFT is not provided as a module.  A build against this compiler
+# and this FFTW3 already exists at the P3DFFT_HOME below; if it has to
+# be redone:
+#
+#   ./configure --prefix=$HOME/work/.local/p3dfft.2 \
+#               --enable-pgi --enable-fftw --with-fftw=$FFTW3_HOME \
+#               --enable-stride1 --enable-measure \
+#               FC=mpif90 CC=mpicc
+#   make && make install
+#
+# --enable-stride1 and --enable-measure must match the -DSTRIDE1
+# -DMEASURE that src/Makefile passes unconditionally.
+#=======================================================================
+FC = mpif90
+
+P3DFFT_HOME=$(HOME)/work/.local/p3dfft.2
+P3DFFT_INC=-I$(P3DFFT_HOME)/include/
+P3DFFT_LIB=-L$(P3DFFT_HOME)/lib/ -lp3dfft
+
+FFTW3_HOME=/work/opt/local/aarch64/apps/nvidia/25.9/fftw/3.3.10
+FFTW3_INC=-I$(FFTW3_HOME)/include/
+FFTW3_LIB=-L$(FFTW3_HOME)/lib/ -lfftw3
+
+# The netcdf and netcdf-fortran modules are separate on Miyabi, as in
+# gallope_dev/arch/miyabi.in.
+NETCDF_INC=-I$(NETCDF_DIR)/include -I$(NETCDF_FORTRAN_DIR)/include
+NETCDF_LIB=-L$(NETCDF_DIR)/lib -L$(NETCDF_FORTRAN_DIR)/lib \
+           -lnetcdf -lnetcdff -lhdf5_hl -lhdf5 -lz
+
+# -O3 rather than -fast: -fast bundles further transformations whose
+# effect on floating-point association is not spelled out, and the
+# code-to-code difference this build exists to measure is of that same
+# order.  gallope_dev/arch/miyabi.in does use -fast, so the two builds
+# are not flag-identical; that asymmetry is part of what is being
+# bounded, not something the test assumes away.
+F90FLAGS = -O3 -Mpreprocess -Mextend
+LDFLAGS =
+MPI_LIB = -lm
+LIB_OPENMP = -mp # used only when USE_OPENMP=yes in ../Makefile.in
