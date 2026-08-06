@@ -4,10 +4,12 @@
 #
 # Tracked: the run definition, the job script, the stdout log and this README.
 # Untracked but present in the directory (Dropbox-backed): rms.dat, cfl.dat,
-# the NetCDF diagnostics output and the figures generated from it.
+# the NetCDF diagnostics output, the final out2d/ snapshot and the figures
+# generated from them.
 #
-# Deliberately not copied from Miyabi at all: restart/ (930 MB), out2d/
-# (4.2 GB) and calliope.modes.out (1.2 GB).
+# Deliberately not copied from Miyabi at all: restart/ (930 MB),
+# calliope.modes.out (1.2 GB), and all but the last snapshot of out2d/ (4.2 GB
+# there, 48 MB here -- see README.md).
 *
 !*/
 __pycache__/

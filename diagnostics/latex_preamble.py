@@ -202,7 +202,6 @@ r'\newcommand{\rml}{\mathrm{l}}'+ \
 r'\newcommand{\rmm}{\mathrm{m}}'+ \
 r'\newcommand{\rmn}{\mathrm{n}}'+ \
 r'\newcommand{\rmo}{\mathrm{o}}'+ \
-r'% \newcommand{\rmp}{\mathrm{p}}'+ \
 r'\newcommand{\rmq}{\mathrm{q}}'+ \
 r'\newcommand{\rmr}{\mathrm{r}}'+ \
 r'\newcommand{\rms}{\mathrm{s}}'+ \

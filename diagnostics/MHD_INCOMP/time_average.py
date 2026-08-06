@@ -4,24 +4,28 @@ from fft import *
 import sys
 sys.path.append('../')
 from plots import *
-from scipy.integrate import simps, trapz
+try:                                    # numpy >= 2.0
+  from numpy import trapezoid as trapz
+except ImportError:                     # numpy < 2.0
+  from numpy import trapz
 from scipy import interpolate
 
 avg_start_time = 1.
 avg_end_time   = 900.
 
-@jit
-def time_average(x, y, axis=0): # x: 1D array, y: any-D array 
+# No @jit here: these three wrap scipy.interpolate and numpy reductions, which
+# numba cannot compile in nopython mode.  They only ever ran because a bare
+# @jit used to fall back to object mode silently; numba >= 0.59 makes nopython
+# the default and raises instead.  The gallope equivalents carry no decorator.
+def time_average(x, y, axis=0): # x: 1D array, y: any-D array
   print ('averaging from %.2E to %.2E' % (x[0], x[-1]))
   return trapz(y, x, axis=axis)/(x[-1] - x[0])
   # return trapz(y, x, axis=axis)/(x[-1] - x[0])
 
-@jit
 def std_dev(x, y): # x, y: 1D array
   y_intp = interpolate.interp1d(x, y)
   return np.std(y_intp(np.linspace(x[0], x[-1], x.size)), ddof=0)
 
-@jit
 def cov(x, y1, y2): # x, y: 1D array
   y1_intp  = interpolate.interp1d(x, y1)
   y2_intp  = interpolate.interp1d(x, y2)
@@ -39,7 +43,7 @@ outdir = './fig_energy/'
 W        = u2_sum + b2_sum
 W_dot    = u2dot_sum + b2dot_sum
 D        = u2dissip_sum + b2dissip_sum
-P        = p_ext_sum + p_re_sum + p_ma_sum
+P        = p_ext_ene_sum + p_re_sum + p_ma_sum
 
 avg_start = np.argmin(abs(tt - avg_start_time))
 avg_end   = np.argmin(abs(tt - avg_end_time))
@@ -79,10 +83,10 @@ ys = [
        u2dot_sum + b2dot_sum, 
        u2dissip_sum, 
        b2dissip_sum, 
-       -p_ext_sum, 
+       -p_ext_ene_sum, 
        -p_re_sum, 
        -p_ma_sum, 
-       u2dot_sum + b2dot_sum + u2dissip_sum + b2dissip_sum - p_ext_sum - p_re_sum - p_ma_sum,
+       u2dot_sum + b2dot_sum + u2dissip_sum + b2dissip_sum - p_ext_ene_sum - p_re_sum - p_ma_sum,
        np.full([tt[avg_start:avg_end].size], W_dot_avg),
        np.full([tt[avg_start:avg_end].size], D_avg),
        np.full([tt[avg_start:avg_end].size], -P_avg),
