@@ -372,7 +372,7 @@ contains
       do k = ilz_st, ilz_en
         do j = ily_st, ily_en
           phi_r(j, k, i) = -(cos(xx(i)/x0 + 1.4d0 + zz(k)/z0) + cos(yy(j)/y0 + 0.5d0 + zz(k)/z0))
-          psi_r(j, k, i) = -(0.5d0*cos(2.d0*(xx(i)/x0) + 2.3d0 + zz(k)/z0) + cos(yy(j)/x0 + 4.1d0 + zz(k)/z0))
+          psi_r(j, k, i) = -(0.5d0*cos(2.d0*(xx(i)/x0) + 2.3d0 + zz(k)/z0) + cos(yy(j)/y0 + 4.1d0 + zz(k)/z0))
         end do
       end do
     end do
@@ -380,7 +380,7 @@ contains
     ! compute r2c transform
     call p3dfft_ftran_r2c(phi_r, phi, 'fft'); phi = phi/nlx/nly/nlz
     call p3dfft_ftran_r2c(psi_r, psi, 'fft'); psi = psi/nlx/nly/nlz
-    call p3dfft_ftran_r2c(aaa_r, psi, 'fft'); aaa = aaa/nlx/nly/nlz
+    call p3dfft_ftran_r2c(aaa_r, aaa, 'fft'); aaa = aaa/nlx/nly/nlz
     do j = iky_st, iky_en
       do k = ikz_st, ikz_en
         do i = ikx_st, ikx_en

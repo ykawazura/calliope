@@ -855,7 +855,7 @@ contains
 
     ! (get max_vel for dt reset)
     if(dt_reset) then
-      !$omp parallel do private(j, k) schedule(static)
+      !$omp parallel do private(j, k, vax2_r, vay2_r, vaz2_r) schedule(static)
       do i = ilx_st, ilx_en
         do k = ilz_st, ilz_en
           do j = ily_st, ily_en

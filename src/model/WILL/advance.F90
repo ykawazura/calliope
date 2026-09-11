@@ -48,7 +48,7 @@ module advance
   integer :: cfl_unit
 
   ! Backward FFT variables
-  integer, parameter :: nbtran = 12
+  integer, parameter :: nbtran = 10
   integer, parameter :: idphi_dx = 1 , idphi_dy = 2
   integer, parameter :: idomg_dx = 3 , idomg_dy = 4
   integer, parameter :: idpsi_dx = 5 , idpsi_dy = 6

@@ -127,11 +127,11 @@ contains
 
     call set_file_handle('out3d/rho.dat', fh_rho, disp_rho)
     call set_file_handle('out3d/mx.dat' , fh_mx , disp_mx )
-    call set_file_handle('out3d/my.dat' , fh_my , disp_mx )
-    call set_file_handle('out3d/mz.dat' , fh_mz , disp_mx )
+    call set_file_handle('out3d/my.dat' , fh_my , disp_my )
+    call set_file_handle('out3d/mz.dat' , fh_mz , disp_mz )
     call set_file_handle('out3d/bx.dat' , fh_bx , disp_bx )
-    call set_file_handle('out3d/by.dat' , fh_by , disp_bx )
-    call set_file_handle('out3d/bz.dat' , fh_bz , disp_bx )
+    call set_file_handle('out3d/by.dat' , fh_by , disp_by )
+    call set_file_handle('out3d/bz.dat' , fh_bz , disp_bz )
 
     if(proc0) then
       call open_output_file (out3d_time_unit, 'out3d/time.dat')

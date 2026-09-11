@@ -14,16 +14,16 @@
   ly = 1.0 ! to be multiplied by 2pi
   lz = 1.0 ! to be multiplied by 2pi
 
-  nlx = 64
-  nly = 64
-  nlz = 64
+  nlx = 256
+  nly = 256
+  nlz = 128
 
   pruned = .true.
 /
 
 !==============================================================================
 &time_parameters
-  dt    = 2.0d-2
+  dt    = 8.0d-3
   nstep = 50000 
   cfl   = 1.0d0
   reset_method = 'decrement'  !'multiply'  => multiply by a factor of 0.5
@@ -49,16 +49,16 @@
 !==============================================================================
 &physical_parameters
   ! hyper dissipation ~ nu*kperp^(2*nuexp)
-  nupe_x      = 1d+3  ! perp viscosity   for phi
-  nupe_x_exp  = 4
-  etape_x     = 1d+3  ! perp resistivity for psi
-  etape_x_exp = 4
+  nupe_x      = 5d+1  ! perp viscosity   for phi
+  nupe_x_exp  = 2
+  etape_x     = 5d+1  ! perp resistivity for psi
+  etape_x_exp = 2
 
   ! hyper dissipation ~ nu*kz^(2*nuexp)
   nupe_z      = 1d+1  ! para viscosity   for phi
-  nupe_z_exp  = 4
+  nupe_z_exp  = 2
   etape_z     = 1d+1  ! para resistivity for psi
-  etape_z_exp = 4
+  etape_z_exp = 2
 /
 
 !==============================================================================
@@ -82,16 +82,16 @@
   elsasser = .true.
   fix_power = .true.
   ene_inj = 1.0d0
-  xhl_inj = 0.8d0 ! 0 <= xhl_inj <= 1 ! helicity injection rate. only when elsasser = .true.
+  xhl_inj = 0.0d0 ! 0 <= xhl_inj <= 1 ! helicity injection rate. only when elsasser = .true.
 !  res_inj = 0.99d0 ! 0 <= res_inj <= 1 ! residual energy injection rate. only when elsasser = .false.
-  kmin = 0.d0  0.d0  1.d0
-  kmax = 2.0d0  2.0d0  2.d0
+  kmin = 0.0d0  0.0d0  0.1d0
+  kmax = 1.1d0  1.1d0  1.1d0
   nfields = 2
 /
 &forced_fields
   field_names = 'zppe'      , 'zmpe'            
 !  field_names = 'phi'      , 'psi'            
-  amplitudes  =  100.0      ,  100.0             
+  amplitudes  =  1.0      ,  1.0             
   frequencies = (0.9, -0.6), (0.9, -0.6)
 /
 

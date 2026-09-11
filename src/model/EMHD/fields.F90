@@ -300,7 +300,7 @@ contains
               by(i, k, j) = 0.d0
               bz(i, k, j) = 0.d0
             endif
-            if (kx(i)**2 >= kmax(2)**2) then
+            if (kx(i)**2 >= kmax(1)**2) then
               bx(i, k, j) = 0.d0
               by(i, k, j) = 0.d0
               bz(i, k, j) = 0.d0
@@ -308,12 +308,12 @@ contains
           endif
 
           if(nky > 1)then
-            if (ky(j)**2 <= kmin(1)**2) then
+            if (ky(j)**2 <= kmin(2)**2) then
               bx(i, k, j) = 0.d0
               by(i, k, j) = 0.d0
               bz(i, k, j) = 0.d0
             endif
-            if (ky(j)**2 >= kmax(3)**2) then
+            if (ky(j)**2 >= kmax(2)**2) then
               bx(i, k, j) = 0.d0
               by(i, k, j) = 0.d0
               bz(i, k, j) = 0.d0
@@ -321,7 +321,7 @@ contains
           endif
 
           if(nkz > 1)then
-            if (kz(k)**2 <= kmin(2)**2) then
+            if (kz(k)**2 <= kmin(3)**2) then
               bx(i, k, j) = 0.d0
               by(i, k, j) = 0.d0
               bz(i, k, j) = 0.d0
@@ -334,24 +334,11 @@ contains
             endif
           endif
 
-
-          if(nky > 1)then
-            if (ky(j) == 0.d0) then
-              by(i, k, j) = 0.d0
-            else
-              by(i, k, j) = -(kx(i)*bx(i, k, j) + kz(k)*bz(i, k, j))/ky(j)
-            endif
-          elseif(nkx > 1)then
-            if (kx(i) == 0.d0) then
-              by(i, k, j) = 0.d0
-            else
-              bx(i, k, j) = -(ky(j)*by(i, k, j) + kz(k)*bz(i, k, j))/kx(i)
-            endif
-          endif
-          ! endif
         end do
       end do
     end do
+
+    call div_free(bx, by, bz)
 
     ! normalize bx, by, bz by rms of |b|
     call p3dfft_btran_c2r(bx, bx_r, 'tff')

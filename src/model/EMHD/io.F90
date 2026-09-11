@@ -117,8 +117,8 @@ contains
     implicit none
 
     call set_file_handle('out3d/bx.dat', fh_bx, disp_bx)
-    call set_file_handle('out3d/by.dat', fh_by, disp_bx)
-    call set_file_handle('out3d/bz.dat', fh_bz, disp_bx)
+    call set_file_handle('out3d/by.dat', fh_by, disp_by)
+    call set_file_handle('out3d/bz.dat', fh_bz, disp_bz)
 
     if(proc0) then
       call open_output_file (out3d_time_unit, 'out3d/time.dat')

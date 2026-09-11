@@ -396,7 +396,7 @@ contains
               by(i, k, j) = 0.d0
               bz(i, k, j) = 0.d0
             endif
-            if (kx(i)**2 >= kmax(2)**2) then
+            if (kx(i)**2 >= kmax(1)**2) then
               ux(i, k, j) = 0.d0
               uy(i, k, j) = 0.d0
               uz(i, k, j) = 0.d0
@@ -407,7 +407,7 @@ contains
           endif
 
           if(nky > 1)then
-            if (ky(j)**2 <= kmin(1)**2) then
+            if (ky(j)**2 <= kmin(2)**2) then
               ux(i, k, j) = 0.d0
               uy(i, k, j) = 0.d0
               uz(i, k, j) = 0.d0
@@ -415,7 +415,7 @@ contains
               by(i, k, j) = 0.d0
               bz(i, k, j) = 0.d0
             endif
-            if (ky(j)**2 >= kmax(3)**2) then
+            if (ky(j)**2 >= kmax(2)**2) then
               ux(i, k, j) = 0.d0
               uy(i, k, j) = 0.d0
               uz(i, k, j) = 0.d0
@@ -426,7 +426,7 @@ contains
           endif
 
           if(nkz > 1)then
-            if (kz(k)**2 <= kmin(2)**2) then
+            if (kz(k)**2 <= kmin(3)**2) then
               ux(i, k, j) = 0.d0
               uy(i, k, j) = 0.d0
               uz(i, k, j) = 0.d0
