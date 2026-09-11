@@ -129,15 +129,15 @@ contains
             ! update b
             call eSSPIFRK1(bx_tmp(i,k,j), bx(i,k,j), &
                exp_terms(i,k,j,ibx), &
-               imp_terms_tintg2(ibx), imp_terms_tintg0(ibx) &
+               imp_terms_tintg1(ibx), imp_terms_tintg0(ibx) &
             )
             call eSSPIFRK1(by_tmp(i,k,j), by(i,k,j), &
                exp_terms(i,k,j,iby), &
-               imp_terms_tintg2(iby), imp_terms_tintg0(iby) &
+               imp_terms_tintg1(iby), imp_terms_tintg0(iby) &
             )
             call eSSPIFRK1(bz_tmp(i,k,j), bz(i,k,j), &
                exp_terms(i,k,j,ibz), &
-               imp_terms_tintg2(ibz), imp_terms_tintg0(ibz) &
+               imp_terms_tintg1(ibz), imp_terms_tintg0(ibz) &
             )
 
           enddo

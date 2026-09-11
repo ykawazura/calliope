@@ -155,11 +155,11 @@ contains
     implicit none
 
     call set_file_handle('out3d/ux.dat', fh_ux, disp_ux)
-    call set_file_handle('out3d/uy.dat', fh_uy, disp_ux)
-    call set_file_handle('out3d/uz.dat', fh_uz, disp_ux)
+    call set_file_handle('out3d/uy.dat', fh_uy, disp_uy)
+    call set_file_handle('out3d/uz.dat', fh_uz, disp_uz)
     call set_file_handle('out3d/bx.dat', fh_bx, disp_bx)
-    call set_file_handle('out3d/by.dat', fh_by, disp_bx)
-    call set_file_handle('out3d/bz.dat', fh_bz, disp_bx)
+    call set_file_handle('out3d/by.dat', fh_by, disp_by)
+    call set_file_handle('out3d/bz.dat', fh_bz, disp_bz)
 
     if(proc0) then
       call open_output_file (out3d_time_unit, 'out3d/time.dat')

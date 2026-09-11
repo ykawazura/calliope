@@ -1565,7 +1565,7 @@ contains
 
 
     ! get dissipation and injection for each kprp_log(ii)
-    do ii = 1, nkpolar_log
+    do ii = 1, nkpolar_log - 1
       do j = iky_st, iky_en
         do k = ikz_st, ikz_en
           do i = ikx_st, ikx_en
@@ -1598,6 +1598,8 @@ contains
     call sum_reduce(trans_bb, 0)
     call sum_reduce(trans_ub, 0)
     call sum_reduce(trans_bu, 0)
+    call sum_reduce(p_re    , 0)
+    call sum_reduce(p_ma    , 0)
     call sum_reduce(b2dissip, 0)
     call sum_reduce(u2dissip, 0)
 

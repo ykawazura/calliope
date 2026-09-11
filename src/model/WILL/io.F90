@@ -577,7 +577,7 @@ contains
 
     call mpiio_write_var(fh_phi, disp_phi, sizes, subsizes, starts, phi)
     call mpiio_write_var(fh_psi, disp_psi, sizes, subsizes, starts, psi)
-    call mpiio_write_var(fh_aaa, disp_psi, sizes, subsizes, starts, aaa)
+    call mpiio_write_var(fh_aaa, disp_aaa, sizes, subsizes, starts, aaa)
 
     if(proc0) then
       write (unit=out3d_time_unit, fmt="(100es30.21)") tt
