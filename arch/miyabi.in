@@ -3,7 +3,7 @@
 #
 # Calliope is CPU-only, so this builds for the Grace cores of the same
 # nodes Gallope runs on.  Written for the deterministic Gallope <->
-# Calliope comparison in gallope_dev/tests/determinism/.
+# Calliope comparison in gallope_dev/CPC-paper/determinism/.
 #
 #   module load nvidia nv-hpcx hdf5 netcdf netcdf-fortran
 #

@@ -122,6 +122,7 @@ contains
     real(r8), dimension(:, :), allocatable :: upa2_KAW_bin, bpa2_KAW_bin                 ! [kprp, kz]
     real(r8), dimension(:, :), allocatable :: upe2_ICW_bin, bpe2_ICW_bin                 ! [kprp, kz]
     real(r8), dimension(:, :), allocatable :: upa2_ICW_bin, bpa2_ICW_bin                 ! [kprp, kz]
+    real(r8), dimension(:, :), allocatable :: flux_W_bin, flux_X_bin                     ! [kprp, kz]
     complex(r8) :: phi_mid, psi_mid, jpa_mid, upa_mid, bpa_mid, fphi_mid, fpsi_mid, fupa_mid, fbpa_mid
     complex(r8) :: zppe_mid, zmpe_mid, fzppe_mid, fzmpe_mid
 
@@ -222,6 +223,8 @@ contains
     allocate (bpe2_ICW_bin       (1:nkpolar, nkz)); bpe2_ICW_bin          = 0.d0
     allocate (upa2_ICW_bin       (1:nkpolar, nkz)); upa2_ICW_bin          = 0.d0
     allocate (bpa2_ICW_bin       (1:nkpolar, nkz)); bpa2_ICW_bin          = 0.d0
+    allocate (flux_W_bin         (1:nkpolar, nkz)); flux_W_bin            = 0.d0
+    allocate (flux_X_bin         (1:nkpolar, nkz)); flux_X_bin            = 0.d0
 
     call split_KAW_ICW( &
                         phi    , psi    , upa    , bpa    , &
@@ -462,6 +465,8 @@ contains
   
     ! call get_nonlinear_transfer(ntrans_aw_l_bin, ntrans_aw_g_bin, ntrans_compr_l_bin, ntrans_compr_g_bin)
 
+    call get_flux_WX(flux_W_bin, flux_X_bin)
+
     if (proc0) call put_time_stamp(timer_diagnostics_total)
     call loop_io( &
                   upe2_sum, bpe2_sum, upa2_sum, bpa2_sum, &
@@ -484,7 +489,8 @@ contains
                   dissip_aw_bin, dissip_compr_bin, &
                   dissip_KAW_bin, dissip_ICW_bin, &
                   ntrans_aw_l_bin, ntrans_compr_l_bin, &
-                  ntrans_aw_g_bin, ntrans_compr_g_bin  &
+                  ntrans_aw_g_bin, ntrans_compr_g_bin, &
+                  flux_W_bin, flux_X_bin  &
                 )
 
     deallocate(upe2)
@@ -578,7 +584,218 @@ contains
     deallocate (bpe2_ICW_bin)
     deallocate (upa2_ICW_bin)
     deallocate (bpa2_ICW_bin)
+    deallocate (flux_W_bin)
+    deallocate (flux_X_bin)
   end subroutine loop_diagnostics
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    12 Sep 2026
+!! @brief   Nonlinear fluxes of the free energy W
+!!          and the generalized helicity X
+!!
+!!  W = 1/2 <|grad_perp phi|^2 + |grad_perp psi|^2 + upa^2 + bpa^2>
+!!  X = <grad_perp phi . grad_perp psi + upa*bpa/sgm
+!!       + (rho/sgm)*upa*lap_perp phi>
+!!  (SKB19 (5.24) and (5.68) in the code normalization, vA = 1.)
+!!
+!!  The linear (d/dz) terms cancel pairwise at every k in both
+!!  budgets, so only the Poisson brackets redistribute W and X over
+!!  k_perp.  Writing N_f for the nonlinear term of the f equation,
+!!  the local transfer densities are
+!!
+!!    T_W = -Re[conjg(phi) N_omg] + kprp2*Re[conjg(psi) N_psi]
+!!          + Re[conjg(upa) N_upa] + Re[conjg(bpa) N_bpa]
+!!    T_X = -Re[conjg(N_omg) psi] + kprp2*Re[conjg(phi) N_psi]
+!!          + (Re[conjg(N_upa) bpa] + Re[conjg(upa) N_bpa])/sgm
+!!          + (rho/sgm)*(Re[conjg(upa) N_omg]
+!!                       - kprp2*Re[conjg(N_upa) phi])
+!!
+!!  (phi enters through omg = lap_perp phi = -kprp2*phi, hence the
+!!  sign of the first term.)  The flux through the shell boundary
+!!  kpbin(idx) is the cumulative sum from below,
+!!
+!!    Pi(K) = - sum_{kprp < K} T(k),
+!!
+!!  which is stored at the lower bin edge so that it lines up with
+!!  kpbin itself.  Since sum_k T = 0 exactly, Pi vanishes at both
+!!  ends up to the dealiased modes.
+!!
+!!  The fields are taken at the midpoint of the last step, as
+!!  everything else in loop_diagnostics is, so that Pi, p_*_bin and
+!!  dissip_*_bin all refer to the same instant and the k_perp budget
+!!  closes.
+!-----------------------------------------------!
+  subroutine get_flux_WX(flux_W_bin, flux_X_bin)
+    use grid, only: nlx, nly, nlz, nkz, kx, ky, kprp2
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
+    use fields, only: phi, psi, upa, bpa
+    use fields, only: phi_old, psi_old, upa_old, bpa_old
+    use params, only: zi, nonlinear, rho, sgm
+    use mp, only: proc0
+    use p3dfft
+    implicit none
+    real(r8), dimension(1:nkpolar, nkz), intent(out) :: flux_W_bin, flux_X_bin
+
+    ! same layout as the backward transforms of advance::get_nonlinear_terms
+    integer, parameter :: nbtran   = 12
+    integer, parameter :: idphi_dx = 1 , idphi_dy = 2
+    integer, parameter :: idomg_dx = 3 , idomg_dy = 4
+    integer, parameter :: idpsi_dx = 5 , idpsi_dy = 6
+    integer, parameter :: idjpa_dx = 7 , idjpa_dy = 8
+    integer, parameter :: idupa_dx = 9 , idupa_dy = 10
+    integer, parameter :: idbpa_dx = 11, idbpa_dy = 12
+    integer, parameter :: nfld = 4
+    integer, parameter :: jomg = 1, jpsi = 2, jupa = 3, jbpa = 4
+
+    complex(r8), allocatable :: w(:,:,:,:), nonlin(:,:,:,:)
+    real   (r8), allocatable :: w_r(:,:,:,:), nonlin_r(:,:,:,:)
+    real   (r8), allocatable :: tw(:,:,:), tx(:,:,:)
+    real   (r8), allocatable :: tw_bin(:,:), tx_bin(:,:)
+    complex(r8) :: phi_mid, psi_mid, upa_mid, bpa_mid
+    integer :: i, j, k, idx
+
+    flux_W_bin = 0.d0
+    flux_X_bin = 0.d0
+    if (.not. nonlinear) return
+
+    allocate(w       (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nbtran), source=(0.d0, 0.d0))
+    allocate(nonlin  (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, nfld  ), source=(0.d0, 0.d0))
+    allocate(w_r     (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nbtran), source=0.d0)
+    allocate(nonlin_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, nfld  ), source=0.d0)
+    allocate(tw      (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=0.d0)
+    allocate(tx      (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=0.d0)
+    allocate(tw_bin  (1:nkpolar, nkz), source=0.d0)
+    allocate(tx_bin  (1:nkpolar, nkz), source=0.d0)
+
+    ! 1. grad of the midpoint fields in Fourier space
+    !$omp parallel do private(i, k, phi_mid, psi_mid, upa_mid, bpa_mid) schedule(static)
+    do j = iky_st, iky_en
+      do k = ikz_st, ikz_en
+        do i = ikx_st, ikx_en
+          phi_mid = 0.5d0*(phi(i, k, j) + phi_old(i, k, j))
+          psi_mid = 0.5d0*(psi(i, k, j) + psi_old(i, k, j))
+          upa_mid = 0.5d0*(upa(i, k, j) + upa_old(i, k, j))
+          bpa_mid = 0.5d0*(bpa(i, k, j) + bpa_old(i, k, j))
+
+          w(i,k,j,idphi_dx) = zi*kx(i)                  *phi_mid
+          w(i,k,j,idphi_dy) = zi*ky(j)                  *phi_mid
+          w(i,k,j,idomg_dx) = zi*kx(i)*(-kprp2(i, k, j))*phi_mid
+          w(i,k,j,idomg_dy) = zi*ky(j)*(-kprp2(i, k, j))*phi_mid
+
+          w(i,k,j,idpsi_dx) = zi*kx(i)                  *psi_mid
+          w(i,k,j,idpsi_dy) = zi*ky(j)                  *psi_mid
+          w(i,k,j,idjpa_dx) = zi*kx(i)*(-kprp2(i, k, j))*psi_mid
+          w(i,k,j,idjpa_dy) = zi*ky(j)*(-kprp2(i, k, j))*psi_mid
+
+          w(i,k,j,idupa_dx) = zi*kx(i)                  *upa_mid
+          w(i,k,j,idupa_dy) = zi*ky(j)                  *upa_mid
+          w(i,k,j,idbpa_dx) = zi*kx(i)                  *bpa_mid
+          w(i,k,j,idbpa_dy) = zi*ky(j)                  *bpa_mid
+        enddo
+      enddo
+    enddo
+    !$omp end parallel do
+
+    ! 2. Inverse FFT (p3dfft_btran_c2r destroys its input, but w is rebuilt every call)
+    do i = 1, nbtran
+      call p3dfft_btran_c2r(w(:,:,:,i), w_r(:,:,:,i), 'tff')
+    enddo
+
+    ! 3. Nonlinear terms in real space. Must stay identical to
+    !    advance::get_nonlinear_terms, otherwise Pi is not the flux of
+    !    what the code actually integrates.
+    !$omp parallel do private(j, k) schedule(static)
+    do i = ilx_st, ilx_en
+      do k = ilz_st, ilz_en
+        do j = ily_st, ily_en
+          nonlin_r(j,k,i,jomg) = - w_r(j,k,i,idphi_dx)*w_r(j,k,i,idomg_dy) &
+                                 + w_r(j,k,i,idphi_dy)*w_r(j,k,i,idomg_dx) &
+                                 + w_r(j,k,i,idpsi_dx)*w_r(j,k,i,idjpa_dy) &
+                                 - w_r(j,k,i,idpsi_dy)*w_r(j,k,i,idjpa_dx)
+          nonlin_r(j,k,i,jpsi) =   w_r(j,k,i,idpsi_dx)*(w_r(j,k,i,idphi_dy) + rho*w_r(j,k,i,idbpa_dy))&
+                                 - w_r(j,k,i,idpsi_dy)*(w_r(j,k,i,idphi_dx) + rho*w_r(j,k,i,idbpa_dx))
+          nonlin_r(j,k,i,jupa) = - w_r(j,k,i,idphi_dx)*w_r(j,k,i,idupa_dy) &
+                                 + w_r(j,k,i,idphi_dy)*w_r(j,k,i,idupa_dx) &
+                                 + w_r(j,k,i,idpsi_dx)*sgm*w_r(j,k,i,idbpa_dy) &
+                                 - w_r(j,k,i,idpsi_dy)*sgm*w_r(j,k,i,idbpa_dx)
+          nonlin_r(j,k,i,jbpa) = - w_r(j,k,i,idphi_dx)*w_r(j,k,i,idbpa_dy) &
+                                 + w_r(j,k,i,idphi_dy)*w_r(j,k,i,idbpa_dx) &
+                                 + w_r(j,k,i,idpsi_dx)*(sgm*w_r(j,k,i,idupa_dy) - rho*w_r(j,k,i,idjpa_dy))&
+                                 - w_r(j,k,i,idpsi_dy)*(sgm*w_r(j,k,i,idupa_dx) - rho*w_r(j,k,i,idjpa_dx))
+        enddo
+      enddo
+    enddo
+    !$omp end parallel do
+
+    ! 4. Forward FFT
+    do i = 1, nfld
+      call p3dfft_ftran_r2c(nonlin_r(:,:,:,i), nonlin(:,:,:,i), 'fft')
+    enddo
+    !$omp workshare
+    nonlin = nonlin/nlx/nly/nlz
+    !$omp end workshare
+
+    ! 5. Local transfer densities
+    !$omp parallel do private(i, k, phi_mid, psi_mid, upa_mid, bpa_mid) schedule(static)
+    do j = iky_st, iky_en
+      do k = ikz_st, ikz_en
+        do i = ikx_st, ikx_en
+          phi_mid = 0.5d0*(phi(i, k, j) + phi_old(i, k, j))
+          psi_mid = 0.5d0*(psi(i, k, j) + psi_old(i, k, j))
+          upa_mid = 0.5d0*(upa(i, k, j) + upa_old(i, k, j))
+          bpa_mid = 0.5d0*(bpa(i, k, j) + bpa_old(i, k, j))
+
+          tw(i, k, j) = - dble(conjg(phi_mid)*nonlin(i,k,j,jomg))                    &
+                        + kprp2(i, k, j)*dble(conjg(psi_mid)*nonlin(i,k,j,jpsi))     &
+                        + dble(conjg(upa_mid)*nonlin(i,k,j,jupa))                    &
+                        + dble(conjg(bpa_mid)*nonlin(i,k,j,jbpa))
+
+          tx(i, k, j) = - dble(conjg(nonlin(i,k,j,jomg))*psi_mid)                    &
+                        + kprp2(i, k, j)*dble(conjg(phi_mid)*nonlin(i,k,j,jpsi))     &
+                        + (  dble(conjg(nonlin(i,k,j,jupa))*bpa_mid)                 &
+                           + dble(conjg(upa_mid)*nonlin(i,k,j,jbpa)))/sgm            &
+                        + rho/sgm*(  dble(conjg(upa_mid)*nonlin(i,k,j,jomg))         &
+                                   - kprp2(i, k, j)*dble(conjg(nonlin(i,k,j,jupa))*phi_mid))
+
+          ! compensate for the ky < 0 half that FFTW does not store
+          ! (see the comment in loop_diagnostics)
+          if (j /= 1) then
+            tw(i, k, j) = 2.0d0*tw(i, k, j)
+            tx(i, k, j) = 2.0d0*tx(i, k, j)
+          endif
+        enddo
+      enddo
+    enddo
+    !$omp end parallel do
+
+    ! 6. Bin over kprp (sum_reduce onto proc0 happens inside) and
+    !    accumulate from below.  Pi is stored at the lower edge of each
+    !    bin, so flux_W_bin(idx, :) is the flux through kpbin(idx).
+    call get_polar_spectrum_2d(tw, tw_bin)
+    call get_polar_spectrum_2d(tx, tx_bin)
+
+    if (proc0) then
+      flux_W_bin(1, :) = 0.d0
+      flux_X_bin(1, :) = 0.d0
+      do idx = 2, nkpolar
+        flux_W_bin(idx, :) = flux_W_bin(idx-1, :) - tw_bin(idx-1, :)
+        flux_X_bin(idx, :) = flux_X_bin(idx-1, :) - tx_bin(idx-1, :)
+      enddo
+    endif
+
+    deallocate(w)
+    deallocate(nonlin)
+    deallocate(w_r)
+    deallocate(nonlin_r)
+    deallocate(tw)
+    deallocate(tx)
+    deallocate(tw_bin)
+    deallocate(tx_bin)
+  end subroutine get_flux_WX
+
 
 
 !-----------------------------------------------!

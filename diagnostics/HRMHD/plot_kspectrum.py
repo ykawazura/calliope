@@ -59,6 +59,26 @@ bpe2_ICW_bin    = sum_negative_kz2d(bpe2_ICW_bin)
 upa2_ICW_bin    = sum_negative_kz2d(upa2_ICW_bin)
 bpa2_ICW_bin    = sum_negative_kz2d(bpa2_ICW_bin)
 
+# Nonlinear fluxes of the free energy W and the generalized helicity X
+# (cf. Meyrand et al. 2021, Fig. 6). Runs made before these were written to
+# calliope.out.nc do not have them, hence the has_flux guard everywhere below.
+#
+# Pi(kprp) is the flux through a kprp shell, so it has to be summed over the
+# FULL kz axis. sum_negative_kz2d folds +-kz with a 1/2 weight, which keeps the
+# shape but halves the total, so the kz sum is taken here, before folding. The
+# folded arrays are kept as well, for the combined figure below where every
+# other curve is folded the same way.
+if has_flux:
+  flux_W_kprp = np.sum(flux_W_bin, axis = 1)                       # [t, kprp]
+  flux_X_kprp = np.sum(flux_X_bin, axis = 1)                       # [t, kprp]
+
+  # injection rates used to normalize Pi; p_*_sum are the true totals
+  eps_W = np.mean(p_aw_sum + p_compr_sum)
+  eps_X = np.mean(p_xhl_sum)
+
+  flux_W_bin  = sum_negative_kz2d(flux_W_bin)
+  flux_X_bin  = sum_negative_kz2d(flux_X_bin)
+
 if nlz == nkz:
   kp_end = np.argmin(np.abs(kpbin - kpbin.max()*2./3.))
   if not is2D:
@@ -181,7 +201,36 @@ legends = [
             r'$\calN_\mr{compr}^{<k_\+}$', 
             r'$\calN_\mr{compr}^{>k_\+}$', 
           ]
+if has_flux:
+  ys      += [
+               np.sum(flux_W_bin[final_idx,:,1:kp_end], axis=0),
+               np.sum(flux_X_bin[final_idx,:,1:kp_end], axis=0),
+             ]
+  xs      += [kpbin[1:kp_end], kpbin[1:kp_end]]
+  ls      += ['', '']
+  legends += [r'$\Pi_W$', r'$\Pi_X$']
 plot_log1d_many(xs, ys, xlab=r'$'+kplab+'$', legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', vline_at = 1./rho, term=True, save=outdir+'kprp_spectra_flux.pdf')
+
+# nonlinear flux of W through the kprp shells, one curve per output time
+# (cf. Meyrand et al. 2021, Fig. 6)
+if has_flux:
+  plot_semilogx1d_time(kpbin[1:kp_end], flux_W_kprp[:, 1:kp_end]/eps_W, tt,
+      xlab=r'$'+kplab+'$', clab=tlab, ylab=r'$\Pi_W/\varepsilon_W$',
+      title='kprp_flux_W', vline_at=1./rho, hline_at=0.,
+      term=True, save=outdir+'kprp_flux_W.pdf')
+
+  # same for the generalized helicity. Runs with xhl_inj = 0 have eps_X = 0, so
+  # there is nothing to normalize by and the raw flux is plotted instead.
+  if eps_X != 0.:
+    ys_X   = flux_X_kprp[:, 1:kp_end]/eps_X
+    ylab_X = r'$\Pi_X/\varepsilon_X$'
+  else:
+    ys_X   = flux_X_kprp[:, 1:kp_end]
+    ylab_X = r'$\Pi_X$'
+  plot_semilogx1d_time(kpbin[1:kp_end], ys_X, tt,
+      xlab=r'$'+kplab+'$', clab=tlab, ylab=ylab_X,
+      title='kprp_flux_X', vline_at=1./rho, hline_at=0.,
+      term=True, save=outdir+'kprp_flux_X.pdf')
 
 # Elsasser fields
 ys = [ 

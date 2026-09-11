@@ -83,6 +83,7 @@ module io
   integer :: zppe2_bin_id, zmpe2_bin_id, zppa2_bin_id, zmpa2_bin_id
   integer :: upe2_KAW_bin_id, bpe2_KAW_bin_id, upa2_KAW_bin_id, bpa2_KAW_bin_id
   integer :: upe2_ICW_bin_id, bpe2_ICW_bin_id, upa2_ICW_bin_id, bpa2_ICW_bin_id
+  integer :: flux_W_bin_id, flux_X_bin_id
 
   integer (kind_nf) :: xx_dim, yy_dim, zz_dim, kx_dim, ky_dim, kz_dim, kpbin_dim, tt_dim
   integer, dimension (3) :: bin_dim
@@ -348,6 +349,8 @@ contains
       status = nf90_def_var (ncid, 'bpe2_ICW_bin', NF90_DOUBLE, bin_dim, bpe2_ICW_bin_id)
       status = nf90_def_var (ncid, 'upa2_ICW_bin', NF90_DOUBLE, bin_dim, upa2_ICW_bin_id)
       status = nf90_def_var (ncid, 'bpa2_ICW_bin', NF90_DOUBLE, bin_dim, bpa2_ICW_bin_id)
+      status = nf90_def_var (ncid, 'flux_W_bin'  , NF90_DOUBLE, bin_dim, flux_W_bin_id  )
+      status = nf90_def_var (ncid, 'flux_X_bin'  , NF90_DOUBLE, bin_dim, flux_X_bin_id  )
 
       status = nf90_enddef (ncid)  ! out of definition mode
 
@@ -410,7 +413,8 @@ contains
                       dissip_aw_bin, dissip_compr_bin, &
                       dissip_KAW_bin, dissip_ICW_bin, &
                       ntrans_aw_l_bin, ntrans_compr_l_bin, &
-                      ntrans_aw_g_bin, ntrans_compr_g_bin  &
+                      ntrans_aw_g_bin, ntrans_compr_g_bin, &
+                      flux_W_bin, flux_X_bin  &
                     )
     use time, only: tt
     use grid, only: nlx, nly, nlz, nkz
@@ -443,6 +447,7 @@ contains
     real(r8), intent(in) :: upa2_KAW_bin(1:nkpolar, nkz), bpa2_KAW_bin(1:nkpolar, nkz)
     real(r8), intent(in) :: upe2_ICW_bin(1:nkpolar, nkz), bpe2_ICW_bin(1:nkpolar, nkz)
     real(r8), intent(in) :: upa2_ICW_bin(1:nkpolar, nkz), bpa2_ICW_bin(1:nkpolar, nkz)
+    real(r8), intent(in) :: flux_W_bin  (1:nkpolar, nkz), flux_X_bin  (1:nkpolar, nkz)
 
     integer, dimension (3) :: start3, count3
 
@@ -533,6 +538,8 @@ contains
       status = nf90_put_var (ncid, bpe2_ICW_bin_id, bpe2_ICW_bin, start=start3, count=count3)
       status = nf90_put_var (ncid, upa2_ICW_bin_id, upa2_ICW_bin, start=start3, count=count3)
       status = nf90_put_var (ncid, bpa2_ICW_bin_id, bpa2_ICW_bin, start=start3, count=count3)
+      status = nf90_put_var (ncid, flux_W_bin_id  , flux_W_bin  , start=start3, count=count3)
+      status = nf90_put_var (ncid, flux_X_bin_id  , flux_X_bin  , start=start3, count=count3)
 
       status = nf90_sync (ncid)
 

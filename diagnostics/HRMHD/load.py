@@ -136,6 +136,15 @@ bpe2_ICW_bin    = np.copy(ncfile.variables['bpe2_ICW_bin'   ][:]); bpe2_ICW_bin 
 upa2_ICW_bin    = np.copy(ncfile.variables['upa2_ICW_bin'   ][:]); upa2_ICW_bin    = np.delete(upa2_ICW_bin   , ignored_points, axis = 0)
 bpa2_ICW_bin    = np.copy(ncfile.variables['bpa2_ICW_bin'   ][:]); bpa2_ICW_bin    = np.delete(bpa2_ICW_bin   , ignored_points, axis = 0)
 
+# Nonlinear fluxes of W and X. Runs made before these were added do not have
+# them, so guard the load and let the plotting scripts test has_flux.
+try:
+  flux_W_bin    = np.copy(ncfile.variables['flux_W_bin'     ][:]); flux_W_bin      = np.delete(flux_W_bin     , ignored_points, axis = 0)
+  flux_X_bin    = np.copy(ncfile.variables['flux_X_bin'     ][:]); flux_X_bin      = np.delete(flux_X_bin     , ignored_points, axis = 0)
+  has_flux = True
+except KeyError:
+  has_flux = False
+
 ncfile.close()
 
 tlab  = r'(v_\mathrm{A}/L_\|) t'
