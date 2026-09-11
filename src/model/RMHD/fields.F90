@@ -66,6 +66,9 @@ contains
     if(init_type == 'restart') then
       call restart
     endif
+    if(init_type == 'convert_restartfiles_to_real') then
+      call convert_restartfiles_to_real
+    endif
     ! if(init_type == 'test') then
       ! call init_test
     ! endif
@@ -423,6 +426,140 @@ contains
     omg_old = omg
     psi_old = psi
   end subroutine restart
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    30 Aug 2023
+!! @brief   Convert restart files to real
+!-----------------------------------------------!
+  subroutine convert_restartfiles_to_real
+    use p3dfft
+    use mp, only: proc0
+    use time, only: tt, dt
+    use params, only: zi
+    use grid, only: nkx, nky, nkz
+    use grid, only: nlx, nly, nlz
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
+    use grid, only: kx, ky
+    use params, only: restart_dir
+    use file, only: open_input_file, close_file
+    use mpiio, only: mpiio_read_one, mpiio_write_one
+    use shearing_box, only: tsc
+    use MPI
+    implicit none
+    real(r8)   , allocatable, dimension(:,:,:) :: phi_r, psi_r
+    real(r8)   , allocatable, dimension(:,:,:) :: ux_r, uy_r
+    real(r8)   , allocatable, dimension(:,:,:) :: bx_r, by_r
+    real(r8)   , allocatable, dimension(:,:,:) :: src_r
+
+    complex(r8), allocatable, dimension(:,:,:) :: ux, uy, bx, by
+    complex(r8), allocatable, dimension(:,:,:) :: src_c
+    integer :: time_unit
+    integer, dimension(3) :: sizes, subsizes, starts
+    integer :: i, j, k
+
+    if(proc0) then
+      print *, 'This is not a regular simulation.'
+      print *, 'The restart files is converted to real values and saved as XXX_r.dat.'
+      print *, 'Then, the simulation goes on exactly in the same way as the regular restart.'
+    endif
+
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v                   Read time                 v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    call open_input_file (time_unit, trim(restart_dir)//'time.dat')
+    read (unit=time_unit, fmt=*)
+    read (unit=time_unit, fmt="(100es30.21)") tt, tsc
+    call close_file (time_unit)
+    !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
+
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v               Read Binary file              v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    sizes(1) = nkx
+    sizes(2) = nkz
+    sizes(3) = nky
+    subsizes(1) = ikx_en - ikx_st + 1
+    subsizes(2) = ikz_en - ikz_st + 1
+    subsizes(3) = iky_en - iky_st + 1
+    starts(1) = ikx_st - 1
+    starts(2) = ikz_st - 1
+    starts(3) = iky_st - 1
+
+    call mpiio_read_one(phi, sizes, subsizes, starts, trim(restart_dir)//'phi.dat')
+    call mpiio_read_one(psi, sizes, subsizes, starts, trim(restart_dir)//'psi.dat')
+
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v               Convert to real               v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    allocate(src_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
+    allocate(phi_r, source=src_r)
+    allocate(psi_r, source=src_r)
+    allocate(ux_r , source=src_r)
+    allocate(uy_r , source=src_r)
+    allocate(bx_r , source=src_r)
+    allocate(by_r , source=src_r)
+    deallocate(src_r)
+
+    allocate(src_c(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0,0.d0))
+    allocate(ux  , source=src_c)
+    allocate(uy  , source=src_c)
+    allocate(bx  , source=src_c)
+    allocate(by  , source=src_c)
+    deallocate(src_c)
+
+    do j = iky_st, iky_en
+      do k = ikz_st, ikz_en
+        do i = ikx_st, ikx_en
+          ux(i,k,j) = -zi*ky(j)*phi(i, k, j)
+          uy(i,k,j) =  zi*kx(i)*phi(i, k, j)
+                      
+          bx(i,k,j) = -zi*ky(j)*psi(i, k, j)
+          by(i,k,j) =  zi*kx(i)*psi(i, k, j)
+        enddo
+      enddo
+    enddo
+
+    call p3dfft_btran_c2r(phi, phi_r, 'tff')
+    call p3dfft_btran_c2r(psi, psi_r, 'tff')
+    call p3dfft_btran_c2r(ux , ux_r , 'tff')
+    call p3dfft_btran_c2r(uy , uy_r , 'tff')
+    call p3dfft_btran_c2r(bx , bx_r , 'tff')
+    call p3dfft_btran_c2r(by , by_r , 'tff')
+
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    !v               Save Binary file              v!
+    !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
+    sizes(1) = nly
+    sizes(2) = nlz
+    sizes(3) = nlx
+    subsizes(1) = ily_en - ily_st + 1
+    subsizes(2) = ilz_en - ilz_st + 1
+    subsizes(3) = ilx_en - ilx_st + 1
+    starts(1) = ily_st - 1
+    starts(2) = ilz_st - 1
+    starts(3) = ilx_st - 1
+
+    call mpiio_write_one(phi_r, sizes, subsizes, starts, 'phi_r.dat')
+    call mpiio_write_one(psi_r, sizes, subsizes, starts, 'psi_r.dat')
+    call mpiio_write_one(ux_r , sizes, subsizes, starts, 'ux_r.dat' )
+    call mpiio_write_one(uy_r , sizes, subsizes, starts, 'uy_r.dat' )
+    call mpiio_write_one(bx_r , sizes, subsizes, starts, 'bx_r.dat' )
+    call mpiio_write_one(by_r , sizes, subsizes, starts, 'by_r.dat' )
+
+    deallocate(phi_r)
+    deallocate(psi_r)
+    deallocate(ux_r )
+    deallocate(uy_r )
+    deallocate(bx_r )
+    deallocate(by_r )
+    deallocate(ux   )
+    deallocate(uy   )
+    deallocate(bx   )
+    deallocate(by   )
+  end subroutine convert_restartfiles_to_real
 
 
 ! !-----------------------------------------------!
