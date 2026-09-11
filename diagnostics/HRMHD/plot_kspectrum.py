@@ -207,7 +207,8 @@ if has_flux:
                np.sum(flux_X_bin[final_idx,:,1:kp_end], axis=0),
              ]
   xs      += [kpbin[1:kp_end], kpbin[1:kp_end]]
-  ls      += ['', '']
+  # black, because the 8-colour prop_cycle has already wrapped around by here
+  ls      += ['k-', 'k--']
   legends += [r'$\Pi_W$', r'$\Pi_X$']
 plot_log1d_many(xs, ys, xlab=r'$'+kplab+'$', legends=legends, ls=ls, legendloc='lower left', title=r'$t = %.2E $' % tt[final_idx], ylab='', vline_at = 1./rho, term=True, save=outdir+'kprp_spectra_flux.pdf')
 
@@ -216,12 +217,14 @@ plot_log1d_many(xs, ys, xlab=r'$'+kplab+'$', legends=legends, ls=ls, legendloc='
 if has_flux:
   plot_semilogx1d_time(kpbin[1:kp_end], flux_W_kprp[:, 1:kp_end]/eps_W, tt,
       xlab=r'$'+kplab+'$', clab=tlab, ylab=r'$\Pi_W/\varepsilon_W$',
-      title='kprp_flux_W', vline_at=1./rho, hline_at=0.,
+      title=r'$t = %.2E - %.2E$' % (tt[0], tt[final_idx]),
+      vline_at=1./rho, hline_at=0.,
       term=True, save=outdir+'kprp_flux_W.pdf')
 
-  # same for the generalized helicity. Runs with xhl_inj = 0 have eps_X = 0, so
-  # there is nothing to normalize by and the raw flux is plotted instead.
-  if eps_X != 0.:
+  # same for the generalized helicity. Balanced runs (xhl_inj = 0) only have a
+  # residual eps_X left over from the random forcing, so normalizing by it is
+  # meaningless; the raw flux is plotted instead.
+  if np.abs(eps_X) > 1.e-3*np.abs(eps_W):
     ys_X   = flux_X_kprp[:, 1:kp_end]/eps_X
     ylab_X = r'$\Pi_X/\varepsilon_X$'
   else:
@@ -229,7 +232,8 @@ if has_flux:
     ylab_X = r'$\Pi_X$'
   plot_semilogx1d_time(kpbin[1:kp_end], ys_X, tt,
       xlab=r'$'+kplab+'$', clab=tlab, ylab=ylab_X,
-      title='kprp_flux_X', vline_at=1./rho, hline_at=0.,
+      title=r'$t = %.2E - %.2E$' % (tt[0], tt[final_idx]),
+      vline_at=1./rho, hline_at=0.,
       term=True, save=outdir+'kprp_flux_X.pdf')
 
 # Elsasser fields
