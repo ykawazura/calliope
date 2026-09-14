@@ -264,6 +264,7 @@ def plot_semilogx1d_many(xs, ys, xlab, legends, ls, xmin='', xmax='', ymin='', y
 
 def plot_semilogx1d_time(x, ys, tt, xlab, clab='', ylab='', title='', cmap=None,
                          xmin='', xmax='', ymin='', ymax='', vline_at=None, hline_at=None,
+                         hline_ls=None, mean_line=False,
                          term=True, save=False):
   """One curve per output time, coloured by time, with a time colourbar.
 
@@ -272,7 +273,11 @@ def plot_semilogx1d_time(x, ys, tt, xlab, clab='', ylab='', title='', cmap=None,
   tt       : 1D array of times, same length as ys
   clab     : colourbar label (math mode, without the $); defaults to 't'
   vline_at : draw a dashed vertical line here (e.g. the ion Larmor scale)
-  hline_at : draw a dashed horizontal line here (e.g. zero flux)
+  hline_at : horizontal reference line(s); a scalar or a sequence
+  hline_ls : line style(s) for hline_at, matching it element by element.
+             A single string applies to all; None means dotted (the default).
+  mean_line: overlay the time mean of ys as a thick black line, as in
+             Meyrand et al. 2021 fig. 6
   """
   if cmap is None:
     cmap = default_colormap_seq
@@ -289,9 +294,19 @@ def plot_semilogx1d_time(x, ys, tt, xlab, clab='', ylab='', title='', cmap=None,
     ax.semilogx(x, ys[i], lw=2, color=cmap(norm(tt[i])))
 
   if hline_at is not None:
-    ax.axhline(hline_at, color='k', ls=':', lw=2)
+    hs = list(hline_at) if np.iterable(hline_at) else [hline_at]
+    if hline_ls is None or isinstance(hline_ls, str):
+      lss = [hline_ls]*len(hs)
+    else:
+      lss = list(hline_ls)
+    for h, ls in zip(hs, lss):
+      ax.axhline(h, color='k', ls=(':' if ls is None else ls), lw=2)
   if vline_at is not None:
     ax.axvline(vline_at, color='k', ls='--', lw=2)
+
+  # drawn last so it sits on top of the bundle of coloured curves
+  if mean_line:
+    ax.semilogx(x, ys.mean(axis=0), color='k', lw=3, zorder=10)
 
   plt.xlabel(xlab)
   if xmin != '':

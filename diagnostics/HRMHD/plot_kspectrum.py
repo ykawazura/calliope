@@ -218,7 +218,7 @@ if has_flux:
   plot_semilogx1d_time(kpbin[1:kp_end], flux_W_kprp[:, 1:kp_end]/eps_W, tt,
       xlab=r'$'+kplab+'$', clab=tlab, ylab=r'$\Pi_W/\varepsilon_W$',
       title=r'$t = %.2E - %.2E$' % (tt[0], tt[final_idx]),
-      vline_at=1./rho, hline_at=0.,
+      vline_at=1./rho, hline_at=(0., 1.), hline_ls=(':', '--'), mean_line=True,
       term=True, save=outdir+'kprp_flux_W.pdf')
 
   # same for the generalized helicity. Balanced runs (xhl_inj = 0) only have a
@@ -227,13 +227,15 @@ if has_flux:
   if np.abs(eps_X) > 1.e-3*np.abs(eps_W):
     ys_X   = flux_X_kprp[:, 1:kp_end]/eps_X
     ylab_X = r'$\Pi_X/\varepsilon_X$'
+    hl_X, hls_X = (0., 1.), (':', '--')
   else:
     ys_X   = flux_X_kprp[:, 1:kp_end]
     ylab_X = r'$\Pi_X$'
+    hl_X, hls_X = 0., None          # the raw flux has no natural unit level
   plot_semilogx1d_time(kpbin[1:kp_end], ys_X, tt,
       xlab=r'$'+kplab+'$', clab=tlab, ylab=ylab_X,
       title=r'$t = %.2E - %.2E$' % (tt[0], tt[final_idx]),
-      vline_at=1./rho, hline_at=0.,
+      vline_at=1./rho, hline_at=hl_X, hline_ls=hls_X, mean_line=True,
       term=True, save=outdir+'kprp_flux_X.pdf')
 
 # Elsasser fields
