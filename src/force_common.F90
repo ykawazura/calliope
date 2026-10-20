@@ -19,6 +19,10 @@ module force_common
   real(r8):: ene_inj, xhl_inj, res_inj
   real(r8):: kmin(3), kmax(3)
   integer :: nfields
+  !> Base seed for the stochastic forcing RNG. stir_seed < 0 (default) draws a
+  !> wall-clock seed => nondeterministic run-to-run. stir_seed >= 0 gives a
+  !> fixed, reproducible forcing realization, independent of the number of MPI ranks.
+  integer :: stir_seed
   character(len=100), allocatable :: field_names(:)
   real   (r8), allocatable :: amplitudes(:)
   complex(r8), allocatable :: frequencies(:)
@@ -67,9 +71,8 @@ contains
     use params, only: pi
     use mp, only: proc0
     use mp, only: broadcast
-    use grid, only: kx, ky, kz
+    use grid, only: nkx, nky, nkz
     use grid, only: ikx, iky, ikz
-    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use file, only: get_unused_unit, get_indexed_namelist_unit, open_output_file
     implicit none
     integer :: i, j, k, count, ifield, unit, in_file
@@ -77,7 +80,7 @@ contains
     character(len=100), intent(in) :: filename
     integer  :: ierr
 
-    namelist /force/ driven, elsasser, fix_power, ene_inj, xhl_inj, res_inj, kmin, kmax, nfields
+    namelist /force/ driven, elsasser, fix_power, ene_inj, xhl_inj, res_inj, kmin, kmax, nfields, stir_seed
     namelist /forced_fields/ field_names, amplitudes, frequencies
 
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
@@ -93,6 +96,7 @@ contains
     kmin = (/0.d0, 0.d0, 0.d0/)
     kmax = (/0.d0, 0.d0, 0.d0/)
     nfields = 0
+    stir_seed = -1   ! < 0 => wall-clock (random) seed
     !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
 
     call get_unused_unit (unit)
@@ -119,16 +123,15 @@ contains
     call broadcast(amplitudes)
     call broadcast(frequencies)
 
+    ! The list of forced modes is built from the global wavenumbers, so every
+    ! rank holds the same list and draws the same random numbers. On the ky = 0
+    ! plane, only half of the modes are listed; get_force sets the other half
+    ! by the reality condition.
     count = 0
-    do j = iky_st, iky_en
-      do k = ikz_st, ikz_en
-        do i = ikx_st, ikx_en
-          if(       kx(i)**2 >= kmin(1)**2 .and. kx(i)**2 <= kmax(1)**2 &
-              .and. ky(j)**2 >= kmin(2)**2 .and. ky(j)**2 <= kmax(2)**2 &
-              .and. kz(k)**2 >= kmin(3)**2 .and. kz(k)**2 <= kmax(3)**2 &
-            ) then
-            count = count + 1
-          endif
+    do j = 1, nky
+      do k = 1, nkz
+        do i = 1, nkx
+          if(is_stirred(i, j, k)) count = count + 1
         end do
       end do
     end do
@@ -146,13 +149,10 @@ contains
 
     do ifield = 1, nfields
       count = 1
-      do j = iky_st, iky_en
-        do k = ikz_st, ikz_en
-          do i = ikx_st, ikx_en
-            if(     kx(i)**2 >= kmin(1)**2 .and. kx(i)**2 <= kmax(1)**2 &
-              .and. ky(j)**2 >= kmin(2)**2 .and. ky(j)**2 <= kmax(2)**2 &
-              .and. kz(k)**2 >= kmin(3)**2 .and. kz(k)**2 <= kmax(3)**2 &
-              ) then
+      do j = 1, nky
+        do k = 1, nkz
+          do i = 1, nkx
+            if(is_stirred(i, j, k)) then
 
               kx_stir    (ifield, count) = ikx(i)
               ky_stir    (ifield, count) = iky(j)
@@ -170,8 +170,21 @@ contains
       end do
     end do
 
-    if(proc0) call init_ranf(.true.,init_seed)
+    ! Seed the stochastic forcing. Default (stir_seed < 0) draws a wall-clock
+    ! seed => nondeterministic between runs; stir_seed >= 0 gives a fixed,
+    ! reproducible forcing realization. proc0 builds the seed and broadcasts it
+    ! so every rank shares the same forcing sequence.
+    if(proc0) then
+      if (stir_seed < 0) then
+        call init_ranf(.true., init_seed)
+      else
+        call seed_from_int(stir_seed, init_seed)
+      endif
+    endif
     call broadcast (init_seed)
+    fin_seed = init_seed
+
+    if(proc0) print '("  forcing: nk_stir = ", i0, " modes per field, stir_seed = ", i0)', nk_stir, stir_seed
 
     ! if(proc0) then
     !   call open_output_file (force_unit, 'force.dat')
@@ -206,10 +219,14 @@ contains
 
     allocate (w_stir(nfields, nk_stir))
 
+    ! Continue the forcing's own random sequence, so that other calls of
+    ! random_seed/random_number (e.g., random initial conditions) do not alter it
+    call random_seed(put=fin_seed)
+
     do istir = 1, nk_stir
       do ifield = 1, nfields
 
-        w_stir(ifield, istir) = lz/(2.d0*pi)*abs(kz_stir(ifield, istir))*f_frequency(ifield, istir)
+        w_stir(ifield, istir) = 2.d0*pi/lz*abs(kz_stir(ifield, istir))*f_frequency(ifield, istir)
         
         sigma = sqrt(12.d0*abs(aimag(w_stir(ifield, istir)))/dt)*f_amplitude(ifield, istir)
         fa = cmplx(ranf() - 0.5d0, ranf() - 0.5d0) * sigma
@@ -217,10 +234,10 @@ contains
 
         a_force(ifield, istir) = a_force(ifield, istir)*exp(-zi*w_stir(ifield, istir)*dt) + fa*dt
         b_force(ifield, istir) = 0.d0
-
-        call get_rnd_seed(fin_seed)
       end do
     end do
+
+    call get_rnd_seed(fin_seed)
 
     ! if(proc0) then
     !   write (unit=force_unit, fmt="(100es30.21)", advance='no') tt + dt
@@ -249,7 +266,6 @@ contains
 !!          inputfile
 !-----------------------------------------------!
   subroutine get_force (name, u)
-    use grid, only: nkx, nkz
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use mp, only: proc0
     use time_stamp, only: put_time_stamp, timer_force
@@ -258,7 +274,8 @@ contains
     complex(r8), dimension (ikx_st:ikx_en, &
                             ikz_st:ikz_en, &
                             iky_st:iky_en), intent(inout) :: u
-    integer :: i, j, k, ifield, istir
+    integer :: i, ifield, istir
+    complex(r8) :: f
 
     if (proc0) call put_time_stamp(timer_force)
 
@@ -270,26 +287,12 @@ contains
     if (ifield == 0) return
     
     do istir = 1, nk_stir
-      j = ky_stir(ifield, istir) + 1
+      f = (a_force(ifield, istir) + b_force(ifield, istir))/sqrt(2.d0)
+      call set_mode(u, kx_stir(ifield, istir), ky_stir(ifield, istir), kz_stir(ifield, istir), f)
 
-      if(kx_stir(ifield, istir) >= 0) then
-        i = kx_stir(ifield, istir) + 1
-      else
-        i = nkx + kx_stir(ifield, istir) + 1
-      endif
-
-      if(kz_stir(ifield, istir) >= 0) then
-        k = kz_stir(ifield, istir) + 1
-      else
-        k = nkz + kz_stir(ifield, istir) + 1
-      endif
-
-      if(      (i >= ikx_st .and. i <= ikx_en) &
-         .and. (j >= iky_st .and. j <= iky_en) &
-         .and. (k >= ikz_st .and. k <= ikz_en) ) then
-
-         u(i, k, j) = (a_force(ifield, istir) + b_force(ifield, istir))/sqrt(2.d0)
-      endif
+      ! reality condition on the ky = 0 plane: f(-k) = conjg(f(k))
+      if(ky_stir(ifield, istir) == 0) &
+        call set_mode(u, -kx_stir(ifield, istir), 0, -kz_stir(ifield, istir), conjg(f))
     end do
 
     if (proc0) call put_time_stamp(timer_force)
@@ -328,7 +331,6 @@ contains
 !!          unforced one )
 !-----------------------------------------------!
   subroutine zeroing_at_forcing_wavenumber (u)
-    use grid, only: nkx, nkz
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use mp, only: proc0
     use time_stamp, only: put_time_stamp, timer_force
@@ -336,37 +338,83 @@ contains
     complex(r8), dimension (ikx_st:ikx_en, &
                             ikz_st:ikz_en, &
                             iky_st:iky_en), intent(inout) :: u
-    integer :: i, j, k, ifield, istir
+    integer :: ifield, istir
 
     if (proc0) call put_time_stamp(timer_force)
 
     do ifield = 1, nfields
       do istir = 1, nk_stir
-        j = ky_stir(ifield, istir) + 1
+        call set_mode(u, kx_stir(ifield, istir), ky_stir(ifield, istir), kz_stir(ifield, istir), (0.0_r8, 0.0_r8))
 
-        if(kx_stir(ifield, istir) >= 0) then
-          i = kx_stir(ifield, istir) + 1
-        else
-          i = nkx + kx_stir(ifield, istir) + 1
-        endif
-
-        if(kz_stir(ifield, istir) >= 0) then
-          k = kz_stir(ifield, istir) + 1
-        else
-          k = nkz + kz_stir(ifield, istir) + 1
-        endif
-
-        if(      (i >= ikx_st .and. i <= ikx_en) &
-          .and. (j >= iky_st .and. j <= iky_en) &
-          .and. (k >= ikz_st .and. k <= ikz_en) ) then
-
-          u(i, k, j) = 0.d0
-        endif
+        if(ky_stir(ifield, istir) == 0) &
+          call set_mode(u, -kx_stir(ifield, istir), 0, -kz_stir(ifield, istir), (0.0_r8, 0.0_r8))
       end do
     enddo
 
     if (proc0) call put_time_stamp(timer_force)
   end subroutine zeroing_at_forcing_wavenumber
+
+
+!-----------------------------------------------!
+!> @brief   Whether the mode (kx(i), ky(j), kz(k))
+!!          is listed as a forced mode
+!-----------------------------------------------!
+  function is_stirred (i, j, k)
+    use grid, only: kx, ky, kz, ikx, iky, ikz
+    use grid, only: nlxc, nlyc, nlzc
+    implicit none
+    logical :: is_stirred
+    integer, intent(in) :: i, j, k
+
+    ! In the band kmin <= |k| <= kmax, without the Nyquist mode and, for an even
+    ! pruned size, the unpaired edge mode (on the ky = 0 plane, neither has a
+    ! distinct -k partner on the grid; both are left out on every plane).
+    ! On the ky = 0 plane, only the half kz > 0 .or. (kz == 0 .and. kx > 0) is
+    ! listed (k = 0 excluded); get_force sets the other half.
+    is_stirred = in_band(kx(i), 1) .and. in_band(ky(j), 2) .and. in_band(kz(k), 3) &
+      .and. 2*abs(ikx(i)) < nlxc .and. 2*iky(j) < nlyc .and. 2*abs(ikz(k)) < nlzc &
+      .and. (iky(j) > 0 .or. ikz(k) > 0 .or. (ikz(k) == 0 .and. ikx(i) > 0))
+
+  contains
+
+    ! kmin(d) <= |k| <= kmax(d), tolerating round-off in k
+    ! (e.g., kz = 0.9999999999999999 with Fujitsu -Kfast)
+    logical function in_band (kk, d)
+      real(r8), intent(in) :: kk
+      integer , intent(in) :: d
+      real(r8), parameter :: tol = 1.d-8
+
+      in_band = kk**2 >= kmin(d)**2*(1.d0 - tol) .and. kk**2 <= kmax(d)**2*(1.d0 + tol)
+    end function in_band
+
+  end function is_stirred
+
+
+!-----------------------------------------------!
+!> @brief   u(k) = val if the mode with integer
+!!          wavenumbers (jkx, jky, jkz), jky >= 0,
+!!          is on this rank
+!-----------------------------------------------!
+  subroutine set_mode (u, jkx, jky, jkz, val)
+    use grid, only: nkx, nkz
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    implicit none
+    complex(r8), dimension (ikx_st:ikx_en, &
+                            ikz_st:ikz_en, &
+                            iky_st:iky_en), intent(inout) :: u
+    integer, intent(in) :: jkx, jky, jkz
+    complex(r8), intent(in) :: val
+    integer :: i, j, k
+
+    i = modulo(jkx, nkx) + 1
+    j = jky + 1
+    k = modulo(jkz, nkz) + 1
+
+    if(      (i >= ikx_st .and. i <= ikx_en) &
+       .and. (j >= iky_st .and. j <= iky_en) &
+       .and. (k >= ikz_st .and. k <= ikz_en) ) u(i, k, j) = val
+
+  end subroutine set_mode
 
 
   !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
@@ -422,6 +470,24 @@ contains
     endif
 
   end subroutine init_ranf
+
+  subroutine seed_from_int(base, seed_out)
+    !  Fill the RNG seed vector deterministically from an integer base,
+    !  reusing the lcg mixer of the randomize path in init_ranf. Independent of
+    !  the wall clock, so the forcing realization is bitwise-reproducible.
+    implicit none
+    integer, intent(in) :: base
+    integer, intent(inout), dimension(:) :: seed_out
+    integer :: i, n
+    integer (kind=kind_id) :: t
+
+    call random_seed(size=n)
+    t = int(base, kind_id) + 1_kind_id   ! +1 avoids the t==0 degenerate branch in lcg
+    do i = 1, n
+      seed_out(i) = lcg(t)
+    end do
+
+  end subroutine seed_from_int
 
   ! This simple PRNG might not be good enough for real work, but is
   ! sufficient for seeding a better PRNG.
