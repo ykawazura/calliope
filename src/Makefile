@@ -67,6 +67,7 @@ SRC_MHD_COMP_ISOTH = \
 			$(MODEL_DIR)/params.F90 mp.F90 mpiio.F90 \
 			terminate.F90 grid.F90 time.F90 utils.F90 dealias.F90 \
 			shearing_box.F90 \
+			$(MODEL_DIR)/shock_viscosity.F90 \
 			$(MODEL_DIR)/fields.F90 \
 			$(MODEL_DIR)/force.F90 \
 			$(MODEL_DIR)/$(MODEL)_specific.F90 \

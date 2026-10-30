@@ -58,10 +58,10 @@ contains
     use grid, only: nlx, nly, nlz
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
-    use fields, only: rho
+    use fields, only: lnrho, lnrho_to_rho
     use fields, only: mx, my, mz
     use fields, only: bx, by, bz
-    use fields, only: rho_old
+    use fields, only: lnrho_old
     use fields, only: mx_old, my_old, mz_old
     use fields, only: bx_old, by_old, bz_old
     use fields, only: m_to_u
@@ -88,7 +88,7 @@ contains
 
     complex(r8), allocatable, dimension(:,:,:) :: ux, uy, uz
     complex(r8), allocatable, dimension(:,:,:) :: ux_old, uy_old, uz_old
-    complex(r8), allocatable, dimension(:,:,:) :: lnrho, lnrho_old
+    complex(r8), allocatable, dimension(:,:,:) :: rho, rho_old
     complex(r8), allocatable, dimension(:,:,:) :: u2half, u2half_old
     complex(r8), allocatable, dimension(:,:,:) :: f
     complex(r8), allocatable, dimension(:,:,:) :: src_c
@@ -129,8 +129,8 @@ contains
     allocate(ux_old     , source=src_c)
     allocate(uy_old     , source=src_c)
     allocate(uz_old     , source=src_c)
-    allocate(lnrho      , source=src_c)
-    allocate(lnrho_old  , source=src_c)
+    allocate(rho        , source=src_c)
+    allocate(rho_old    , source=src_c)
     allocate(u2half     , source=src_c)
     allocate(u2half_old , source=src_c)
     allocate(f          , source=src_c)
@@ -184,10 +184,10 @@ contains
     allocate( bz_r, source=src_r)
     deallocate(src_r)
 
-    call rho_to_lnrho(rho    , lnrho    )
-    call rho_to_lnrho(rho_old, lnrho_old)
-    call m_to_u(rho    , mx    , my    , mz    , ux    , uy    , uz    )
-    call m_to_u(rho_old, mx_old, my_old, mz_old, ux_old, uy_old, uz_old)
+    call lnrho_to_rho(lnrho    , rho    )
+    call lnrho_to_rho(lnrho_old, rho_old)
+    call m_to_u(lnrho    , mx    , my    , mz    , ux    , uy    , uz    )
+    call m_to_u(lnrho_old, mx_old, my_old, mz_old, ux_old, uy_old, uz_old)
     call get_u2half(ux    , uy    , uz    , u2half    )
     call get_u2half(ux_old, uy_old, uz_old, u2half_old)
 
@@ -395,8 +395,8 @@ contains
     deallocate(ux_old     )
     deallocate(uy_old     )
     deallocate(uz_old     )
-    deallocate(lnrho      )
-    deallocate(lnrho_old  )
+    deallocate(rho        )
+    deallocate(rho_old    )
     deallocate(u2half     )
     deallocate(u2half_old )
 
@@ -460,7 +460,7 @@ contains
     use grid, only: nlx, nly, nlz, nkx, nky, nkz
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
-    use fields, only: rho
+    use fields, only: lnrho, lnrho_to_rho
     use fields, only: mx, my, mz
     use fields, only: bx, by, bz
     use fields, only: m_to_u
@@ -470,7 +470,7 @@ contains
     use shearing_box, only: to_non_shearing_coordinate, tsc, nremap
     implicit none
 
-    complex(r8), allocatable, dimension(:,:,:) :: f
+    complex(r8), allocatable, dimension(:,:,:) :: f, rho
     real(r8)   , allocatable, dimension(:,:,:) :: fr
     complex(r8), allocatable, dimension(:,:,:) :: ux, uy, uz
     complex(r8), allocatable, dimension(:,:,:) :: wx, wy, wz, jx, jy, jz
@@ -504,6 +504,7 @@ contains
     if (proc0) call put_time_stamp(timer_diagnostics_total)
 
     allocate(f (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); f   = 0.d0
+    allocate(rho(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en)); rho = 0.d0
     allocate(fr(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); fr  = 0.d0
 
     allocate(src1(ilx_st:ilx_en, ily_st:ily_en), source=0.d0) 
@@ -592,7 +593,8 @@ contains
     deallocate(src1, src2, src3)
 
     !vvvvvvvvvvvvvvvvvv         2D cut of fields          vvvvvvvvvvvvvvvvvv!
-    call m_to_u(rho, mx, my, mz, ux, uy, uz)
+    call lnrho_to_rho(lnrho, rho)
+    call m_to_u(lnrho, mx, my, mz, ux, uy, uz)
     call curl(ux, uy, uz, wx, wy, wz)
     call curl(bx, by, bz, jx, jy, jz)
 
@@ -688,6 +690,7 @@ contains
     deallocate(jy)
     deallocate(jz)
 
+    deallocate(rho)
     deallocate(rho_r_z0)
     deallocate(rho_r_x0)
     deallocate(rho_r_y0)
@@ -754,46 +757,6 @@ contains
     deallocate( b2_kyz)
     deallocate( b2_kxz)
   end subroutine loop_diagnostics_2D
-
-!-----------------------------------------------!
-!> @author  YK
-!! @date    15 Dec 2020
-!! @brief   rho to ln(rho)
-!-----------------------------------------------!
-  subroutine rho_to_lnrho(rho, lnrho)
-    use grid, only: nlx, nly, nlz
-    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
-    use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
-    implicit none
-    complex(r8), dimension (ikx_st:ikx_en, &
-                            ikz_st:ikz_en, &
-                            iky_st:iky_en), intent(in) :: rho
-    complex(r8), dimension (ikx_st:ikx_en, &
-                            ikz_st:ikz_en, &
-                            iky_st:iky_en), intent(out) :: lnrho
-    real   (r8), allocatable, dimension(:,:,:) :: rho_r, lnrho_r
-    complex(r8), allocatable, dimension(:,:,:) :: rho_
-
-    allocate(rho_   (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
-    allocate(rho_r  (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
-    allocate(lnrho_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
-
-    !$omp workshare
-    rho_ = rho
-    !$omp end workshare
-
-    call p3dfft_btran_c2r(rho_, rho_r, 'tff')
-
-    !$omp workshare
-    lnrho_r = dlog(rho_r)
-    !$omp end workshare
-
-    call p3dfft_ftran_r2c(lnrho_r, lnrho, 'fft'); lnrho = lnrho/nlx/nly/nlz 
-
-    deallocate(rho_)
-    deallocate(rho_r)
-    deallocate(lnrho_r)
-  end subroutine rho_to_lnrho
 
 !-----------------------------------------------!
 !> @author  YK

@@ -18,14 +18,15 @@
   nly = 64
   nlz = 64
 
-  pruned = .true.
+  pruned = .false. ! .true. truncates every field, which requires filter_lnrho = .true.
+                   ! (see numerics_parameters); the projection of ln(rho) does not conserve mass
 /
 
 !==============================================================================
 &time_parameters
   dt    = 1.0d-2
   nstep = 2000
-  cfl   = 2.0d0
+  cfl   = 0.5d0  ! dt_adv = cfl/sum_d max(|u_d| + c_f,d)/dl_d (sum over the directions with nl > 2)
   reset_method = 'multiply'  !'multiply'  => multiply by a factor of 0.5
                              !'decrement' => decrement the top integer of dt
                              !'stop'      => terminate the run
@@ -38,7 +39,7 @@
 
 !==============================================================================
 &scheme_parameters
-  time_step_scheme = 'eSSPIFRK3' ! 'gear3' or 'eSSPIFRK3'
+  time_step_scheme = 'eSSPIFRK3' ! only 'eSSPIFRK3' in this model
 /
 
 !==============================================================================
@@ -58,6 +59,7 @@
   eta_h_exp = 4
 
   ! regular and hyper diffusion ~ lmd*k^2 + lmd_h*k^(2*lmd_h_exp)
+  ! acts on ln(rho) and does not conserve mass (a warning is printed when lmd or lmd_h /= 0)
   lmd       = 1d+0  ! regular diffusion
   lmd_h     = 1d+4  ! hyper diffusion
   lmd_h_exp = 4
@@ -67,6 +69,39 @@
   ! shear parameters
   shear  = .false.
   q      = 0.d0
+/
+
+!==============================================================================
+&numerics_parameters
+  formulation  = 'C'     ! ds/dt = -(div m)/rho, dm/dt = -div[m u + (p + B^2/2 - q) I - B B] (only 'C')
+  visc_form    = 'flux'  ! q = rho zeta div(u) on the grid, then FFT (only 'flux')
+  filter_lnrho = .false. ! 2/3 filter on ln(rho) after each stage; .true. changes sum exp(s) (mass)
+  filter_mom   = .true.  ! 2/3 filter on m after each stage
+  filter_mag   = .true.  ! 2/3 filter on B after each stage
+  cfl_visc     = 1.0d0   ! dt_visc = cfl_visc/(largest viscous rate); SSPRK3 is stable up to 2.51
+  mass_correction = .false. ! uniform correction s(k=0) += ln(M0/M) after each step (logged in conservation.dat)
+  s_abort      = 100.d0  ! stop when |ln(rho)| > s_abort (exp overflow guard)
+  debug_nan_step = -1    ! > 0: inject a NaN at this step to test the abort
+/
+
+&shock_parameters
+  C_shock       = 2.d0   ! zeta = C_shock Delta^2 S[max(0, -div u)]; 0 disables the shock viscosity
+  shock_nmax    = 1      ! number of local-max passes (half width 1) in S
+  shock_nsmooth = 1      ! number of [1,2,1]/4 passes in S
+  shock_dl      = 0.d0   ! Delta; <= 0: min_d dl_d over the directions with nl > 2
+  shock_selftest = .false.
+/
+
+&svv_parameters
+  svv_eps0     = 0.5d0   ! spectral vanishing viscosity eps_d = svv_eps0 dl_d max(|u_d| + c_f,d); <= 0: off
+  svv_mN       = 0.5d0   ! Q(|k_d|) = 0 for |k_d| <= svv_mN*k_c,d (k_c,d = 2/3 of the Nyquist wavenumber)
+  svv_above_kc = .true.  ! Q = 1 (.true.) or 0 (.false.) for |k_d| >= k_c,d (only ln(rho) has such modes)
+/
+
+&isoth_diagnostics
+  write_intvl_1D   = 0.d0  ! out1d/line_*.dat along the first direction with nl > 2; <= 0: none
+  write_intvl_cons = 0.d0  ! conservation.dat; 0: every step, < 0: none
+  budget           = .false. ! budget.dat every step (extra FFTs)
 /
 
 !==============================================================================

@@ -1,0 +1,67 @@
+!--------------------------------------------------!
+!  Stage 0 baseline: old MHD_COMP_ISOTH (rho, m)   !
+!  small-amplitude fast eigenmode, kx = kz = 1     !
+!--------------------------------------------------!
+&mpi_settings
+  dim_decomp = 2
+/
+&box_parameters
+  lx = 1.0
+  ly = 1.0
+  lz = 1.0
+  nlx = 16
+  nly = 16
+  nlz = 16
+  pruned = .true.
+/
+&time_parameters
+  dt    = 1.0d-3
+  nstep = 10000
+  cfl   = 0.5d0
+  reset_method = 'stop'
+  increase_dt = 1e+10
+/
+&scheme_parameters
+  time_step_scheme = 'eSSPIFRK3'
+/
+&operation_parameters
+  nonlinear = T
+/
+&physical_parameters
+  nu        = 0d0
+  nu_h      = 0d0
+  nu_h_exp  = 4
+  eta       = 0d0
+  eta_h     = 0d0
+  eta_h_exp = 4
+  lmd       = 0d0
+  lmd_h     = 0d0
+  lmd_h_exp = 4
+  beta0  = 2.d0
+  rho_min = 1.d-2
+  shear  = .false.
+  q      = 0.d0
+/
+&initial_condition
+  init_type = 'single_mode'
+/
+&initial_condition_params
+  mode_type = 'fast'
+/
+&force
+  driven = F
+/
+&terminate
+  max_wall_time   = 0.4
+  terminate_file_name = 'terminate'
+/
+&diagnostics_parameters
+  write_intvl       = 0.01d0
+  write_intvl_2D    = 0.d0
+  write_intvl_3D    = 0.d0
+  output_modes      = 2 1 2
+/
+&restart_parameters
+  save_restart_intvl = 100.d0
+  restart_dir = './restart/'
+/

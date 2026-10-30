@@ -8,26 +8,27 @@ module fields
   implicit none
 
   public :: init_fields, finish_fields, m_to_u, u_to_m
-  public :: rho
+  public :: lnrho_to_rho, rho_to_lnrho
+  public :: lnrho
   public :: mx, my, mz
   public :: ux, uy, uz
   public :: bx, by, bz
-  public :: rho_old
+  public :: lnrho_old
   public :: mx_old, my_old, mz_old
   public :: bx_old, by_old, bz_old
   public :: ux_old, uy_old, uz_old
   public :: nfields
-  public :: irho
+  public :: ilnrho
   public :: imx, imy, imz
   public :: ibx, iby, ibz
 
   private
 
-  complex(r8), allocatable, dimension(:,:,:) :: rho
+  complex(r8), allocatable, dimension(:,:,:) :: lnrho ! state variable s = ln(rho); rho = exp(s) > 0 by construction
   complex(r8), allocatable, dimension(:,:,:) :: mx, my, mz
   complex(r8), allocatable, dimension(:,:,:) :: ux, uy, uz
   complex(r8), allocatable, dimension(:,:,:) :: bx, by, bz
-  complex(r8), allocatable, dimension(:,:,:) :: rho_old
+  complex(r8), allocatable, dimension(:,:,:) :: lnrho_old
   complex(r8), allocatable, dimension(:,:,:) :: mx_old, my_old, mz_old
   complex(r8), allocatable, dimension(:,:,:) :: ux_old, uy_old, uz_old
   complex(r8), allocatable, dimension(:,:,:) :: bx_old, by_old, bz_old
@@ -36,7 +37,7 @@ module fields
 
   ! Field index
   integer, parameter :: nfields = 7
-  integer, parameter :: irho = 1
+  integer, parameter :: ilnrho = 1
   integer, parameter :: imx  = 2, imy = 3, imz = 4
   integer, parameter :: ibx  = 5, iby = 6, ibz = 7
 
@@ -55,7 +56,7 @@ contains
     complex(r8), allocatable, dimension(:,:,:) :: src
 
     allocate(src(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
-    allocate(rho    , source=src)
+    allocate(lnrho  , source=src)
     allocate(mx     , source=src)
     allocate(my     , source=src)
     allocate(mz     , source=src)
@@ -65,7 +66,7 @@ contains
     allocate(bx     , source=src)
     allocate(by     , source=src)
     allocate(bz     , source=src)
-    allocate(rho_old, source=src)
+    allocate(lnrho_old, source=src)
     allocate(mx_old , source=src)
     allocate(my_old , source=src)
     allocate(mz_old , source=src)
@@ -88,8 +89,21 @@ contains
     if(init_type == 'random') then
       call init_random
     endif
+    if(init_type == 'sound_wave' .or. init_type == 'simple_wave') then
+      call init_wave1d
+    endif
+    if(init_type == 'riemann') then
+      call init_riemann
+    endif
     if(init_type == 'restart') then
       call restart
+    endif
+
+    if(       init_type /= 'zero'       .and. init_type /= 'single_mode' .and. init_type /= 'random' &
+        .and. init_type /= 'sound_wave' .and. init_type /= 'simple_wave' .and. init_type /= 'riemann' &
+        .and. init_type /= 'restart') then
+      print *, 'Unknown init_type: ', trim(init_type)
+      stop
     endif
 
   end subroutine init_fields
@@ -133,18 +147,13 @@ contains
 !-----------------------------------------------!
   subroutine init_zero
     use mp, only: proc0
-    use grid, only: nlx, nly, nlz
-    use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     implicit none
-    real(r8), allocatable, dimension(:,:,:) :: rho_r
 
     if(proc0) then
       print *, 'Zero initialization'
     endif
 
-    allocate(rho_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en)); rho_r = 0.d0
-    rho_r = 1.d0
-    call p3dfft_ftran_r2c(rho_r, rho, 'fft'); rho = rho/nlx/nly/nlz 
+    lnrho = 0.d0 ! rho = 1
 
     mx = 0.d0
     my = 0.d0
@@ -153,7 +162,13 @@ contains
     by = 0.d0
     bz = 0.d0
 
-    deallocate(rho_r)
+    lnrho_old = lnrho
+    mx_old    = mx
+    my_old    = my
+    mz_old    = mz
+    bx_old    = bx
+    by_old    = by
+    bz_old    = bz
 
   end subroutine init_zero
 
@@ -177,6 +192,7 @@ contains
     real(r8) :: u1(3), b1(3), rho0, rho1
     real(r8), allocatable, dimension(:,:,:) :: bx_r, by_r, bz_r, rho_r
     real(r8), allocatable, dimension(:,:,:) :: src
+    complex(r8), allocatable, dimension(:,:,:) :: rho
     real(r8) :: kprp, kpar, omega, alpha
     integer :: i, j, k
 
@@ -235,6 +251,7 @@ contains
     allocate(by_r , source=src)
     allocate(bz_r , source=src)
     deallocate(src)
+    allocate(rho(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
 
     ! Alfven eigen mode
     if(trim(mode_type) == 'Alfven') then
@@ -352,8 +369,9 @@ contains
     endif
 
     call u_to_m(rho, ux, uy, uz, mx, my, mz)
+    call rho_to_lnrho(rho, lnrho)
 
-    rho_old = rho
+    lnrho_old = lnrho
     mx_old  = mx
     my_old  = my
     mz_old  = mz
@@ -365,6 +383,7 @@ contains
     deallocate(bx_r)
     deallocate(by_r)
     deallocate(bz_r)
+    deallocate(rho)
 
   end subroutine init_single_mode
 
@@ -386,7 +405,7 @@ contains
     use file, only: get_unused_unit
     use time, only: microsleep
     implicit none
-    complex(r8), allocatable, dimension(:,:,:) :: phi, psi, ux, uy, uz
+    complex(r8), allocatable, dimension(:,:,:) :: phi, psi, ux, uy, uz, rho
     real   (r8), allocatable, dimension(:,:,:) :: phi_r, psi_r, rho_r
     real   (r8), allocatable, dimension(:,:,:) :: mx_r, my_r, mz_r
     real   (r8), allocatable, dimension(:,:,:) :: ux_r, uy_r, uz_r
@@ -447,6 +466,7 @@ contains
     allocate(ux , source=src_c)
     allocate(uy , source=src_c)
     allocate(uz , source=src_c)
+    allocate(rho, source=src_c)
     deallocate(src_c)
 
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
@@ -660,7 +680,9 @@ contains
     if(proc0) write(*, "('rms of (1) sound mach num = ', es10.3, ',  (2) Alfven mach num = ', es10.3, ',  (3) beta = ', es10.3)") &
                 & smach_rms, amach_rms, beta_rms
 
-    rho_old = rho
+    call rho_to_lnrho(rho, lnrho)
+
+    lnrho_old = lnrho
     mx_old  = mx
     my_old  = my
     mz_old  = mz
@@ -679,6 +701,7 @@ contains
     deallocate(ux  )
     deallocate(uy  )
     deallocate(uz  )
+    deallocate(rho )
     deallocate(ux_r)
     deallocate(uy_r)
     deallocate(uz_r)
@@ -734,7 +757,7 @@ contains
     starts(2) = ikz_st - 1
     starts(3) = iky_st - 1
 
-    call mpiio_read_one(rho, sizes, subsizes, starts, trim(restart_dir)//'rho.dat' )
+    call mpiio_read_one(lnrho, sizes, subsizes, starts, trim(restart_dir)//'lnrho.dat')
     call mpiio_read_one(mx , sizes, subsizes, starts, trim(restart_dir)//'mx.dat')
     call mpiio_read_one(my , sizes, subsizes, starts, trim(restart_dir)//'my.dat')
     call mpiio_read_one(mz , sizes, subsizes, starts, trim(restart_dir)//'mz.dat')
@@ -742,7 +765,7 @@ contains
     call mpiio_read_one(by , sizes, subsizes, starts, trim(restart_dir)//'by.dat')
     call mpiio_read_one(bz , sizes, subsizes, starts, trim(restart_dir)//'bz.dat')
 
-    rho_old = rho
+    lnrho_old = lnrho
     mx_old  = mx
     my_old  = my
     mz_old  = mz
@@ -755,9 +778,9 @@ contains
 !-----------------------------------------------!
 !> @author  YK
 !! @date    15 Dec 2020
-!! @brief   m to u
+!! @brief   m to u (u = m/exp(lnrho))
 !-----------------------------------------------!
-  subroutine m_to_u(rho, mx, my, mz, ux, uy, uz)
+  subroutine m_to_u(lnrho, mx, my, mz, ux, uy, uz)
     use grid, only: nlx, nly, nlz
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
@@ -765,7 +788,7 @@ contains
     complex(r8), dimension (ikx_st:ikx_en, &
                             ikz_st:ikz_en, &
                             iky_st:iky_en), intent(in) :: &
-                            rho, mx, my, mz
+                            lnrho, mx, my, mz
     complex(r8), dimension (ikx_st:ikx_en, &
                             ikz_st:ikz_en, &
                             iky_st:iky_en), intent(out) :: &
@@ -799,7 +822,7 @@ contains
     allocate(uz_ , source=src_c)
     deallocate(src_c)
 
-    rho_ = rho
+    rho_ = lnrho
     mx_  = mx
     my_  = my
     mz_  = mz
@@ -809,6 +832,7 @@ contains
     call p3dfft_btran_c2r(my_ , my_r , 'tff')
     call p3dfft_btran_c2r(mz_ , mz_r , 'tff')
 
+    rho_r = exp(rho_r)
     ux_r = mx_r/rho_r
     uy_r = my_r/rho_r
     uz_r = mz_r/rho_r
@@ -837,7 +861,7 @@ contains
 !-----------------------------------------------!
 !> @author  YK
 !! @date    15 Dec 2020
-!! @brief   m to u
+!! @brief   u to m (rho is the density, not ln(rho); used only for initial conditions)
 !-----------------------------------------------!
   subroutine u_to_m(rho, ux, uy, uz, mx, my, mz)
     use grid, only: nlx, nly, nlz
@@ -918,6 +942,304 @@ contains
 
 !-----------------------------------------------!
 !> @author  YK
+!! @date    31 Oct 2026
+!! @brief   rho to ln(rho) (Fourier to Fourier).
+!!          Stops if rho <= 0 at any grid point; no floor is applied.
+!-----------------------------------------------!
+  subroutine rho_to_lnrho(rho, lnrho)
+    use grid, only: nlx, nly, nlz
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
+    use mp, only: proc0, min_allreduce
+    implicit none
+    complex(r8), dimension (ikx_st:ikx_en, &
+                            ikz_st:ikz_en, &
+                            iky_st:iky_en), intent(in) :: rho
+    complex(r8), dimension (ikx_st:ikx_en, &
+                            ikz_st:ikz_en, &
+                            iky_st:iky_en), intent(out) :: lnrho
+    real   (r8), allocatable, dimension(:,:,:) :: rho_r
+    complex(r8), allocatable, dimension(:,:,:) :: rho_
+    real   (r8) :: rho_min_r
+
+    allocate(rho_ (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
+    allocate(rho_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
+
+    rho_ = rho
+    call p3dfft_btran_c2r(rho_, rho_r, 'tff')
+
+    rho_min_r = minval(rho_r); call min_allreduce(rho_min_r)
+    if(rho_min_r <= 0.d0) then
+      if(proc0) then
+        print *, '!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!'
+        print *, '!              Error!              !'
+        print *, '!  initial rho <= 0 somewhere      !'
+        print *, '!~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~!'
+        print '("  min(rho) = ", es12.4e3)', rho_min_r
+      endif
+      stop
+    endif
+
+    rho_r = log(rho_r)
+    call p3dfft_ftran_r2c(rho_r, lnrho, 'fft'); lnrho = lnrho/nlx/nly/nlz 
+
+    deallocate(rho_)
+    deallocate(rho_r)
+  end subroutine rho_to_lnrho
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    31 Oct 2026
+!! @brief   ln(rho) to rho (Fourier to Fourier)
+!-----------------------------------------------!
+  subroutine lnrho_to_rho(lnrho, rho)
+    use grid, only: nlx, nly, nlz
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
+    implicit none
+    complex(r8), dimension (ikx_st:ikx_en, &
+                            ikz_st:ikz_en, &
+                            iky_st:iky_en), intent(in) :: lnrho
+    complex(r8), dimension (ikx_st:ikx_en, &
+                            ikz_st:ikz_en, &
+                            iky_st:iky_en), intent(out) :: rho
+    real   (r8), allocatable, dimension(:,:,:) :: rho_r
+    complex(r8), allocatable, dimension(:,:,:) :: lnrho_
+
+    allocate(lnrho_(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
+    allocate(rho_r (ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
+
+    lnrho_ = lnrho
+    call p3dfft_btran_c2r(lnrho_, rho_r, 'tff')
+    rho_r = exp(rho_r)
+    call p3dfft_ftran_r2c(rho_r, rho, 'fft'); rho = rho/nlx/nly/nlz 
+
+    deallocate(lnrho_)
+    deallocate(rho_r)
+  end subroutine lnrho_to_rho
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    31 Oct 2026
+!! @brief   1D wave along dir ('x', 'y', or 'z') on a uniform background (rho0, b0)
+!!          'sound_wave' : standing wave,  ln(rho) = ln(rho0) + amp*cos(k xi), u = 0
+!!          'simple_wave': right-going simple wave, ln(rho) = ln(rho0) + amp*sin(k xi),
+!!                         u_dir = c_s ln(rho/rho0) (Riemann invariant u - c_s ln(rho) is uniform).
+!!                         Exact solution of isothermal Euler (B parallel to dir) until breaking.
+!-----------------------------------------------!
+  subroutine init_wave1d
+    use mp, only: proc0
+    use grid, only: nlx, nly, nlz, lx, ly, lz, xx, yy, zz
+    use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
+    use params, only: inputfile, cs2va2, pi
+    use file, only: get_unused_unit
+    implicit none
+    character(1) :: dir
+    integer  :: mode
+    real(r8) :: amp, rho0
+    real(r8) :: kk, xi, cs
+    real(r8), allocatable, dimension(:,:,:) :: s_r, u_r, m_r, b_r
+    integer :: i, j, k
+    integer :: unit, ierr
+    namelist /wave1d_params/ dir, mode, amp, rho0, b0
+
+    dir  = 'x'
+    mode = 1
+    amp  = 1.d-3
+    rho0 = 1.d0
+    b0   = (/0.d0, 0.d0, 0.d0/)
+
+    call get_unused_unit (unit)
+    open(unit=unit,file=inputfile,status='old')
+    read(unit,nml=wave1d_params,iostat=ierr)
+        if (ierr/=0) write(*,*) "Reading wave1d_params failed"
+    close(unit)
+
+    if(proc0) then
+      print '("1D wave initialization: ", A, ", dir = ", A, ", mode = ", I4, ", amp = ", es12.4e3)', &
+            trim(init_type), dir, mode, amp
+    endif
+    if(rho0 <= 0.d0 .or. (dir /= 'x' .and. dir /= 'y' .and. dir /= 'z')) then
+      if(proc0) print *, 'init_wave1d: rho0 must be positive and dir must be x, y, or z'
+      stop
+    endif
+
+    allocate(s_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
+    allocate(u_r, source=s_r)
+    allocate(m_r, source=s_r)
+    allocate(b_r, source=s_r)
+
+    cs = dsqrt(cs2va2)
+    if(dir == 'x') kk = 2.d0*pi*mode/lx
+    if(dir == 'y') kk = 2.d0*pi*mode/ly
+    if(dir == 'z') kk = 2.d0*pi*mode/lz
+
+    do i = ilx_st, ilx_en
+      do k = ilz_st, ilz_en
+        do j = ily_st, ily_en
+          if(dir == 'x') xi = xx(i)
+          if(dir == 'y') xi = yy(j)
+          if(dir == 'z') xi = zz(k)
+          if(init_type == 'sound_wave') then
+            s_r(j, k, i) = log(rho0) + amp*cos(kk*xi)
+            u_r(j, k, i) = 0.d0
+          else
+            s_r(j, k, i) = log(rho0) + amp*sin(kk*xi)
+            u_r(j, k, i) = cs*amp*sin(kk*xi)
+          endif
+        end do
+      end do
+    end do
+    m_r = exp(s_r)*u_r
+
+    call p3dfft_ftran_r2c(s_r, lnrho, 'fft'); lnrho = lnrho/nlx/nly/nlz 
+    mx = 0.d0; my = 0.d0; mz = 0.d0
+    if(dir == 'x') then
+      call p3dfft_ftran_r2c(m_r, mx, 'fft'); mx = mx/nlx/nly/nlz 
+    endif
+    if(dir == 'y') then
+      call p3dfft_ftran_r2c(m_r, my, 'fft'); my = my/nlx/nly/nlz 
+    endif
+    if(dir == 'z') then
+      call p3dfft_ftran_r2c(m_r, mz, 'fft'); mz = mz/nlx/nly/nlz 
+    endif
+    b_r = b0(1); call p3dfft_ftran_r2c(b_r, bx, 'fft'); bx = bx/nlx/nly/nlz 
+    b_r = b0(2); call p3dfft_ftran_r2c(b_r, by, 'fft'); by = by/nlx/nly/nlz 
+    b_r = b0(3); call p3dfft_ftran_r2c(b_r, bz, 'fft'); bz = bz/nlx/nly/nlz 
+
+    lnrho_old = lnrho
+    mx_old    = mx
+    my_old    = my
+    mz_old    = mz
+    bx_old    = bx
+    by_old    = by
+    bz_old    = bz
+
+    deallocate(s_r)
+    deallocate(u_r)
+    deallocate(m_r)
+    deallocate(b_r)
+  end subroutine init_wave1d
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    31 Oct 2026
+!! @brief   Periodic Riemann problem along dir ('x', 'y', or 'z').
+!!          The R state occupies L/4 < xi < 3L/4 and the L state the rest:
+!!            H(xi) = [tanh((xi - L/4)/w) - tanh((xi - 3L/4)/w)]/2,  w = width*dl (width <= 0: step, H = 1/2 at the interfaces),
+!!            (rho, u, B) = (1 - H)*(L state) + H*(R state).
+!!          The interface at L/4 is the Riemann problem (L | R); the one at 3L/4 is its mirror (R | L).
+!!          B_dir must be the same on both sides (div B = 0).
+!-----------------------------------------------!
+  subroutine init_riemann
+    use mp, only: proc0
+    use grid, only: nlx, nly, nlz, lx, ly, lz, xx, yy, zz, dlx, dly, dlz
+    use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
+    use params, only: inputfile
+    use file, only: get_unused_unit
+    implicit none
+    character(1) :: dir
+    real(r8) :: rho_L, rho_R, u_L(3), u_R(3), b_L(3), b_R(3), width
+    real(r8) :: ll, ww, xi, hh
+    real(r8), allocatable, dimension(:,:,:) :: s_r, den_r, hh_r, f_r ! density is den_r: rho_r is the same name as rho_R
+    integer :: i, j, k, idir
+    integer :: unit, ierr
+    namelist /riemann_params/ dir, rho_L, rho_R, u_L, u_R, b_L, b_R, width
+
+    dir   = 'x'
+    rho_L = 1.d0
+    rho_R = 1.d0
+    u_L   = 0.d0
+    u_R   = 0.d0
+    b_L   = 0.d0
+    b_R   = 0.d0
+    width = 1.d0
+
+    call get_unused_unit (unit)
+    open(unit=unit,file=inputfile,status='old')
+    read(unit,nml=riemann_params,iostat=ierr)
+        if (ierr/=0) write(*,*) "Reading riemann_params failed"
+    close(unit)
+
+    if(dir == 'x') then
+      idir = 1; ll = lx; ww = width*dlx
+    elseif(dir == 'y') then
+      idir = 2; ll = ly; ww = width*dly
+    elseif(dir == 'z') then
+      idir = 3; ll = lz; ww = width*dlz
+    else
+      if(proc0) print *, 'init_riemann: dir must be x, y, or z'
+      stop
+    endif
+    if(rho_L <= 0.d0 .or. rho_R <= 0.d0) then
+      if(proc0) print *, 'init_riemann: rho_L and rho_R must be positive'
+      stop
+    endif
+    if(b_L(idir) /= b_R(idir)) then
+      if(proc0) print *, 'init_riemann: b_L(dir) must be equal to b_R(dir) (div B = 0)'
+      stop
+    endif
+
+    if(proc0) then
+      print '("Riemann initialization: dir = ", A, ", width = ", f6.2, " cells")', dir, width
+      print '("  L: rho = ", es12.4e3, ", u = ", 3es12.4e3, ", b = ", 3es12.4e3)', rho_L, u_L, b_L
+      print '("  R: rho = ", es12.4e3, ", u = ", 3es12.4e3, ", b = ", 3es12.4e3)', rho_R, u_R, b_R
+    endif
+
+    allocate(s_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
+    allocate(den_r, source=s_r)
+    allocate(hh_r , source=s_r)
+    allocate(f_r  , source=s_r)
+
+    do i = ilx_st, ilx_en
+      do k = ilz_st, ilz_en
+        do j = ily_st, ily_en
+          if(dir == 'x') xi = xx(i)
+          if(dir == 'y') xi = yy(j)
+          if(dir == 'z') xi = zz(k)
+          if(ww > 0.d0) then
+            hh = 0.5d0*(tanh((xi - 0.25d0*ll)/ww) - tanh((xi - 0.75d0*ll)/ww))
+          else
+            hh = 0.d0
+            if(xi > 0.25d0*ll .and. xi < 0.75d0*ll) hh = 1.d0
+            if(xi == 0.25d0*ll .or. xi == 0.75d0*ll) hh = 0.5d0
+          endif
+          hh_r(j, k, i) = hh
+        end do
+      end do
+    end do
+
+    den_r = (1.d0 - hh_r)*rho_L + hh_r*rho_R
+    s_r   = log(den_r)
+    call p3dfft_ftran_r2c(s_r, lnrho, 'fft'); lnrho = lnrho/nlx/nly/nlz 
+
+    f_r = den_r*((1.d0 - hh_r)*u_L(1) + hh_r*u_R(1)); call p3dfft_ftran_r2c(f_r, mx, 'fft'); mx = mx/nlx/nly/nlz 
+    f_r = den_r*((1.d0 - hh_r)*u_L(2) + hh_r*u_R(2)); call p3dfft_ftran_r2c(f_r, my, 'fft'); my = my/nlx/nly/nlz 
+    f_r = den_r*((1.d0 - hh_r)*u_L(3) + hh_r*u_R(3)); call p3dfft_ftran_r2c(f_r, mz, 'fft'); mz = mz/nlx/nly/nlz 
+    f_r =        (1.d0 - hh_r)*b_L(1) + hh_r*b_R(1) ; call p3dfft_ftran_r2c(f_r, bx, 'fft'); bx = bx/nlx/nly/nlz 
+    f_r =        (1.d0 - hh_r)*b_L(2) + hh_r*b_R(2) ; call p3dfft_ftran_r2c(f_r, by, 'fft'); by = by/nlx/nly/nlz 
+    f_r =        (1.d0 - hh_r)*b_L(3) + hh_r*b_R(3) ; call p3dfft_ftran_r2c(f_r, bz, 'fft'); bz = bz/nlx/nly/nlz 
+
+    lnrho_old = lnrho
+    mx_old    = mx
+    my_old    = my
+    mz_old    = mz
+    bx_old    = bx
+    by_old    = by
+    bz_old    = bz
+
+    deallocate(s_r)
+    deallocate(den_r)
+    deallocate(hh_r)
+    deallocate(f_r)
+  end subroutine init_riemann
+
+
+!-----------------------------------------------!
+!> @author  YK
 !! @date    3 Oct 2020
 !! @brief   Check if divergence free is satisfied
 !-----------------------------------------------!
@@ -965,7 +1287,7 @@ contains
   subroutine finish_fields
     implicit none
 
-    deallocate(rho)
+    deallocate(lnrho)
     deallocate(mx)
     deallocate(my)
     deallocate(mz)
@@ -975,7 +1297,7 @@ contains
     deallocate(bx)
     deallocate(by)
     deallocate(bz)
-    deallocate(rho_old)
+    deallocate(lnrho_old)
     deallocate(mx_old)
     deallocate(my_old)
     deallocate(mz_old)

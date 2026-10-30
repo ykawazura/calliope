@@ -1,0 +1,59 @@
+#!/bin/bash
+#------- qsub option -----------
+#PBS -P NIFS24KISC013
+#PBS -q A_dev
+#PBS -l select=1:ncpus=8:mem=16gb:mpiprocs=8:ompthreads=1
+#PBS -l walltime=00:30:00
+#PBS -j oe
+#
+# Runs every case listed in $CASES (space separated run directories
+# relative to $PBS_O_WORKDIR).  Each directory must contain calliope.in
+# and a file "nproc" holding the number of MPI ranks.  The binary is
+# $EXE (default: ./calliope in $PBS_O_WORKDIR).
+#
+#   qsub -v CASES="runs/a runs/b",EXE=bin/calliope_isoth tests/MHD_COMP_ISOTH/job.pbs-ps-fes-dev
+#
+# A file "exe" in a run directory overrides $EXE for that case (path relative to
+# $PBS_O_WORKDIR).  CASEFILE=<file> reads the list from a file instead.  PAR=<ncores> runs the cases
+# concurrently: cases with np ranks run PAR/np at a time, in the order listed
+# (gen_stage1.py lists them by decreasing cost), with Intel MPI pinning off.
+
+module load intel/2025.1
+module load fftw/3.3.10/oneapi2025.1
+module load hdf5/1.14.6/oneapi2025.1-parallel
+module load netcdf-fortran/4.6.2/oneapi2025.1-parallel
+export I_MPI_OFI_PROVIDER=psm3
+export OMP_NUM_THREADS=1
+
+cd ${PBS_O_WORKDIR}
+EXE=${EXE:-./calliope}
+EXE=$(readlink -f ${EXE})
+
+CASES=${CASES:-$(cat ${CASEFILE})}
+
+run_case() {
+  c=$1
+  np=$(cat ${c}/nproc 2>/dev/null || echo 1)
+  exe=${EXE}
+  [ -f ${c}/exe ] && exe=$(readlink -f $(cat ${c}/exe))
+  t0="$(date '+%F %T')"
+  ( cd ${c} && mkdir -p out1d out2d out3d restart && \
+    /usr/bin/time -f "wall %e s" mpirun -np ${np} ${exe} < calliope.in > calliope.out.std 2>&1 ; \
+    echo "exit $?" > exit_status )
+  echo "=== ${c}  (np = ${np}, $(basename ${exe}))  ${t0}
+$(tail -3 ${c}/calliope.out.std)"
+}
+
+if [ -z "${PAR}" ]; then
+  for c in ${CASES}; do run_case ${c}; done
+else
+  # concurrent mpirun instances would otherwise pin their ranks to the same cores
+  export I_MPI_PIN=off
+  export -f run_case
+  export EXE
+  for np in 1 2 4 8; do
+    sel=$(for c in ${CASES}; do [ "$(cat ${c}/nproc 2>/dev/null || echo 1)" = "${np}" ] && echo ${c}; done)
+    [ -n "${sel}" ] && echo "${sel}" | xargs -P $(( PAR / np > 0 ? PAR / np : 1 )) -I{} bash -c 'run_case {}'
+  done
+fi
+echo "=== all done $(date '+%F %T')"

@@ -23,7 +23,7 @@ contains
     use force, only :init_force, alloc_force
     use shearing_box, only: init_shearing_time
     use params, only: shear, pi, cs2va2
-    use fields, only: bx, by, bz, rho
+    use fields, only: bx, by, bz, lnrho, lnrho_to_rho
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use mp, only: broadcast
     implicit none
@@ -32,6 +32,7 @@ contains
     real(r8) :: vax0, vay0, vaz0
     real(r8) :: lmd_MRI, H
     integer :: i, j, k
+    complex(r8), allocatable, dimension(:,:,:) :: rho
 
     call init_shearing_time
 
@@ -50,6 +51,8 @@ contains
 
     ! show minimum k in unit of omega0/vA
     if(shear) then
+      allocate(rho(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
+      call lnrho_to_rho(lnrho, rho)
       do j = iky_st, iky_en
         do k = ikz_st, ikz_en
           do i = ikx_st, ikx_en
@@ -66,6 +69,7 @@ contains
       call broadcast(by0)
       call broadcast(bz0)
       call broadcast(rho0)
+      deallocate(rho)
 
       if(proc0) then
         vax0 = bx0/sqrt(rho0)

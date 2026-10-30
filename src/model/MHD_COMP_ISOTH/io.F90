@@ -776,7 +776,7 @@ contains
 !! @brief   Append 3D field via MPIIO
 !-----------------------------------------------!
   subroutine loop_io_3D
-    use fields, only: rho
+    use fields, only: lnrho, lnrho_to_rho
     use fields, only: mx, my, mz
     use fields, only: bx, by, bz
     use mp, only: proc0
@@ -788,9 +788,14 @@ contains
     use time_stamp, only: put_time_stamp, timer_io_total, timer_io_3D
     implicit none
     integer, dimension(3) :: sizes, subsizes, starts
+    complex(r8), allocatable, dimension(:,:,:) :: rho
 
     if (proc0) call put_time_stamp(timer_io_total)
     if (proc0) call put_time_stamp(timer_io_3D)
+
+    ! out3d/rho.dat keeps the density (not ln(rho)) so that the output format is unchanged
+    allocate(rho(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0, 0.d0))
+    call lnrho_to_rho(lnrho, rho)
 
     sizes(1) = nkx
     sizes(2) = nkz
@@ -809,6 +814,7 @@ contains
     call mpiio_write_var(fh_bx , disp_bx , sizes, subsizes, starts, bx )
     call mpiio_write_var(fh_by , disp_by , sizes, subsizes, starts, by )
     call mpiio_write_var(fh_bz , disp_bz , sizes, subsizes, starts, bz )
+    deallocate(rho)
 
     if(proc0) then
       write (unit=out3d_time_unit, fmt="(100es30.21)") tt, tsc
@@ -826,7 +832,7 @@ contains
 !! @brief   Save restart file via MPIIO
 !-----------------------------------------------!
   subroutine save_restart
-    use fields, only: rho
+    use fields, only: lnrho
     use fields, only: mx, my, mz
     use fields, only: bx, by, bz
     use mp, only: proc0
@@ -854,7 +860,7 @@ contains
     starts(2) = ikz_st - 1
     starts(3) = iky_st - 1
 
-    call mpiio_write_one(rho, sizes, subsizes, starts, trim(restart_dir)//'rho.dat')
+    call mpiio_write_one(lnrho, sizes, subsizes, starts, trim(restart_dir)//'lnrho.dat')
     call mpiio_write_one(mx , sizes, subsizes, starts, trim(restart_dir)//'mx.dat' )
     call mpiio_write_one(my , sizes, subsizes, starts, trim(restart_dir)//'my.dat' )
     call mpiio_write_one(mz , sizes, subsizes, starts, trim(restart_dir)//'mz.dat' )
