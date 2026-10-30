@@ -434,7 +434,7 @@ max|Δρ| ≤ 1.47e-14、max|Δu| ≤ 1.09e-14 である（基準 1e-10）。
   Fortran と `proto1d.py` の相対差は ≤ 1.9e-14 である。
 - SVV を切った経路: SVV の実装前のバイナリと、`conservation.dat`・`cfl.dat`・`budget.dat` の共通の列がビット一致する。
 - MHD_INCOMP の回帰（OT2、4 rank、強制なし、200 ステップ）: 同じ branch でビルドした出力が develop のベースラインとバイト一致する
-  （`.std` の日付と経過時間を除く）。
+  （`.std` の日付と経過時間を除く）。入力は `tests/MHD_INCOMP_regression/calliope.in`（16³）である。
 - fast 固有モード（16³、dt = 1e-3、t = 10、Stage 0 と同じ `pruned = T`, `filter_lnrho = T`）。
   ω は mx(k = (1, 0, 1)) の位相に直線を当てはめて求め、理論値 √(2 + √2) = 1.8477591 と比べた。
 

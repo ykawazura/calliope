@@ -1,0 +1,137 @@
+!--------------------------------------------------!
+!               INPUTS for MHD INCOMP              !
+!--------------------------------------------------!
+&mpi_settings
+  dim_decomp = 2
+  !dim1 = 4 ! decomp will be (dim1, nproc/dim1)
+           ! if this is empty, decomp will be (dim1, dim2)
+           ! such that dim1 ~= dim2.
+/
+
+!==============================================================================
+&box_parameters
+  lx = 1.0 ! to be multiplied by 2pi
+  ly = 1.0 ! to be multiplied by 2pi
+  lz = 1.0 ! to be multiplied by 2pi
+
+  nlx = 16
+  nly = 16
+  nlz = 16
+
+  pruned = .true.
+/
+
+!==============================================================================
+&time_parameters
+  dt    = 2.0d-3
+  nstep = 200
+  cfl   = 5.0d0
+  reset_method = 'multiply'  !'multiply'  => multiply by a factor of 0.5
+                             !'decrement' => decrement the top integer of dt
+                             !'stop'      => terminate the run
+  increase_dt = 0e+0         !When max dt computed from the cfl condition is 
+                             ! larger than this value, set dt = increase_dt.
+
+                             ! When the file 'dt_adjust' including a float number is created,
+                             ! dt will be manually adjusted to that value while running.
+/
+
+!==============================================================================
+&scheme_parameters
+  time_step_scheme = 'eSSPIFRK3' ! 'gear3' or 'eSSPIFRK3'
+/
+
+!==============================================================================
+&operation_parameters
+  nonlinear = T
+/
+
+!==============================================================================
+&physical_parameters
+  ! regular and hyper viscosity ~ nu*k^2 + nu_h*k^(2*nu_h_exp)
+  nu        = 0d+0  ! regular viscosity
+  nu_h      = 1d+3  ! hyper viscosity
+  nu_h_exp  = 4
+  ! regular and hyper resistivity ~ eta*k^2 + eta_h*k^(2*eta_h_exp)
+  eta       = 0d+0  ! regular resistivity
+  eta_h     = 1d+3  ! hyper resistivity
+  eta_h_exp = 4
+
+  ! shear parameters
+  shear  = .false.
+  q      = 0.d0
+/
+
+!==============================================================================
+&initial_condition
+  !init_type = 'zero'
+  !init_type = 'single_vortex'
+  init_type = 'OT2'
+  !init_type = 'random'
+  !init_type = 'restart'
+/
+
+&initial_condition_params
+  kmin = 0.d0  0.d0  1.d0
+  kmax = 3.d0  3.d0  3.d0
+  b0   = 0.d0  0.d0  1.d0
+  b1   = 0.d0  0.d0  0.d0 
+  u1   = 0.d0  0.d0  0.d0 
+  nf_or_znf = 'nf'
+/
+
+!==============================================================================
+&force
+  driven = F
+  elsasser = .true.
+  fix_power = .true.
+  ene_inj = 0.5d0
+  xhl_inj = 0.8d0 ! 0 <= xhl_inj <= 1
+  kmin = 0.d0  0.d0  0.d0
+  kmax = 4.d0  4.d0  4.d0
+  nfields = 4
+/
+&forced_fields
+  field_names = 'zpx'      , 'zpy'      , 'zmx'      , 'zmy'      
+  amplitudes  =  1.0       ,  1.0       ,  1.0       ,  1.0       
+  frequencies = (0.9, -0.6), (0.9, -0.6), (0.9, -0.6), (0.9, -0.6)
+/
+
+!==============================================================================
+&terminate
+  max_wall_time   = 0.3             ! The simulation will be terminated when the wall  
+                                    ! time exceeds this value (in the unit of hour).
+
+  terminate_file_name = 'terminate' ! The simulation will be terminated when the file 
+                                    ! named this value is created in the root directory
+                                    ! in the middle of simulaiton.
+/
+
+!==============================================================================
+&diagnostics_parameters
+  write_intvl         = 0.1d0  ! output every this value.
+  write_intvl_2D      = 0.d0
+  write_intvl_3D      = 0.d0
+  write_intvl_kpar    = 0.d0
+  write_intvl_SF2     = 0.d0
+  write_intvl_nltrans = 0.d0
+  SF2_nsample = 100000 ! number of sample points for each separation
+
+!  If one wants to change the separation of kpolar_log, one can set kpolar_log_sep so that
+!    kpolar_log_sep = (0, k1*kpolar_log_sep^i) [i = 1, 2., ....]
+!    Default is kpolar_log_sep = 2^1/3.
+
+  output_modes =   3   1   2
+                   5   1   3
+                   7   1   4
+/
+
+!==============================================================================
+&restart_parameters
+  save_restart_intvl = 1.d3
+  restart_dir = './restart/'
+/
+
+
+
+
