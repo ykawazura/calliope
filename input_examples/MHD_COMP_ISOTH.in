@@ -96,6 +96,11 @@
   svv_eps0     = 0.5d0   ! spectral vanishing viscosity eps_d = svv_eps0 dl_d max(|u_d| + c_f,d); <= 0: off
   svv_mN       = 0.5d0   ! Q(|k_d|) = 0 for |k_d| <= svv_mN*k_c,d (k_c,d = 2/3 of the Nyquist wavenumber)
   svv_above_kc = .true.  ! Q = 1 (.true.) or 0 (.false.) for |k_d| >= k_c,d (only ln(rho) has such modes)
+  svv_form     = 'entropy' ! rho, m: 'entropy' (flux form in the entropy variables, dE/dt <= 0 for any state)
+                           !         or 'linear' (-lambda(k) on m and on rho; B always gets -lambda(k))
+  cfl_svv      = 2.0d0   ! 'entropy': dt <= cfl_svv/lambda_svv, lambda_svv by the power method (eSSPIFRK3: 2.51)
+  svv_pi_init  = 50      ! 'entropy': power iterations at the first step (one per step afterwards)
+  svv_pi_check = 100     ! 'entropy': converged power method every svv_pi_check steps; stop if dt*lambda_svv > 2.51
 /
 
 &isoth_diagnostics

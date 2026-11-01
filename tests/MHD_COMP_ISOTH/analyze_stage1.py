@@ -54,15 +54,29 @@ def load(path):
     return a if a.size else None
 
 
+def run_dirs(case):
+    """Output directories of a case in time order: chunk_1, chunk_2, ... (runs continued from restart/,
+    whose earlier output job.pbs-ps-fes-dev moves there) and the case directory."""
+    ch = glob.glob(os.path.join(case, 'chunk_*'))
+    return sorted(ch, key=lambda d: int(d.rsplit('_', 1)[1])) + [case]
+
+
+def load_runs(case, name):
+    """load() of <name> in each output directory of the case (runs without the file are left out)."""
+    return [a for a in (load(os.path.join(d, name)) for d in run_dirs(case)) if a is not None]
+
+
 def read_lines(case):
-    out = []
-    for fn in sorted(glob.glob(os.path.join(case, 'out1d', 'line_*.dat'))):
-        with open(fn) as f:
-            hdr = f.readline()
-        t = float(re.search(r't =\s*([-+0-9.eE]+)', hdr).group(1))
-        step = int(re.search(r'step =\s*(\d+)', hdr).group(1))
-        out.append((t, step, np.loadtxt(fn, comments='#')))
-    return out
+    """out1d/line_*.dat of all runs by time; step counts the steps of the run that wrote the file."""
+    out = {}
+    for d in run_dirs(case):
+        for fn in glob.glob(os.path.join(d, 'out1d', 'line_*.dat')):
+            with open(fn) as f:
+                hdr = f.readline()
+            t = float(re.search(r't =\s*([-+0-9.eE]+)', hdr).group(1))
+            step = int(re.search(r'step =\s*(\d+)', hdr).group(1))
+            out[t] = (t, step, np.loadtxt(fn, comments='#'))
+    return [out[t] for t in sorted(out)]
 
 
 # ---------------------------------------------------------------- shocks
@@ -261,6 +275,9 @@ def simple_wave_analysis(nml, lines, out):
 def analyze(case, plot=False):
     out = dict(case=case)
     nml = read_nml(os.path.join(case, 'calliope.in'))
+    # eps_svv + D_svv = 0 (entropy-stable SVV) holds for filter_lnrho = F only; no svv_form: linear SVV (older runs)
+    out['svv'] = dict(form=strv(nml.get('svv_form', "'linear'")), eps0=num(nml.get('svv_eps0', '0.5d0')),
+                      filter_lnrho=nml.get('filter_lnrho', 'F').upper().lstrip('.').startswith('T'))
     st = os.path.join(case, 'exit_status')
     out['exit'] = open(st).read().strip() if os.path.exists(st) else None
     std = os.path.join(case, 'calliope.out.std')
@@ -268,26 +285,34 @@ def analyze(case, plot=False):
         txt = open(std, errors='replace').read()
         if 'This run is stopped' in txt:  # time.F90 reset_dt, reset_method = 'stop' (exit code 0)
             out['exit'] = '%s, stopped by the CFL check' % out['exit']
+        if 'dt*lambda_svv =' in txt:  # advance.F90, check steps of the power method (abort_run)
+            out['exit'] = '%s, stopped by the dt*lambda_svv check' % out['exit']
         if 'Wall time has exceeded' in txt:  # terminate.F90, max_wall_time (exit code 0)
             out['exit'] = '%s, terminated by max_wall_time' % out['exit']
 
-    cons = load(os.path.join(case, 'conservation.dat'))
-    if cons is not None:
+    out['runs'] = len(run_dirs(case))
+    runs = load_runs(case, 'conservation.dat')
+    if runs:
+        cons = np.concatenate(runs)
+        # column 4 is relative to M at the start of each run; (M - M0)/M0 from column 3 is the same
+        # number for one run (es26.17 restores the double exactly)
         M0 = cons[0, 2]
+        dM = (cons[:, 2] - M0) / M0
         Px, Py, Pz = cons[:, 4], cons[:, 5], cons[:, 6]
         P0 = np.array([Px[0], Py[0], Pz[0]])
         # momentum scale: sum |m| dV ~ M * max|u|; use sqrt(2 M E_kin,max)
         pscale = math.sqrt(2.0 * M0 * max(cons[:, 7].max(), 1e-300))
         out['cons'] = dict(n=len(cons), t_end=float(cons[-1, 0]),
-                           max_abs_dM_over_M0=float(np.max(np.abs(cons[:, 3]))),
-                           final_dM_over_M0=float(cons[-1, 3]),
+                           max_abs_dM_over_M0=float(np.max(np.abs(dM))),
+                           final_dM_over_M0=float(dM[-1]),
                            max_abs_dP_over_scale=float(np.max(np.abs(np.stack([Px, Py, Pz], 1) - P0)) / pscale),
                            rho_min=float(cons[:, 11].min()), rho_max=float(cons[:, 12].max()),
                            zeta_max=float(cons[:, 13].max()),
                            E0=float(cons[0, 10]), E_end=float(cons[-1, 10]),
-                           dmass_corr_tot=float(cons[-1, 17]))
+                           dmass_corr_tot=float(sum(r[-1, 17] for r in runs)))
 
-    bud = load(os.path.join(case, 'budget.dat'))
+    runs = load_runs(case, 'budget.dat')
+    bud = np.concatenate(runs) if runs else None
     if bud is not None:
         dEdt = bud[:, 6]
         visc = -bud[:, 11]
@@ -313,13 +338,27 @@ def analyze(case, plot=False):
             int_eps_svv=float(np.sum(bud[:, 20] * dt)) if bud.shape[1] > 20 else 0.0,
             dE_total=float(bud[-1, 19] - bud[0, 18]),
         )
+        if bud.shape[1] > 24:  # entropy-stable SVV (0 for svv_form = 'linear')
+            D = -bud[:, 22]
+            out['budget'].update(int_eps_svv_B=float(np.sum(bud[:, 21] * dt)), int_D_svv=float(np.sum(D * dt)),
+                                 min_D_svv=float(np.min(D)), max_R_svv_ratio=float(np.max(bud[:, 24])),
+                                 n_eps_svv_pos=int(np.sum(bud[:, 20] - bud[:, 21] > 0.0)))
+        if bud.shape[1] > 25:  # |R_svv| relative to the rounding scale sum |dE/dU.U_svv| dV
+            out['budget'].update(max_R_svv_scale=float(np.max(bud[:, 25])))
 
-    cfl = load(os.path.join(case, 'cfl.dat'))
+    runs = load_runs(case, 'cfl.dat')
+    cfl = np.concatenate(runs) if runs else None
     if cfl is not None:
         out['cfl'] = dict(dt_min=float(cfl[:, 1].min()), dt_max=float(cfl[:, 1].max()),
                           min_dt_adv=float(cfl[:, 2].min()), min_dt_visc=float(cfl[:, 3].min()),
                           max_dt_over_limit=float(np.max(cfl[:, 1] / np.minimum(cfl[:, 2], cfl[:, 3]))),
                           max_eps_svv=float(np.max(cfl[:, 9:12])) if cfl.shape[1] > 9 else 0.0)
+        if cfl.shape[1] > 15:  # power method of the entropy-stable SVV; n_iter > 1 at the check steps
+            chk = cfl[:, 15] > 1.0
+            out['cfl'].update(max_lam_svv=float(np.max(cfl[:, 12])), max_F_svv=float(np.max(cfl[:, 13])),
+                              max_dt_lam=float(np.max(cfl[:, 14])),
+                              max_dt_lam_check=float(np.max(cfl[chk, 14])) if np.any(chk) else None,
+                              max_n_iter_check=int(np.max(cfl[chk, 15])) if np.any(chk) else None)
 
     lines = read_lines(case)
     if lines and strv(nml.get('init_type', "'zero'")) == 'riemann':
@@ -368,6 +407,11 @@ def brief(o):
         s.append('          int: dE=%.4e = ideal %.3e + shock %.4e (visc %.4e) + svv %.4e + nu %.2e + err_t %.2e'
                  % (b['int_dEdt_actual'], b['int_eps_ideal'], b['int_eps_shock'], -b['int_visc'],
                     b['int_eps_svv'], b['int_eps_nu'], b['int_err_t']))
+        if 'min_D_svv' in b:
+            s.append('          ES-SVV: int D_svv=%.4e min D_svv=%.2e max|R_svv|/D_svv=%.2e max|R_svv|/A_svv=%s '
+                     'int eps_svv_B=%.2e' % (b['int_D_svv'], b['min_D_svv'], b['max_R_svv_ratio'],
+                                             '%.2e' % b['max_R_svv_scale'] if 'max_R_svv_scale' in b else '-',
+                                             b['int_eps_svv_B']))
         if b.get('int_err_t_over_E0') is not None:
             s.append('          int err_t/|E0| = %.2e' % b['int_err_t_over_E0'])
     c = o.get('cfl')
@@ -375,6 +419,9 @@ def brief(o):
         s.append('  cfl: dt=[%.3e, %.3e] min dt_adv=%.3e min dt_visc=%.3e max dt/limit=%.3f max eps_svv=%.3e'
                  % (c['dt_min'], c['dt_max'], c['min_dt_adv'], c['min_dt_visc'], c['max_dt_over_limit'],
                     c['max_eps_svv']))
+    if c and c.get('max_dt_lam_check') is not None:
+        s.append('  power method: max lam_svv=%.4e max F_svv=%.3f max dt*lam=%.3f (check steps %.3f, n_iter <= %d)'
+                 % (c['max_lam_svv'], c['max_F_svv'], c['max_dt_lam'], c['max_dt_lam_check'], c['max_n_iter_check']))
     w = o.get('sound')
     if w:
         s.append('  sound: max|amp err|=%.2e max|phase err|=%.2e rad; at t=%.3f harmonics/A=%.2e'

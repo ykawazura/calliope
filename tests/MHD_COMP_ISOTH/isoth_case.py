@@ -27,7 +27,8 @@ DEFAULTS = {
                                    mass_correction=False, s_abort=100.0, debug_nan_step=-1),
     'shock_parameters':       dict(C_shock=2.0, shock_nmax=1, shock_nsmooth=1, shock_dl=0.0,
                                    shock_selftest=False),
-    'svv_parameters':         dict(svv_eps0=0.5, svv_mN=0.5, svv_above_kc=True),
+    'svv_parameters':         dict(svv_eps0=0.5, svv_mN=0.5, svv_above_kc=True, svv_form="'entropy'",
+                                   cfl_svv=2.0, svv_pi_init=50, svv_pi_check=100),
     'isoth_diagnostics':      dict(write_intvl_1D=0.0, write_intvl_cons=0.0, budget=True),
     'force':                  dict(driven=False),
     # below the 30 min of A_dev, so that a long run ends by itself (and is flagged by analyze_stage1)

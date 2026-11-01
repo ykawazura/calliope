@@ -46,7 +46,9 @@ module advance
   real   (r8), allocatable, dimension(:,:,:,:) :: w_r, flx_r
   real   (r8), allocatable, dimension(:,:,:)   :: rho_r, ux_r, uy_r, uz_r
   real   (r8), allocatable, dimension(:,:,:)   :: div_r, zeta_r, q_r ! D, zeta, q = rho*zeta*D
-  real   (r8), allocatable, dimension(:,:,:)   :: svv_r ! SVV term of the s equation, (1/rho) F^-1(-lambda F rho)
+  real   (r8), allocatable, dimension(:,:,:)   :: svv_r ! SVV term of the s equation, (d rho/dt)_svv/rho
+  complex(r8), allocatable, dimension(:,:,:,:) :: svv_mh ! SVV term of m ('entropy'), filtered and normalized as the state
+  complex(r8), allocatable, dimension(:,:,:,:) :: svv_uh ! F u/(nlx nly nlz) of the current stage ('entropy')
   complex(r8), allocatable, dimension(:,:,:,:) :: flx, exp_terms
   real   (r8), allocatable, dimension(:,:)     :: kxt ! sheared kx
   real   (r8), allocatable, dimension(:,:)     :: kxd ! kx for derivatives: kx_d (shear = F) or kxt (shear = T)
@@ -97,15 +99,23 @@ module advance
 
   ! SVV coefficients eps_d of the current step (set at stage 1 and fixed over the step)
   real(r8) :: eps_svv(3) = 0.d0
+  ! 'entropy': D_svv = sum [a t^2 + b |g_m|^2 + kap rho g_h^2] dV (>= 0) of the latest RHS evaluation
+  real(r8) :: svv_diss = 0.d0
+  ! dt before reset_dt of the current step (for the check of dt*lambda_svv)
+  real(r8) :: dt_prev = 0.d0
 
   ! Energy and mass budget accumulated over the RK stages with weights b_rk (budget.dat)
-  integer, parameter :: nbgt = 12
+  integer, parameter :: nbgt = 16
   integer, parameter :: ib_dMdt_raw = 1, ib_dMdt_proj = 2, ib_dMdt_abs = 3
   integer, parameter :: ib_eps_N    = 4, ib_eps_shock = 5, ib_visc     = 6, ib_R_zeta = 7
   integer, parameter :: ib_eps_force = 8, ib_eps_res  = 9, ib_eps_nu   = 10, ib_eps_lmd = 11
-  integer, parameter :: ib_eps_svv  = 12
+  integer, parameter :: ib_eps_svv  = 12, ib_eps_svv_b = 13 ! SVV of (rho, m) and of B
+  integer, parameter :: ib_D_svv    = 14, ib_R_svv     = 15 ! D_svv and R_svv = eps_svv + D_svv ('entropy')
+  integer, parameter :: ib_A_svv    = 16 ! sum |dE/dU.U_svv| dV over (rho, m): rounding scale of eps_svv
   real(r8) :: bgt(nbgt) = 0.d0
   real(r8) :: R_zeta_ratio_max = 0.d0
+  real(r8) :: R_svv_ratio_max  = 0.d0
+  real(r8) :: R_svv_scale_max  = 0.d0
   real(r8) :: t_bgt, dt_bgt
   logical  :: bgt_pending = .false.
 
@@ -439,7 +449,7 @@ contains
     use params, only: nonlinear, shear, time_step_scheme
     use params, only: nu, nu_h, nu_h_exp, eta, eta_h, eta_h_exp, lmd, lmd_h, lmd_h_exp
     use params, only: formulation, visc_form, filter_lnrho, filter_mom, filter_mag
-    use params, only: C_shock, s_abort, budget, write_intvl_cons, svv_eps0
+    use params, only: C_shock, s_abort, budget, write_intvl_cons, svv_eps0, svv_form, cfl_svv
     use shearing_box, only: tsc, k2t, k2t_inv
     use shock_viscosity, only: init_shock_viscosity, abort_run
     use file, only: open_output_file
@@ -459,6 +469,10 @@ contains
       call abort_run('MHD_COMP_ISOTH: shear = T with C_shock > 0 has not been verified')
     if(shear .and. svv_eps0 > 0.d0) &
       call abort_run('MHD_COMP_ISOTH: shear = T with svv_eps0 > 0 is not implemented (the SVV kernel uses the unsheared kx)')
+    if(trim(svv_form) /= 'entropy' .and. trim(svv_form) /= 'linear') &
+      call abort_run('MHD_COMP_ISOTH: svv_form = '//trim(svv_form)//' is not implemented (use entropy or linear)')
+    if(trim(svv_form) == 'entropy' .and. cfl_svv <= 0.d0) &
+      call abort_run('MHD_COMP_ISOTH: cfl_svv must be > 0')
     if(pruned .and. .not. (filter_lnrho .and. filter_mom .and. filter_mag)) &
       call abort_run('MHD_COMP_ISOTH: pruned = T truncates every field; set filter_lnrho = filter_mom = filter_mag = T')
     if(s_abort > 7.d2) &
@@ -466,6 +480,12 @@ contains
     if(proc0 .and. (lmd /= 0.d0 .or. lmd_h /= 0.d0)) then
       print *
       print *, 'WARNING: lmd /= 0 diffuses ln(rho); this term does not conserve mass'
+      print *
+    endif
+    if(proc0 .and. svv_eps0 > 0.d0 .and. trim(svv_form) == 'entropy' .and. filter_lnrho) then
+      print *
+      print *, 'WARNING: filter_lnrho = T filters the SVV term of ln(rho); dE/dt <= 0 of the entropy-stable SVV'
+      print *, '         is then not guaranteed (see R_svv in budget.dat)'
       print *
     endif
 
@@ -511,7 +531,9 @@ contains
     if(proc0) then
       call open_output_file (cfl_unit, 'cfl.dat')
       write(cfl_unit, '(a)') '# 1:t 2:dt 3:dt_adv 4:dt_visc 5:max(|ux|+cf_x) 6:max(|uy|+cf_y) 7:max(|uz|+cf_z) ' &
-                           //'8:zeta_max 9:max(rho*zeta)/(rho_min*zeta_max) 10:eps_svv_x 11:eps_svv_y 12:eps_svv_z'
+                           //'8:zeta_max 9:max(rho*zeta)/(rho_min*zeta_max) 10:eps_svv_x 11:eps_svv_y 12:eps_svv_z ' &
+                           //'13:lam_svv 14:F_svv(=13/sum_d eps_d max k_d^2 Q) 15:dt*lam_svv 16:n_iter'
+      write(cfl_unit, '(a)') '# 13-16: power method of the entropy-stable SVV (0 for svv_form = linear)'
 
       if(write_intvl_cons >= 0.d0) then
         call open_output_file (cons_unit, 'conservation.dat')
@@ -526,7 +548,11 @@ contains
         write(budget_unit, '(a)') '# one line per step [t, t+dt]; rates are sum_i b_i X_i over the RK stages, b = (1/4,3/16,9/16)'
         write(budget_unit, '(a)') '# 1:t 2:dt 3:dMdt_actual 4:dMdt_raw 5:dMdt_proj 6:dMdt_abs 7:dEdt_actual 8:dEdt_sum ' &
                                 //'9:err_t(=7-8) 10:eps_ideal(=eps_N-11-15-21) 11:eps_shock 12:-visc_diss 13:R_zeta ' &
-                                //'14:max|R_zeta|/visc_diss 15:eps_force 16:eps_res 17:eps_nu 18:eps_lmd 19:E_n 20:E_n+1 21:eps_svv'
+                                //'14:max|R_zeta|/visc_diss 15:eps_force 16:eps_res 17:eps_nu 18:eps_lmd 19:E_n 20:E_n+1 ' &
+                                //'21:eps_svv(all) 22:eps_svv_B 23:-D_svv 24:R_svv(=21-22-23) 25:max|R_svv|/D_svv ' &
+                                //'26:max|R_svv|/sum|dE/dU.U_svv|dV'
+        write(budget_unit, '(a)') '# 23-26: entropy-stable SVV of (rho, m) (0 for svv_form = linear); 26 is relative to the ' &
+                                //'rounding scale of 21-22 (25 is not when D_svv is itself at the rounding level)'
       endif
     endif
 
@@ -585,7 +611,7 @@ contains
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use params, only: zi, cs2va2, C_shock, cfl_visc, filter_mom, mass_correction, debug_nan_step
-    use params, only: write_intvl_cons, write_intvl_1D
+    use params, only: write_intvl_cons, write_intvl_1D, cfl_svv, svv_pi_check
     use dealias, only: filter
     use mp, only: proc0, max_allreduce, sum_allreduce
     use time, only: cfl, dt, tt, reset_dt
@@ -594,6 +620,7 @@ contains
     use shock_viscosity, only: get_div_u, get_zeta, ky_d, kz_d, kd2_max
     use shock_viscosity, only: active_x, active_y, active_z, is_nonfinite, abort_run
     use shock_viscosity, only: svv_on, kq2x, kq2y, kq2z, svv_lam_m, svv_lam_s, svv_lam_b, get_svv_eps
+    use shock_viscosity, only: svv_es, get_svv_es, svv_power, svv_lam
     use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan
     implicit none
     complex(r8), dimension (ikx_st:ikx_en, &
@@ -603,9 +630,11 @@ contains
 
     real(r8) :: mon_pre(nmon), sums(3), maxs(8)
     real(r8) :: vad2_r(3), va2_r, cf2_r, b2h_r, ptot_r
-    real(r8) :: dV, mfilt, dt_adv, dt_visc, dt_cfl, rate_visc
-    integer  :: i, j, k, n, d
-    logical  :: first
+    real(r8) :: dV, mfilt, dt_adv, dt_visc, dt_cfl, rate_visc, F_svv
+    integer  :: i, j, k, n, d, pi_nit
+    logical  :: first, pi_check, pi_conv
+    real(r8), parameter :: rk3_lim = 2.51d0 ! real-axis stability limit of SSPRK3 (2.5127)
+    character(len=256) :: msg
 
     if (proc0) call put_time_stamp(timer_nonlinear_terms)
 
@@ -672,7 +701,11 @@ contains
     !$omp end workshare
 
     ! 3. Shock viscosity: D = div_N u, zeta, q = rho*zeta*D
-    if(C_shock > 0.d0 .or. istage <= 1) call get_div_u(ux_r, uy_r, uz_r, kxd, div_r)
+    if(svv_es) then
+      call get_div_u(ux_r, uy_r, uz_r, kxd, div_r, svv_uh)
+    elseif(C_shock > 0.d0 .or. istage <= 1) then
+      call get_div_u(ux_r, uy_r, uz_r, kxd, div_r)
+    endif
     if(C_shock > 0.d0) then
       call get_zeta(div_r, zeta_r)
       q_r = rho_r*zeta_r*div_r
@@ -733,13 +766,34 @@ contains
       call max_allreduce(maxs)
     endif
 
+    ! SVV: eps_d (fixed over the step) and, for svv_form = 'entropy', the terms of rho and m
+    ! and the power method for lambda_svv (one iteration per step; until converged at the check steps)
+    if(istage == 1) call get_svv_eps(maxs(6:8), eps_svv)
+    pi_nit   = 0
+    pi_check = .false.
+    if(svv_es .and. istage >= 1) then
+      call get_svv_es(w_r(:,:,:,ilnrho), rho_r, ux_r, uy_r, uz_r, eps_svv, svv_r, svv_mh, svv_diss, svv_uh)
+      if(istage == 1) then
+        pi_check = svv_pi_check > 0 .and. istep_adv > 0 .and. mod(istep_adv, svv_pi_check) == 0
+        if(pi_check) then
+          call svv_power(w_r(:,:,:,ilnrho), rho_r, w_r(:,:,:,imx), w_r(:,:,:,imy), w_r(:,:,:,imz), eps_svv, &
+                         svv_r, svv_mh, 200, 1.d-3, pi_nit, pi_conv)
+          if(.not. pi_conv .and. proc0) &
+            print '(" WARNING: the power method for lambda_svv did not converge in ", i4, " iterations")', pi_nit
+        else
+          call svv_power(w_r(:,:,:,ilnrho), rho_r, w_r(:,:,:,imx), w_r(:,:,:,imy), w_r(:,:,:,imz), eps_svv, &
+                         svv_r, svv_mh, 1, 0.d0, pi_nit, pi_conv)
+        endif
+      endif
+    endif
+
     ! CFL: advection by fast waves over the active directions, and the explicit viscous terms
     if(istage == 1) then
+      dt_prev = dt
+
       ! When the file 'dt_adjust' including a float number is created,
       ! dt will be manually adjusted to that value while running.
       call dt_adjust_while_running()
-
-      call get_svv_eps(maxs(6:8), eps_svv)
 
       dt_adv = 0.d0
       if(active_x) dt_adv = dt_adv + maxs(6)/dlx
@@ -747,12 +801,22 @@ contains
       if(active_z) dt_adv = dt_adv + maxs(8)/dlz
       dt_adv = cfl/dt_adv
 
-      ! largest damping rate: shock viscosity + SVV in m, SVV in ln rho and in B
-      rate_visc = max(maxs(3)*kd2_max + sum(eps_svv*svv_lam_m), sum(eps_svv*svv_lam_s), sum(eps_svv*svv_lam_b))
-      if(rate_visc > 0.d0) then
-        dt_visc = cfl_visc/rate_visc
+      if(svv_es) then
+        ! 1/dt_visc: shock viscosity/cfl_visc + lambda_svv/cfl_svv in (rho, m), SVV in B/cfl_visc
+        rate_visc = max(maxs(3)*kd2_max/cfl_visc + svv_lam/cfl_svv, sum(eps_svv*svv_lam_b)/cfl_visc)
+        if(rate_visc > 0.d0) then
+          dt_visc = 1.d0/rate_visc
+        else
+          dt_visc = huge(1.d0)
+        endif
       else
-        dt_visc = huge(1.d0)
+        ! largest damping rate: shock viscosity + SVV in m, SVV in ln rho and in B
+        rate_visc = max(maxs(3)*kd2_max + sum(eps_svv*svv_lam_m), sum(eps_svv*svv_lam_s), sum(eps_svv*svv_lam_b))
+        if(rate_visc > 0.d0) then
+          dt_visc = cfl_visc/rate_visc
+        else
+          dt_visc = huge(1.d0)
+        endif
       endif
 
       dt_cfl = min(dt_adv, dt_visc)
@@ -766,9 +830,21 @@ contains
       enddo
       if(dt_cfl < dt) call abort_run('get_nonlinear_terms: dt could not be reduced below dt_cfl (check reset_method)')
 
+      ! check of the explicit SVV step with the converged lambda_svv: dt of the previous and of this step
+      if(pi_check .and. max(dt_prev, dt)*svv_lam > rk3_lim) then
+        write(msg, '("get_nonlinear_terms: dt*lambda_svv = ", es12.4, " > ", f5.2, " (dt_prev = ", es12.4, &
+                    &", dt = ", es12.4, ", lambda_svv = ", es12.4, ", step = ", i10, ")")') &
+              max(dt_prev, dt)*svv_lam, rk3_lim, dt_prev, dt, svv_lam, istep_adv
+        call abort_run(trim(msg))
+      endif
+
+      F_svv = 0.d0
+      if(svv_es .and. sum(eps_svv*svv_lam_s) > 0.d0) F_svv = svv_lam/sum(eps_svv*svv_lam_s)
       if(proc0) then
         write (unit=cfl_unit, fmt="(100es26.17e3)") tt, dt, dt_adv, dt_visc, maxs(6:8), maxs(3), &
-                                                  maxs(5)/max(-maxs(2)*maxs(3), tiny(1.d0)), eps_svv
+                                                  maxs(5)/max(-maxs(2)*maxs(3), tiny(1.d0)), eps_svv, &
+                                                  merge(svv_lam, 0.d0, svv_es), F_svv, &
+                                                  merge(dt*svv_lam, 0.d0, svv_es), dble(pi_nit)
         call flush(cfl_unit)
       endif
     endif
@@ -796,9 +872,13 @@ contains
     ! 4. Calculate nonlinear terms in real space
     flx_r(:,:,:,iflx_s) = -flx_r(:,:,:,iflx_s)/rho_r
 
-    ! SVV of the mass equation in the conservative form, d rho/dt = F^-1(-lambda F rho):
-    ! ds/dt += (1/rho) F^-1(-lambda F rho), so that sum rho ds/dt = 0 is kept (lambda(0) = 0)
-    if(svv_on) then
+    ! SVV of the mass equation: ds/dt += (d rho/dt)_svv/rho, so that sum rho ds/dt = 0 is kept
+    if(svv_es) then
+      ! 'entropy': (d rho/dt)_svv from get_svv_es
+      svv_r = svv_r/rho_r
+      flx_r(:,:,:,iflx_s) = flx_r(:,:,:,iflx_s) + svv_r
+    elseif(svv_on) then
+      ! 'linear': d rho/dt = F^-1(-lambda F rho) (lambda(0) = 0)
       svv_r = rho_r
       if (proc0) call put_time_stamp(timer_fft)
       call p3dfft_ftran_r2c(svv_r, w(:,:,:,1), 'fft')
@@ -1010,13 +1090,15 @@ contains
 !! @date    31 Oct 2026
 !! @brief   Explicit terms of all modes from flx
 !!          (filled by get_nonlinear_terms) and
-!!          the SVV of m and B, -lambda(k) (m^, B^)
+!!          the SVV of m and B: -lambda(k) B^, and
+!!          svv_mh ('entropy') or -lambda(k) m^
+!!          ('linear')
 !-----------------------------------------------!
   subroutine get_explicit_terms(mx, my, mz, bx, by, bz)
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use force, only: fmx, fmy, fmz
     use shock_viscosity, only: ky_d, kz_d
-    use shock_viscosity, only: svv_on, kq2x, kq2y, kq2z
+    use shock_viscosity, only: svv_on, svv_es, kq2x, kq2y, kq2z
     implicit none
     complex(r8), dimension (ikx_st:ikx_en, &
                             ikz_st:ikz_en, &
@@ -1035,9 +1117,15 @@ contains
                              kxd(i,j), ky_d(j), kz_d(k))
           if(svv_on) then
             lam = eps_svv(1)*kq2x(i) + eps_svv(2)*kq2y(j) + eps_svv(3)*kq2z(k)
-            exp_terms(i,k,j,imx) = exp_terms(i,k,j,imx) - lam*mx(i,k,j)
-            exp_terms(i,k,j,imy) = exp_terms(i,k,j,imy) - lam*my(i,k,j)
-            exp_terms(i,k,j,imz) = exp_terms(i,k,j,imz) - lam*mz(i,k,j)
+            if(svv_es) then
+              exp_terms(i,k,j,imx) = exp_terms(i,k,j,imx) + svv_mh(i,k,j,1)
+              exp_terms(i,k,j,imy) = exp_terms(i,k,j,imy) + svv_mh(i,k,j,2)
+              exp_terms(i,k,j,imz) = exp_terms(i,k,j,imz) + svv_mh(i,k,j,3)
+            else
+              exp_terms(i,k,j,imx) = exp_terms(i,k,j,imx) - lam*mx(i,k,j)
+              exp_terms(i,k,j,imy) = exp_terms(i,k,j,imy) - lam*my(i,k,j)
+              exp_terms(i,k,j,imz) = exp_terms(i,k,j,imz) - lam*mz(i,k,j)
+            endif
             exp_terms(i,k,j,ibx) = exp_terms(i,k,j,ibx) - lam*bx(i,k,j)
             exp_terms(i,k,j,iby) = exp_terms(i,k,j,iby) - lam*by(i,k,j)
             exp_terms(i,k,j,ibz) = exp_terms(i,k,j,ibz) - lam*bz(i,k,j)
@@ -1130,8 +1218,14 @@ contains
 !!          eps_shock = sum u.F^-1(P i k_d q^) dV;
 !!          R_zeta = eps_shock + sum rho zeta D^2 dV
 !!          vanishes in exact arithmetic.
-!!          eps_svv: energy rate of the SVV terms (it
-!!          is included in eps_N; not sign-definite).
+!!          eps_svv, eps_svv_b: energy rates of the SVV
+!!          of (rho, m) and of B (included in eps_N).
+!!          eps_svv_b <= 0. 'linear': eps_svv is not
+!!          sign-definite. 'entropy': R_svv = eps_svv
+!!          + D_svv vanishes in exact arithmetic and
+!!          D_svv >= 0 (a sum of squares). A_svv =
+!!          sum |dE/dU.U_svv| dV bounds the rounding
+!!          error of eps_svv.
 !!          The linear terms (integrating factor) are
 !!          evaluated with the stage state.
 !-----------------------------------------------!
@@ -1148,7 +1242,7 @@ contains
     use time_stamp, only: put_time_stamp, timer_fft
     use mp, only: proc0
     use shock_viscosity, only: ky_d, kz_d
-    use shock_viscosity, only: svv_on, kq2x, kq2y, kq2z
+    use shock_viscosity, only: svv_on, svv_es, kq2x, kq2y, kq2z
     implicit none
     integer, intent(in) :: istage
     complex(r8), dimension (ikx_st:ikx_en, &
@@ -1222,7 +1316,8 @@ contains
       deallocate(qh)
     endif
 
-    ! SVV: dE/ds.F^-1(P F svv_r) + u.F^-1(P(-lambda m^)) + B.F^-1(P(-lambda B^))
+    ! SVV: dE/ds.F^-1(P F svv_r) + u.F^-1(P svv_m^) (eps_svv) + B.F^-1(P(-lambda B^)) (eps_svv_b),
+    ! svv_m^ = svv_mh ('entropy') or -lambda m^ ('linear')
     if(svv_on) then
       wk_r = svv_r
       if (proc0) call put_time_stamp(timer_fft)
@@ -1231,6 +1326,7 @@ contains
       wk = wk/nlx/nly/nlz*merge(filter, 1.d0, filt_on(ilnrho))
       call btran_wk
       loc(ib_eps_svv) = loc(ib_eps_svv) + sum(dEds_r*wk_r)
+      loc(ib_A_svv  ) = loc(ib_A_svv  ) + sum(abs(dEds_r*wk_r))
       do n = imx, ibz
         do j = iky_st, iky_en
           do k = ikz_st, ikz_en
@@ -1238,9 +1334,16 @@ contains
               lrate = (eps_svv(1)*kq2x(i) + eps_svv(2)*kq2y(j) + eps_svv(3)*kq2z(k)) &
                      *merge(filter(i,k,j), 1.d0, filt_on(n))
               select case(n)
-                case(imx); wk(i,k,j) = -lrate*mx(i,k,j)
-                case(imy); wk(i,k,j) = -lrate*my(i,k,j)
-                case(imz); wk(i,k,j) = -lrate*mz(i,k,j)
+                case(imx:imz)
+                  if(svv_es) then
+                    wk(i,k,j) = svv_mh(i,k,j,n-imx+1)*merge(filter(i,k,j), 1.d0, filt_on(n))
+                  else
+                    select case(n)
+                      case(imx); wk(i,k,j) = -lrate*mx(i,k,j)
+                      case(imy); wk(i,k,j) = -lrate*my(i,k,j)
+                      case(imz); wk(i,k,j) = -lrate*mz(i,k,j)
+                    end select
+                  endif
                 case(ibx); wk(i,k,j) = -lrate*bx(i,k,j)
                 case(iby); wk(i,k,j) = -lrate*by(i,k,j)
                 case(ibz); wk(i,k,j) = -lrate*bz(i,k,j)
@@ -1250,14 +1353,16 @@ contains
         enddo
         call btran_wk
         select case(n)
-          case(imx); loc(ib_eps_svv) = loc(ib_eps_svv) + sum(ux_r*wk_r)
-          case(imy); loc(ib_eps_svv) = loc(ib_eps_svv) + sum(uy_r*wk_r)
-          case(imz); loc(ib_eps_svv) = loc(ib_eps_svv) + sum(uz_r*wk_r)
-          case(ibx); loc(ib_eps_svv) = loc(ib_eps_svv) + sum(w_r(:,:,:,ibx)*wk_r)
-          case(iby); loc(ib_eps_svv) = loc(ib_eps_svv) + sum(w_r(:,:,:,iby)*wk_r)
-          case(ibz); loc(ib_eps_svv) = loc(ib_eps_svv) + sum(w_r(:,:,:,ibz)*wk_r)
+          case(imx); loc(ib_eps_svv  ) = loc(ib_eps_svv  ) + sum(ux_r*wk_r); loc(ib_A_svv) = loc(ib_A_svv) + sum(abs(ux_r*wk_r))
+          case(imy); loc(ib_eps_svv  ) = loc(ib_eps_svv  ) + sum(uy_r*wk_r); loc(ib_A_svv) = loc(ib_A_svv) + sum(abs(uy_r*wk_r))
+          case(imz); loc(ib_eps_svv  ) = loc(ib_eps_svv  ) + sum(uz_r*wk_r); loc(ib_A_svv) = loc(ib_A_svv) + sum(abs(uz_r*wk_r))
+          case(ibx); loc(ib_eps_svv_b) = loc(ib_eps_svv_b) + sum(w_r(:,:,:,ibx)*wk_r)
+          case(iby); loc(ib_eps_svv_b) = loc(ib_eps_svv_b) + sum(w_r(:,:,:,iby)*wk_r)
+          case(ibz); loc(ib_eps_svv_b) = loc(ib_eps_svv_b) + sum(w_r(:,:,:,ibz)*wk_r)
         end select
       enddo
+      ! svv_diss is a local sum (get_svv_es); it is reduced with loc
+      if(svv_es) loc(ib_D_svv) = svv_diss
     endif
 
     ! Forcing: u.F^-1(P f^)
@@ -1307,6 +1412,7 @@ contains
     loc(ib_dMdt_abs) = dMdt_abs
     loc(ib_visc    ) = visc_diss
     loc(ib_R_zeta  ) = loc(ib_eps_shock) + visc_diss
+    if(svv_es) loc(ib_R_svv) = loc(ib_eps_svv) + loc(ib_D_svv)
 
     if(istage == 1) then
       t_bgt  = tt
@@ -1314,6 +1420,8 @@ contains
     endif
     bgt = bgt + b_rk(istage)*loc
     if(visc_diss > 0.d0) R_zeta_ratio_max = max(R_zeta_ratio_max, abs(loc(ib_R_zeta))/visc_diss)
+    if(loc(ib_D_svv) > 0.d0) R_svv_ratio_max = max(R_svv_ratio_max, abs(loc(ib_R_svv))/loc(ib_D_svv))
+    if(svv_es .and. loc(ib_A_svv) > 0.d0) R_svv_scale_max = max(R_svv_scale_max, abs(loc(ib_R_svv))/loc(ib_A_svv))
     if(istage == 3) bgt_pending = .true.
 
     deallocate(wk, wk_r, dEds_r)
@@ -1348,19 +1456,23 @@ contains
     dMdt_act  = (mon_np1(imon_M) - mon_n(imon_M))/dt_bgt
     dEdt_act  = (E_np1 - E_n)/dt_bgt
     dEdt_sum  = bgt(ib_eps_N) + bgt(ib_eps_res) + bgt(ib_eps_nu) + bgt(ib_eps_lmd)
-    eps_ideal = bgt(ib_eps_N) - bgt(ib_eps_shock) - bgt(ib_eps_force) - bgt(ib_eps_svv)
+    eps_ideal = bgt(ib_eps_N) - bgt(ib_eps_shock) - bgt(ib_eps_force) - bgt(ib_eps_svv) - bgt(ib_eps_svv_b)
 
     if(proc0) then
       write (unit=budget_unit, fmt="(100es26.17e3)") t_bgt, dt_bgt, &
             dMdt_act, bgt(ib_dMdt_raw), bgt(ib_dMdt_proj), bgt(ib_dMdt_abs), &
             dEdt_act, dEdt_sum, dEdt_act - dEdt_sum, &
             eps_ideal, bgt(ib_eps_shock), -bgt(ib_visc), bgt(ib_R_zeta), R_zeta_ratio_max, &
-            bgt(ib_eps_force), bgt(ib_eps_res), bgt(ib_eps_nu), bgt(ib_eps_lmd), E_n, E_np1, bgt(ib_eps_svv)
+            bgt(ib_eps_force), bgt(ib_eps_res), bgt(ib_eps_nu), bgt(ib_eps_lmd), E_n, E_np1, &
+            bgt(ib_eps_svv) + bgt(ib_eps_svv_b), bgt(ib_eps_svv_b), -bgt(ib_D_svv), bgt(ib_R_svv), R_svv_ratio_max, &
+            R_svv_scale_max
       call flush(budget_unit)
     endif
 
     bgt = 0.d0
     R_zeta_ratio_max = 0.d0
+    R_svv_ratio_max  = 0.d0
+    R_svv_scale_max  = 0.d0
     bgt_pending = .false.
 
   end subroutine write_budget
@@ -1633,6 +1745,7 @@ contains
   subroutine allocate_advance
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use shock_viscosity, only: svv_es
     implicit none
     complex(r8), allocatable, dimension(:,:,:) :: src
     real   (r8), allocatable, dimension(:,:,:) :: src_r
@@ -1668,6 +1781,10 @@ contains
     allocate(zeta_r, source=src_r)
     allocate(q_r   , source=src_r)
     allocate(svv_r , source=src_r)
+    if(svv_es) then
+      allocate(svv_mh(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, 3), source=(0.d0, 0.d0))
+      allocate(svv_uh(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, 3), source=(0.d0, 0.d0))
+    endif
 
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
     !v                For eSSPIFRK3                v!
@@ -1723,6 +1840,8 @@ contains
     deallocate(zeta_r)
     deallocate(q_r   )
     deallocate(svv_r )
+    if(allocated(svv_mh)) deallocate(svv_mh)
+    if(allocated(svv_uh)) deallocate(svv_uh)
 
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
     !v                For eSSPIFRK3                v!

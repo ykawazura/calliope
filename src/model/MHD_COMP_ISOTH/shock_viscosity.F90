@@ -23,15 +23,37 @@
 !!          filter applied to the momentum (identity if filter_mom = F).
 !!
 !!          Spectral vanishing viscosity (Tadmor 1989; Maday, Ould Kaber
-!!          & Tadmor 1993) is also set up here. Its rate is
-!!            lambda(k) = sum_d eps_d k_d^2 Q(|k_d|),
-!!            eps_d = svv_eps0*dl_d*max(|u_d| + cf_d)   (active d only),
+!!          & Tadmor 1993) is also set up here. Its kernel and coefficients are
 !!            Q = 0                                for |k_d| <= m_N,
 !!                exp(-((|k_d| - k_c)/(|k_d| - m_N))^2) for m_N < |k_d| < k_c,
 !!                1 (svv_above_kc = T) or 0 (F)    for |k_d| >= k_c,
+!!            eps_d = svv_eps0*dl_d*max(|u_d| + cf_d)   (active d only),
 !!          with k_c,d = 2/3 of the Nyquist wavenumber (the edge of the
 !!          dealiasing filter) and m_N = svv_mN*k_c,d. Here k_d is the
 !!          wavenumber itself (the Nyquist mode is damped).
+!!          B: dB^/dt = -lambda(k) B^, lambda(k) = sum_d eps_d k_d^2 Q(|k_d|).
+!!          rho and m, svv_form = 'linear': the same -lambda(k) on m^ and,
+!!            in the mass-conserving form, on rho^ (the energy rate is not
+!!            sign-definite).
+!!          rho and m, svv_form = 'entropy': flux form in the entropy
+!!            variables w = (cs^2 s - u^2/2, u) (get_svv_es),
+!!              A_L,d = F^-1 sig_d M F,  A_H,d = F^-1 sig_d (1 - M) F,
+!!              sig_d = i k_d sqrt(Q) (|k_d| sqrt(Q) at Nyquist, so that A
+!!                      maps a real field to a real field),
+!!              g_r = A_L,d w_r, g_m = A_L,d u, g_h = A_H,d w_r,
+!!              f_r = a t, t = g_r + u.g_m, f_m = u f_r + b g_m, f_h = kap rho g_h,
+!!              a = eps_d rho/cs^2, b = eps_d rho, kap = eps_d/(cs^2 + max|u|^2),
+!!              d rho/dt = -sum_d (A_L,d^* f_r + A_H,d^* f_h),
+!!              dm/dt    = -sum_d  A_L,d^* f_m,
+!!            where M is the filter of m (identity if filter_mom = F; then
+!!            A_H = 0; M is 0 or 1, so the filter of m after each stage
+!!            leaves dm/dt unchanged). Then sum d rho/dt = sum dm/dt = 0 (sig_d = 0 at
+!!            k_d = 0) and dE/dt = -D_svv with
+!!              D_svv = sum_d sum [a t^2 + b |g_m|^2 + kap rho g_h^2] dV >= 0
+!!            for any state, if the s tendency is not filtered
+!!            (filter_lnrho = F). The explicit step is limited by the
+!!            largest |eigenvalue| of the Jacobian of this term, estimated by
+!!            the power method (svv_power).
 !-----------------------------------------------!
 module shock_viscosity
   use p3dfft
@@ -45,6 +67,7 @@ module shock_viscosity
   public delta_shock, active_x, active_y, active_z
   public is_nonfinite, abort_run
   public svv_on, kq2x, kq2y, kq2z, svv_lam_m, svv_lam_s, svv_lam_b, get_svv_eps
+  public svv_es, get_svv_es, svv_power, svv_lam
 
   logical  :: initialized = .false.
   real(r8), allocatable :: kx_d(:), ky_d(:), kz_d(:) ! wavenumbers for derivatives (0 at Nyquist)
@@ -58,6 +81,10 @@ module shock_viscosity
   logical  :: svv_on = .false.
   real(r8), allocatable :: kq2x(:), kq2y(:), kq2z(:) ! k_d^2 Q(|k_d|); 0 in inactive directions
   real(r8) :: svv_lam_m(3), svv_lam_s(3), svv_lam_b(3) ! max_k k_d^2 Q over the modes kept in m, ln rho and B
+  logical  :: svv_es = .false.                        ! svv_form = 'entropy'
+  complex(r8), allocatable :: sgx(:), sgy(:), sgz(:)  ! sig_d = i k_d sqrt(Q) (|k_d| sqrt(Q) at Nyquist); 0 if inactive
+  real(r8) :: svv_lam = 0.d0                          ! power-method estimate of the largest |eigenvalue| (svv_power)
+  real(r8), allocatable :: pi_v(:,:,:,:)              ! power-method vector (s, mx, my, mz) in real space
 
 contains
 
@@ -79,7 +106,7 @@ contains
     use mp, only: proc0, max_allreduce
     use grid, only: kx_max_noprune, ky_max_noprune, kz_max_noprune
     use params, only: C_shock, shock_dl, shock_nmax, shock_nsmooth, filter_mom, shock_selftest
-    use params, only: svv_eps0, svv_mN, svv_above_kc, filter_lnrho, filter_mag
+    use params, only: svv_eps0, svv_mN, svv_above_kc, filter_lnrho, filter_mag, svv_form, cfl_svv
     implicit none
     real(r8) :: kmx2, kmy2, kmz2, mfilt, sfilt, bfilt
     integer :: i, j, k
@@ -144,6 +171,11 @@ contains
     call svv_kernel(kx, kx_max_noprune, active_x, kq2x)
     call svv_kernel(ky, ky_max_noprune, active_y, kq2y)
     call svv_kernel(kz, kz_max_noprune, active_z, kq2z)
+    svv_es = svv_on .and. trim(svv_form) == 'entropy'
+    allocate(sgx(size(kx)), sgy(size(ky)), sgz(size(kz)))
+    call svv_symbol(kx, ikx, nlx, kq2x, sgx)
+    call svv_symbol(ky, iky, nly, kq2y, sgy)
+    call svv_symbol(kz, ikz, nlz, kq2z, sgz)
     svv_lam_m = 0.d0
     svv_lam_s = 0.d0
     svv_lam_b = 0.d0
@@ -185,6 +217,11 @@ contains
                &", Q(|k| >= k_c) = ", i2)', svv_eps0, svv_mN, merge(1, 0, svv_above_kc)
         print '("                   max k_d^2 Q (x, y, z) in m: ", 3es12.4, ", in ln rho: ", 3es12.4)', &
                svv_lam_m, svv_lam_s
+        if(svv_es) then
+          print '("                   rho and m: entropy-stable flux form, cfl_svv = ", es12.4)', cfl_svv
+        else
+          print '("                   rho and m: linear form, -lambda(k)")'
+        endif
       else
         print '("  spectral vanishing viscosity: off")'
       endif
@@ -233,6 +270,33 @@ contains
 !-----------------------------------------------!
 !> @author  YK
 !! @date    31 Oct 2026
+!! @brief   sig = i k sqrt(Q) of the entropy-stable
+!!          SVV for one direction, from kq2 = k^2 Q
+!!          (real |k| sqrt(Q) at Nyquist; 0 if the
+!!          direction is inactive, where kq2 = 0)
+!-----------------------------------------------!
+  subroutine svv_symbol(k, ik, nl, kq2, sg)
+    use params, only: zi
+    implicit none
+    real(r8)   , intent(in ) :: k(:), kq2(:)
+    integer    , intent(in ) :: ik(:), nl
+    complex(r8), intent(out) :: sg(:)
+    integer :: i
+
+    do i = 1, size(k)
+      if(abs(ik(i)) == nl/2) then
+        sg(i) = sqrt(kq2(i))
+      else
+        sg(i) = zi*sign(sqrt(kq2(i)), k(i))
+      endif
+    enddo
+
+  end subroutine svv_symbol
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    31 Oct 2026
 !! @brief   SVV coefficients eps_d = svv_eps0*dl_d
 !!          *vmax_d (active d), vmax_d = max(|u_d| + cf_d)
 !-----------------------------------------------!
@@ -257,9 +321,10 @@ contains
 !! @date    31 Oct 2026
 !! @brief   D = div_N u = F^-1 i k_d M F u
 !!          kxd(ikx, iky) is the x-wavenumber
-!!          (sheared when shear = T)
+!!          (sheared when shear = T).
+!!          uh (optional): F u/(nlx nly nlz)
 !-----------------------------------------------!
-  subroutine get_div_u(ux_r, uy_r, uz_r, kxd, div_r)
+  subroutine get_div_u(ux_r, uy_r, uz_r, kxd, div_r, uh)
     use grid, only: nlx, nly, nlz
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
@@ -271,6 +336,7 @@ contains
     real(r8), dimension(ily_st:, ilz_st:, ilx_st:), intent(in ) :: ux_r, uy_r, uz_r
     real(r8), dimension(ikx_st:, iky_st:)         , intent(in ) :: kxd
     real(r8), dimension(ily_st:, ilz_st:, ilx_st:), intent(out) :: div_r
+    complex(r8), dimension(ikx_st:, ikz_st:, iky_st:, :), intent(out), optional :: uh
     real(r8)   , allocatable, dimension(:,:,:) :: f_r
     complex(r8), allocatable, dimension(:,:,:) :: ux, uy, uz, divu
     real(r8) :: mfilt
@@ -287,6 +353,12 @@ contains
     f_r = uy_r; call p3dfft_ftran_r2c(f_r, uy, 'fft')
     f_r = uz_r; call p3dfft_ftran_r2c(f_r, uz, 'fft')
     if (proc0) call put_time_stamp(timer_fft)
+
+    if(present(uh)) then
+      uh(:,:,:,1) = ux/nlx/nly/nlz
+      uh(:,:,:,2) = uy/nlx/nly/nlz
+      uh(:,:,:,3) = uz/nlx/nly/nlz
+    endif
 
     do j = iky_st, iky_en
       do k = ikz_st, ikz_en
@@ -305,6 +377,391 @@ contains
     deallocate(f_r, ux, uy, uz, divu)
 
   end subroutine get_div_u
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    31 Oct 2026
+!! @brief   Entropy-stable SVV of rho and m for the
+!!          coefficients eps (module header):
+!!          rdot_r = d rho/dt (real space),
+!!          mdh    = dm/dt (Fourier, normalized as
+!!                   the state; filtered by M),
+!!          dsum   = local sum of a t^2 + b |g_m|^2
+!!                   + kap rho g_h^2 (>= 0) over the
+!!                   grid points and the directions.
+!!          uh (optional): F u/(nlx nly nlz); it is
+!!          computed here if absent.
+!-----------------------------------------------!
+  subroutine get_svv_es(s_r, rho_r, ux_r, uy_r, uz_r, eps, rdot_r, mdh, dsum, uh)
+    use grid, only: nlx, nly, nlz
+    use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use mp, only: proc0
+    use time_stamp, only: put_time_stamp, timer_fft
+    implicit none
+    real(r8), dimension(ily_st:, ilz_st:, ilx_st:), intent(in ) :: s_r, rho_r, ux_r, uy_r, uz_r
+    real(r8), intent(in ) :: eps(3)
+    real(r8), dimension(ily_st:, ilz_st:, ilx_st:), intent(out) :: rdot_r
+    complex(r8), dimension(ikx_st:, ikz_st:, iky_st:, :), intent(out) :: mdh
+    real(r8), intent(out) :: dsum
+    complex(r8), dimension(ikx_st:, ikz_st:, iky_st:, :), intent(in), optional :: uh
+    real(r8)   , allocatable, dimension(:,:,:)   :: f_r
+    complex(r8), allocatable, dimension(:,:,:,:) :: uh_loc
+
+    if(present(uh)) then
+      call svv_es_core(s_r, rho_r, ux_r, uy_r, uz_r, uh, eps, rdot_r, mdh, dsum)
+    else
+      allocate(f_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en))
+      allocate(uh_loc(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, 3))
+      if (proc0) call put_time_stamp(timer_fft)
+      f_r = ux_r; call p3dfft_ftran_r2c(f_r, uh_loc(:,:,:,1), 'fft')
+      f_r = uy_r; call p3dfft_ftran_r2c(f_r, uh_loc(:,:,:,2), 'fft')
+      f_r = uz_r; call p3dfft_ftran_r2c(f_r, uh_loc(:,:,:,3), 'fft')
+      if (proc0) call put_time_stamp(timer_fft)
+      uh_loc = uh_loc/nlx/nly/nlz
+      call svv_es_core(s_r, rho_r, ux_r, uy_r, uz_r, uh_loc, eps, rdot_r, mdh, dsum)
+      deallocate(f_r, uh_loc)
+    endif
+
+  end subroutine get_svv_es
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    31 Oct 2026
+!! @brief   Body of get_svv_es. Per active
+!!          direction: 4 (5 with A_H) inverse and
+!!          4 (5) forward FFTs; in addition 1
+!!          forward (w_r) and 1 inverse (d rho/dt).
+!-----------------------------------------------!
+  subroutine svv_es_core(s_r, rho_r, ux_r, uy_r, uz_r, uh, eps, rdot_r, mdh, dsum)
+    use grid, only: nlx, nly, nlz
+    use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use dealias, only: filter
+    use params, only: cs2va2, filter_mom
+    use mp, only: proc0, max_allreduce
+    use time_stamp, only: put_time_stamp, timer_fft
+    implicit none
+    real(r8), dimension(ily_st:, ilz_st:, ilx_st:), intent(in ) :: s_r, rho_r, ux_r, uy_r, uz_r
+    complex(r8), dimension(ikx_st:, ikz_st:, iky_st:, :), intent(in ) :: uh
+    real(r8), intent(in ) :: eps(3)
+    real(r8), dimension(ily_st:, ilz_st:, ilx_st:), intent(out) :: rdot_r
+    complex(r8), dimension(ikx_st:, ikz_st:, iky_st:, :), intent(out) :: mdh
+    real(r8), intent(out) :: dsum
+    real(r8)   , allocatable, dimension(:,:,:)   :: gr, gh
+    real(r8)   , allocatable, dimension(:,:,:,:) :: gm
+    complex(r8), allocatable, dimension(:,:,:)   :: wh, fh, rdh
+    real(r8) :: umax2, a, b, kap, t
+    integer  :: i, j, k, c, d
+
+    allocate(gr(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en))
+    allocate(gh, mold=gr)
+    allocate(gm(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, 3))
+    allocate(wh(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
+    allocate(fh , mold=wh)
+    allocate(rdh, mold=wh)
+
+    umax2 = maxval(ux_r**2 + uy_r**2 + uz_r**2)
+    call max_allreduce(umax2)
+
+    ! w_r = cs^2 s - u^2/2
+    gr = cs2va2*s_r - 0.5d0*(ux_r**2 + uy_r**2 + uz_r**2)
+    if (proc0) call put_time_stamp(timer_fft)
+    call p3dfft_ftran_r2c(gr, wh, 'fft')
+    if (proc0) call put_time_stamp(timer_fft)
+    wh = wh/nlx/nly/nlz
+
+    rdh  = 0.d0
+    mdh  = 0.d0
+    dsum = 0.d0
+    do d = 1, 3
+      if(eps(d) == 0.d0) cycle ! inactive direction or svv off
+
+      ! gradients g_r = A_L w_r, g_m = A_L u, g_h = A_H w_r
+      call grad(wh, .true., gr)
+      do c = 1, 3
+        call grad(uh(:,:,:,c), .true., gm(:,:,:,c))
+      enddo
+      if(filter_mom) call grad(wh, .false., gh)
+
+      ! fluxes (overwrite the gradients) and the dissipation density
+      kap = eps(d)/(cs2va2 + umax2)
+      do i = ilx_st, ilx_en
+        do k = ilz_st, ilz_en
+          do j = ily_st, ily_en
+            a = eps(d)*rho_r(j,k,i)/cs2va2
+            b = eps(d)*rho_r(j,k,i)
+            t = gr(j,k,i) + ux_r(j,k,i)*gm(j,k,i,1) + uy_r(j,k,i)*gm(j,k,i,2) + uz_r(j,k,i)*gm(j,k,i,3)
+            dsum = dsum + a*t**2 + b*(gm(j,k,i,1)**2 + gm(j,k,i,2)**2 + gm(j,k,i,3)**2)
+            gr(j,k,i) = a*t
+            gm(j,k,i,1) = ux_r(j,k,i)*gr(j,k,i) + b*gm(j,k,i,1)
+            gm(j,k,i,2) = uy_r(j,k,i)*gr(j,k,i) + b*gm(j,k,i,2)
+            gm(j,k,i,3) = uz_r(j,k,i)*gr(j,k,i) + b*gm(j,k,i,3)
+          enddo
+        enddo
+      enddo
+      if(filter_mom) then
+        dsum = dsum + sum(kap*rho_r*gh**2)
+        gh = kap*rho_r*gh
+      endif
+
+      ! adjoints: d rho/dt -= A_L^* f_r + A_H^* f_h, dm/dt -= A_L^* f_m
+      call grad_adj(gr, .true.)
+      rdh = rdh - fh
+      if(filter_mom) then
+        call grad_adj(gh, .false.)
+        rdh = rdh - fh
+      endif
+      do c = 1, 3
+        call grad_adj(gm(:,:,:,c), .true.)
+        mdh(:,:,:,c) = mdh(:,:,:,c) - fh
+      enddo
+    enddo
+
+    if (proc0) call put_time_stamp(timer_fft)
+    call p3dfft_btran_c2r(rdh, rdot_r, 'tff')
+    if (proc0) call put_time_stamp(timer_fft)
+
+    deallocate(gr, gh, gm, wh, fh, rdh)
+
+  contains
+
+    ! y = F^-1 sig_d mf x, mf = M (low = T) or 1 - M (low = F); fh is the work array
+    subroutine grad(x, low, y)
+      complex(r8), dimension(ikx_st:, ikz_st:, iky_st:), intent(in ) :: x
+      logical, intent(in) :: low
+      real(r8), dimension(ily_st:, ilz_st:, ilx_st:), intent(out) :: y
+      fh = x
+      call mult_sig(low, .false.)
+      if (proc0) call put_time_stamp(timer_fft)
+      call p3dfft_btran_c2r(fh, y, 'tff')
+      if (proc0) call put_time_stamp(timer_fft)
+    end subroutine grad
+
+    ! fh = conj(sig_d) mf F y/(nlx nly nlz) (y is destroyed)
+    subroutine grad_adj(y, low)
+      real(r8), dimension(ily_st:, ilz_st:, ilx_st:), intent(inout) :: y
+      logical, intent(in) :: low
+      if (proc0) call put_time_stamp(timer_fft)
+      call p3dfft_ftran_r2c(y, fh, 'fft')
+      if (proc0) call put_time_stamp(timer_fft)
+      fh = fh/nlx/nly/nlz
+      call mult_sig(low, .true.)
+    end subroutine grad_adj
+
+    ! fh <- sig_d mf fh (conj(sig_d) for adj = T)
+    subroutine mult_sig(low, adj)
+      logical, intent(in) :: low, adj
+      complex(r8) :: sg
+      real(r8) :: mf
+      integer  :: i, j, k
+
+      do j = iky_st, iky_en
+        do k = ikz_st, ikz_en
+          do i = ikx_st, ikx_en
+            select case(d)
+              case(1); sg = sgx(i)
+              case(2); sg = sgy(j)
+              case(3); sg = sgz(k)
+            end select
+            if(adj) sg = conjg(sg)
+            mf = merge(filter(i,k,j), 1.d0, filter_mom)
+            if(.not. low) mf = 1.d0 - mf
+            fh(i,k,j) = sg*mf*fh(i,k,j)
+          enddo
+        enddo
+      enddo
+    end subroutine mult_sig
+
+  end subroutine svv_es_core
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    31 Oct 2026
+!! @brief   SVV tendency of the state (s, m) with
+!!          eps fixed: Gs = (d rho/dt)/rho,
+!!          Gm = dm/dt (real space)
+!-----------------------------------------------!
+  subroutine svv_G(s_r, mx_r, my_r, mz_r, eps, Gs, Gm)
+    use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use mp, only: proc0
+    use time_stamp, only: put_time_stamp, timer_fft
+    implicit none
+    real(r8), dimension(ily_st:, ilz_st:, ilx_st:), intent(in ) :: s_r, mx_r, my_r, mz_r
+    real(r8), intent(in ) :: eps(3)
+    real(r8), dimension(ily_st:, ilz_st:, ilx_st:)   , intent(out) :: Gs
+    real(r8), dimension(ily_st:, ilz_st:, ilx_st:, :), intent(out) :: Gm
+    real(r8)   , allocatable, dimension(:,:,:)   :: rho_r, ux_r, uy_r, uz_r
+    complex(r8), allocatable, dimension(:,:,:,:) :: mdh
+    real(r8) :: dsum
+    integer  :: c
+
+    allocate(rho_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en))
+    allocate(ux_r, mold=rho_r)
+    allocate(uy_r, mold=rho_r)
+    allocate(uz_r, mold=rho_r)
+    allocate(mdh(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, 3))
+
+    rho_r = exp(s_r)
+    ux_r  = mx_r/rho_r
+    uy_r  = my_r/rho_r
+    uz_r  = mz_r/rho_r
+    call get_svv_es(s_r, rho_r, ux_r, uy_r, uz_r, eps, Gs, mdh, dsum)
+    Gs = Gs/rho_r
+    if (proc0) call put_time_stamp(timer_fft)
+    do c = 1, 3
+      call p3dfft_btran_c2r(mdh(:,:,:,c), Gm(:,:,:,c), 'tff')
+    enddo
+    if (proc0) call put_time_stamp(timer_fft)
+
+    deallocate(rho_r, ux_r, uy_r, uz_r, mdh)
+
+  end subroutine svv_G
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    31 Oct 2026
+!! @brief   Power method for svv_lam, the largest
+!!          |eigenvalue| of the Jacobian J of
+!!          G(s, m) = ((d rho/dt)/rho, dm/dt) of the
+!!          entropy-stable SVV with eps fixed:
+!!            J v = (G(U + h v) - G(U))/h, h = 1e-7,
+!!            v <- J v/|v|, svv_lam = |J v|/|v|,
+!!          |v|^2 = sum (v_s^2 + |v_m|^2)/(nlx nly nlz).
+!!          The vector is kept between calls (not
+!!          across a restart). Its initial value is a
+!!          fixed function of the global grid index,
+!!          so that it does not depend on the
+!!          decomposition. niter iterations at most
+!!          (max(niter, svv_pi_init) when the vector is
+!!          initialized); with tol > 0 it stops when
+!!          two successive estimates of this call agree
+!!          within tol (relative). nit: iterations
+!!          done; conv: the tol test was met.
+!!          G(U) is given by rdot0_r (d rho/dt) and
+!!          mdh0 (dm/dt, Fourier) of get_svv_es.
+!-----------------------------------------------!
+  subroutine svv_power(s_r, rho_r, mx_r, my_r, mz_r, eps, rdot0_r, mdh0, niter, tol, nit, conv)
+    use grid, only: nlx, nly, nlz
+    use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use params, only: pi, svv_pi_init
+    use mp, only: proc0, sum_allreduce
+    use time_stamp, only: put_time_stamp, timer_fft
+    implicit none
+    real(r8), dimension(ily_st:, ilz_st:, ilx_st:), intent(in) :: s_r, rho_r, mx_r, my_r, mz_r, rdot0_r
+    complex(r8), dimension(ikx_st:, ikz_st:, iky_st:, :), intent(in) :: mdh0
+    real(r8), intent(in ) :: eps(3), tol
+    integer , intent(in ) :: niter
+    integer , intent(out) :: nit
+    logical , intent(out) :: conv
+    real(r8), parameter :: h = 1.d-7
+    real(r8)   , allocatable, dimension(:,:,:)   :: G0s, Gs, ps
+    real(r8)   , allocatable, dimension(:,:,:,:) :: G0m, Gm, pm
+    complex(r8), allocatable, dimension(:,:,:)   :: wk
+    real(r8) :: amp, nv, lam, lam_old
+    integer  :: i, j, k, c, it, nmax, nsg
+
+    nit  = 0
+    conv = .false.
+    if(all(eps == 0.d0)) then
+      svv_lam = 0.d0
+      return
+    endif
+
+    allocate(G0s(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en))
+    allocate(Gs, mold=G0s)
+    allocate(ps, mold=G0s)
+    allocate(G0m(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, 3))
+    allocate(Gm , mold=G0m)
+    allocate(pm , mold=G0m)
+    allocate(wk(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
+
+    nmax = niter
+    if(.not. allocated(pi_v)) then
+      nmax = max(niter, svv_pi_init)
+      ! (-1)^(sum_d (i_d - 1)) (1 + 0.3 sum_d cos(2 pi (i_d - 1)/nl_d + 1)) in s, 0 in m, sums over the
+      ! active directions d: with nl_d = 2 the modes (-1)^(i_d - 1) of an inactive direction are not coupled
+      ! by J to the fields uniform in it, and their stiffness is lower (M = 0 there, so only A_H acts)
+      allocate(pi_v(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, 4))
+      pi_v = 0.d0
+      do i = ilx_st, ilx_en
+        do k = ilz_st, ilz_en
+          do j = ily_st, ily_en
+            amp = 1.d0
+            nsg = 0
+            if(active_x) then
+              amp = amp + 0.3d0*cos(2.d0*pi*dble(i - 1)/dble(nlx) + 1.d0)
+              nsg = nsg + i - 1
+            endif
+            if(active_y) then
+              amp = amp + 0.3d0*cos(2.d0*pi*dble(j - 1)/dble(nly) + 1.d0)
+              nsg = nsg + j - 1
+            endif
+            if(active_z) then
+              amp = amp + 0.3d0*cos(2.d0*pi*dble(k - 1)/dble(nlz) + 1.d0)
+              nsg = nsg + k - 1
+            endif
+            pi_v(j,k,i,1) = merge(1.d0, -1.d0, mod(nsg, 2) == 0)*amp
+          enddo
+        enddo
+      enddo
+    endif
+
+    ! G(U)
+    G0s = rdot0_r/rho_r
+    do c = 1, 3
+      wk = mdh0(:,:,:,c)
+      if (proc0) call put_time_stamp(timer_fft)
+      call p3dfft_btran_c2r(wk, G0m(:,:,:,c), 'tff')
+      if (proc0) call put_time_stamp(timer_fft)
+    enddo
+
+    lam_old = 0.d0
+    lam     = 0.d0
+    do it = 1, nmax
+      nv = norm()
+      if(nv == 0.d0) then
+        ! J v = 0 (degenerate); restart from the initial vector at the next call
+        deallocate(pi_v)
+        lam = 0.d0
+        exit
+      endif
+      pi_v = pi_v/nv
+      ps = s_r + h*pi_v(:,:,:,1)
+      pm(:,:,:,1) = mx_r + h*pi_v(:,:,:,2)
+      pm(:,:,:,2) = my_r + h*pi_v(:,:,:,3)
+      pm(:,:,:,3) = mz_r + h*pi_v(:,:,:,4)
+      call svv_G(ps, pm(:,:,:,1), pm(:,:,:,2), pm(:,:,:,3), eps, Gs, Gm)
+      pi_v(:,:,:,1) = (Gs - G0s)/h
+      do c = 1, 3
+        pi_v(:,:,:,c+1) = (Gm(:,:,:,c) - G0m(:,:,:,c))/h
+      enddo
+      lam  = norm()
+      nit  = it
+      conv = tol > 0.d0 .and. it > 1 .and. abs(lam - lam_old) <= tol*lam
+      lam_old = lam
+      if(conv) exit
+    enddo
+    svv_lam = lam
+
+    deallocate(G0s, Gs, ps, G0m, Gm, pm, wk)
+
+  contains
+
+    real(r8) function norm()
+      real(r8) :: ss
+      ss = sum(pi_v**2)
+      call sum_allreduce(ss)
+      norm = sqrt(ss/(dble(nlx)*dble(nly)*dble(nlz)))
+    end function norm
+
+  end subroutine svv_power
 
 
 !-----------------------------------------------!

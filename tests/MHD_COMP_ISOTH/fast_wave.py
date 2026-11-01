@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Frequency and damping of the fast eigenmode (kx = kz = 1) from calliope.modes.out.
+"""Frequency and damping of the fast eigenmode (kx = kz = 1) from <input name>.modes.out.
 
     python3 fast_wave.py <run_dir> [...]
 
@@ -9,6 +9,7 @@ omega_fit, the theoretical omega = sqrt(2 + sqrt 2) (cs = vA = 1, k^2 = 2, k at 
 """
 import sys
 import os
+import glob
 import math
 import numpy as np
 
@@ -16,8 +17,12 @@ OMEGA = math.sqrt(2.0 + math.sqrt(2.0))
 
 
 def fit(run, field='mx', k=(1.0, 0.0, 1.0)):
+    # <input name>.modes.out: calliope.modes.out, or calliope_run.modes.out for job.pbs-ps-fes-dev
+    files = glob.glob(os.path.join(run, '*.modes.out'))
+    if len(files) != 1:
+        raise SystemExit('%s: expected one *.modes.out, found %d' % (run, len(files)))
     t, a = [], []
-    with open(os.path.join(run, 'calliope.modes.out')) as f:
+    with open(files[0]) as f:
         for line in f:
             w = line.split()
             if w[1] != field or tuple(float(x) for x in w[2:5]) != k:

@@ -10,7 +10,8 @@
 
 The star region is |x - 3L/4| < 0.5 t (rarefaction star, rho* = e^-4); grid-scale noise is measured with
 the local high-pass hp (4th difference, unit gain at k = k_c), not with a spectral band (sinc tails of the shocks).
-dt is the Fortran shock batch's (gen_stage1.py: SAFETY*DT512*512/N)."""
+The SVV is svv_form = 'linear' (the form before the entropy-stable SVV, whose U4 results these diagnose),
+and dt is that of its Fortran shock batch (gen_stage1.py: SAFETY*DT512_LINEAR*512/N)."""
 import sys
 import os
 import math
@@ -20,6 +21,7 @@ from proto1d import Isoth1D
 
 DT_U4_512 = 0.7 * 2.982e-4
 RHO_STAR = math.exp(-4.0)
+LINEAR = dict(svv_form='linear')
 
 
 def hp(f):
@@ -76,7 +78,7 @@ def advance_to(p, t_out, dt):
 def cause(N, tags):
     dt = DT_U4_512 * 512 / N
     for tag in tags or ['default', 'zmask', 'smoothcoll']:
-        p = (ZMask if tag == 'zmask' else Isoth1D)(N)
+        p = (ZMask if tag == 'zmask' else Isoth1D)(N, **LINEAR)
         # smoothcoll: tanh width N/(2 pi) cells = 1 in x at the collision (no shock before t ~ 0.25)
         p.riemann(1.0, 1.0, 4.0, -4.0, width=(N / (2 * math.pi) if tag == 'smoothcoll' else 1.0), width2=1.0)
         for t_out in ((0.2,) if tag == 'smoothcoll' else (0.2, 0.4)):
@@ -92,7 +94,7 @@ def remote(Ns):
     """The RHS of m and s is linear in the field it acts on once (rho, u, q) are fixed:
     RHS[W f] + RHS[(1 - W) f] = RHS[f]. The far part (1 - W) reaches the star only through spectral nonlocality."""
     for N in Ns:
-        p = Isoth1D(N)
+        p = Isoth1D(N, **LINEAR)
         p.riemann(1.0, 1.0, 4.0, -4.0)
         L, dt = p.L, DT_U4_512 * 512 / N
         x0 = 0.75 * L
@@ -119,7 +121,7 @@ def remote(Ns):
 
 
 def onset(N, tag):
-    p = Taper(N) if tag == 'taper' else Isoth1D(N)
+    p = Taper(N, **LINEAR) if tag == 'taper' else Isoth1D(N, **LINEAR)
     p.riemann(1.0, 1.0, 4.0, -4.0, width=N / (2 * math.pi), width2=1.0)
     dt = DT_U4_512 * 512 / N
     for j in range(1, 21):
@@ -136,7 +138,7 @@ def onset(N, tag):
 def taper(N, tags):
     dt = DT_U4_512 * 512 / N
     for tag in tags or ['taper']:
-        p = Taper(N) if tag == 'taper' else Isoth1D(N)
+        p = Taper(N, **LINEAR) if tag == 'taper' else Isoth1D(N, **LINEAR)
         p.riemann(1.0, 1.0, 4.0, -4.0)
         for t_out in (0.2, 0.4):
             if not advance_to(p, t_out, dt):
@@ -147,7 +149,7 @@ def taper(N, tags):
 
 def fsmass(which):
     q1 = which == 'Q1'
-    p = Isoth1D(1024, filter_s=True, svv_above_kc=q1)
+    p = Isoth1D(1024, filter_s=True, svv_above_kc=q1, **LINEAR)
     p.riemann(1.0, 1.0, 2.0, -2.0)
     dt = 0.7 * 5.665e-4 * 0.5
     status = p.run(dt, int(round(0.4 / dt)), stop_on_cfl=False)
@@ -162,7 +164,7 @@ def svvsplit():
              'Sod': (10.0, 1.0, 0.0, 0.0, 1.124e-3)}
     N = 1024
     for name, (rL, rR, uL, uR, dt512) in cases.items():
-        p = Isoth1D(N)
+        p = Isoth1D(N, **LINEAR)
         p.riemann(rL, rR, uL, uR)
         dt = 0.7 * dt512 * 512 / N
         for t_out in (0.05, 0.2, 0.4):

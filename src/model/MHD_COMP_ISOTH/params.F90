@@ -25,7 +25,7 @@ module params
   public  filter_lnrho, filter_mom, filter_mag
   public  cfl_visc, mass_correction, s_abort, debug_nan_step
   public  C_shock, shock_nmax, shock_nsmooth, shock_dl, shock_selftest
-  public  svv_eps0, svv_mN, svv_above_kc
+  public  svv_eps0, svv_mN, svv_above_kc, svv_form, cfl_svv, svv_pi_init, svv_pi_check
   public  write_intvl_1D, write_intvl_cons, budget
   private read_parameters
 
@@ -53,11 +53,17 @@ module params
   real(r8) :: shock_dl           ! Delta; <= 0 means min of the grid spacing in the active directions
   logical  :: shock_selftest     ! write zeta of an analytic D (shock_selftest.dat) for the decomposition test
 
-  ! spectral vanishing viscosity (Tadmor 1989): rate lambda(k) = sum_d eps_d k_d^2 Q(|k_d|),
-  ! eps_d = svv_eps0*dl_d*max(|u_d| + cf_d); applied to m, B and (mass-conserving) to rho
+  ! spectral vanishing viscosity (Tadmor 1989) with the kernel Q(|k_d|) and eps_d = svv_eps0*dl_d*max(|u_d| + cf_d)
+  ! (see shock_viscosity); B: rate lambda(k) = sum_d eps_d k_d^2 Q(|k_d|)
   real(r8) :: svv_eps0           ! <= 0: off
   real(r8) :: svv_mN             ! Q = 0 for |k_d| <= svv_mN*k_c,d (k_c,d = 2/3 of the Nyquist wavenumber)
   logical  :: svv_above_kc       ! Q = 1 (T) or 0 (F) for |k_d| >= k_c,d (only ln rho has such modes, when filter_lnrho = F)
+  character(20) :: svv_form      ! rho and m: 'entropy' (flux form in the entropy variables; dE/dt <= 0 for any state)
+                                 !            or 'linear' (-lambda(k) applied to m and, mass-conserving, to rho)
+  real(r8) :: cfl_svv            ! 'entropy': dt <= cfl_svv/lambda_svv, lambda_svv by the power method (<= 2.51 of eSSPIFRK3)
+  integer  :: svv_pi_init        ! 'entropy': power iterations at the first step (one per step afterwards)
+  integer  :: svv_pi_check       ! 'entropy': every svv_pi_check steps the power method is run until converged and
+                                 !            the run stops if dt*lambda_svv > 2.51 (<= 0: off)
 
   ! diagnostics specific to this model
   real(r8) :: write_intvl_1D     ! interval of line output (out1d/); <= 0: off
@@ -100,7 +106,7 @@ contains
     namelist /numerics_parameters/ formulation, visc_form, filter_lnrho, filter_mom, filter_mag, &
                                    cfl_visc, mass_correction, s_abort, debug_nan_step
     namelist /shock_parameters/ C_shock, shock_nmax, shock_nsmooth, shock_dl, shock_selftest
-    namelist /svv_parameters/ svv_eps0, svv_mN, svv_above_kc
+    namelist /svv_parameters/ svv_eps0, svv_mN, svv_above_kc, svv_form, cfl_svv, svv_pi_init, svv_pi_check
     namelist /isoth_diagnostics/ write_intvl_1D, write_intvl_cons, budget
 
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
@@ -163,6 +169,10 @@ contains
     svv_eps0        = 0.5d0
     svv_mN          = 0.5d0
     svv_above_kc    = .true.
+    svv_form        = 'entropy'
+    cfl_svv         = 2.d0
+    svv_pi_init     = 50
+    svv_pi_check    = 100
     write_intvl_1D  = 0.d0
     write_intvl_cons = 0.d0
     budget          = .false.
