@@ -56,7 +56,7 @@ class Taper(Isoth1D):
         if self.eps > 0.0:
             fm = fm - self.eps * self.kq2 * mh
             fs = fs + self.fwd(self.bwd(-self.eps * self.kq2_s * self.fwd(rho)) / rho)
-        return fs, fm, dict(s=s, rho=rho, u=u, D=D, zeta=zeta, q=q, divm=divm)
+        return fs, fm, dict(s=s, rho=rho, u=u, D=D, zeta=zeta, q=q, divm=divm, d_svv=None)
 
 
 def star_line(N, tag, p):

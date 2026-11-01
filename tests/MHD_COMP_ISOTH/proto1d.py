@@ -19,6 +19,15 @@ It mirrors advance.F90 / shock_viscosity.F90 for a run along x with nly = nlz = 
         ds/dt += (1/rho) F^-1(-lambda F rho), dt_visc = cfl_visc / max(zeta_max kd2_max + eps lam_m, eps lam_s),
     time stepping: eSSPIFRK3 of advance_common.F90 without linear terms.
 The defaults are those of the Fortran code (params.F90).
+Prototype-only variants (REPORT_stage2.md), d_N = F^-1 i k_d M_d F with M_d = deriv_mask (default: the m filter):
+    formulation = 'A': state (s, u), ds/dt = -u d_N s - d_N u, du/dt = -u d_N u - cs^2 d_N s;
+                  'B': state (s, u), ds/dt = -d_N(rho u)/rho (rho u on the grid), du/dt as in A;
+                  'C' (default): the Fortran formulation above. filter_m filters u in A and B.
+      The dissipative terms are those of C in (rho, m), mapped pointwise for A and B:
+      ds/dt = (d rho/dt)/rho, du/dt = (dm/dt - u d rho/dt)/rho.
+    visc_form = 'expanded': dm/dt = rho zeta d_N D + D d_N(rho zeta) instead of d_N q;
+    filter_rhs = True: the m (u) filter acts on the initial state and on the tendency instead of the state;
+    budget(): mass, momentum and energy rates of the ideal, viscous and SVV parts.
 It is used to cross-check the Fortran output (conservation.dat) and to study the
 discretization quickly; it is not a replacement for the Fortran code.
 
@@ -32,8 +41,14 @@ import numpy as np
 class Isoth1D:
     def __init__(self, N, lx=1.0, cs=1.0, C=2.0, nmax=1, nsmooth=1, filter_s=False, filter_m=True,
                  shock_dl=0.0, cfl=0.5, cfl_visc=1.0, pad=1, svv_eps0=0.5, svv_mN=0.5, svv_above_kc=True,
-                 svv_form='entropy', cfl_svv=2.0, svv_pi_init=50, svv_pi_check=100):
+                 svv_form='entropy', cfl_svv=2.0, svv_pi_init=50, svv_pi_check=100,
+                 formulation='C', visc_form='flux', deriv_mask=None, filter_rhs=False):
         # pad > 1 (prototype only): nonlinear terms on a pad*N grid (over-integration), to test aliasing
+        assert formulation in ('A', 'B', 'C') and visc_form in ('flux', 'expanded'), (formulation, visc_form)
+        assert deriv_mask in (None, 'mask', 'none') and not (filter_rhs and not filter_m), (deriv_mask, filter_rhs)
+        self.formulation, self.visc_form, self.filter_rhs = formulation, visc_form, filter_rhs
+        # the Stage 1 code path (rhs) for C, flux form and the default masks; the other variants use parts()
+        self.legacy = formulation == 'C' and visc_form == 'flux' and deriv_mask is None and not filter_rhs
         self.N, self.L, self.cs = N, 2.0 * math.pi * lx, cs
         self.pad, self.Ng = pad, pad * N
         self.dl = self.L / N
@@ -45,10 +60,16 @@ class Isoth1D:
         self.mask = (n < N / 3.0).astype(float)            # dealias.F90: |k| >= kmax*2/3 -> 0
         self.Fs = self.mask if filter_s else np.ones_like(self.mask)
         self.Fm = self.mask if filter_m else np.ones_like(self.mask)
+        # Md: mask in d_N and the low/high split of the SVV; F0m: filter of the initial m (u); Fr: filter of dm/dt
+        self.Md = self.Fm if deriv_mask is None else (self.mask if deriv_mask == 'mask' else np.ones_like(self.mask))
+        self.F0m = self.Fm
+        if filter_rhs:
+            self.Md, self.F0m, self.Fr = self.mask, self.mask, self.mask
+            self.Fm = np.ones_like(self.mask)
         self.C, self.nmax, self.nsmooth = C, nmax, nsmooth
         self.Delta = shock_dl if shock_dl > 0.0 else self.dl
         self.cfl, self.cfl_visc = cfl, cfl_visc
-        self.kd2_max = np.max((self.kd * self.Fm) ** 2)
+        self.kd2_max = np.max((self.kd * self.Md) ** 2)
         # SVV kernel (shock_viscosity.F90: svv_kernel); k itself, so the Nyquist mode is damped
         kc = (2.0 * math.pi / self.L * (N // 2)) * 2.0 / 3.0
         mN = svv_mN * kc
@@ -58,7 +79,7 @@ class Isoth1D:
         Q = np.where(a >= kc, 1.0 if svv_above_kc else 0.0, np.where((a > mN) & (r < 30.0), np.exp(-np.minimum(r, 30.0) ** 2), 0.0))
         self.svv_eps0 = svv_eps0
         self.kq2 = a ** 2 * Q
-        self.lam_m = np.max(self.kq2 * (self.Fm > 0))
+        self.lam_m = np.max(self.kq2 * (self.F0m > 0))
         self.lam_s = np.max(self.kq2 * (self.Fs > 0))
         self.eps = 0.0
         assert svv_form in ('entropy', 'linear'), svv_form
@@ -67,11 +88,12 @@ class Isoth1D:
         sig = 1j * a * np.sqrt(Q)
         if N % 2 == 0:
             sig[-1] = a[-1] * np.sqrt(Q[-1])               # real at Nyquist, so that the Nyquist mode is damped
-        self.sigL, self.sigH = sig * self.Fm, sig * (1.0 - self.Fm)
+        self.sigL, self.sigH = sig * self.Md, sig * (1.0 - self.Md)
         self.lam_svv, self.pi_v, self.pi_conv = 0.0, None, None
         self.prepared = -1
         self.t, self.step = 0.0, 0
         self.hist = []
+        self.track_budget = False          # budget() of the stage-1 state in each hist entry
 
     # ------------------------------------------------------------ transforms
     def fwd(self, f):
@@ -84,8 +106,20 @@ class Isoth1D:
 
     # ------------------------------------------------------------ initial conditions
     def set_state(self, rho, u):
-        self.sh = self.fwd(np.log(rho)) * self.Fs
-        self.mh = self.fwd(rho * u) * self.Fm
+        self.set_su(np.log(rho), u)
+
+    def set_su(self, s, u):
+        self.sh = self.fwd(s) * self.Fs
+        self.mh = self.fwd(np.exp(s) * u if self.formulation == 'C' else u) * self.F0m
+
+    def wave1d(self, kind, amp=1e-3, mode=1, rho0=1.0):
+        """init_wave1d of fields.F90 along x: 'sound_wave' s = ln rho0 + amp cos(k x), u = 0;
+        'simple_wave' s = ln rho0 + amp sin(k x), u = cs amp sin(k x)."""
+        kx = 2.0 * math.pi * mode / self.L * self.x
+        if kind == 'sound_wave':
+            self.set_su(math.log(rho0) + amp * np.cos(kx), np.zeros_like(kx))
+        else:
+            self.set_su(math.log(rho0) + amp * np.sin(kx), self.cs * amp * np.sin(kx))
 
     def riemann(self, rho_L, rho_R, u_L, u_R, width=1.0, width2=None):
         """init_riemann of fields.F90; width2 (prototype only) sets the tanh width at 3L/4."""
@@ -116,10 +150,15 @@ class Isoth1D:
 
     def fields(self, sh, mh):
         s = self.bwd(sh)
-        m = self.bwd(mh)
         rho = np.exp(s)
-        u = m / rho
-        D = self.ddx(self.fwd(u), self.Fm)
+        if self.formulation == 'C':
+            m = self.bwd(mh)
+            u = m / rho
+            D = self.ddx(self.fwd(u), self.Md)
+        else:
+            u = self.bwd(mh)
+            m = rho * u
+            D = self.ddx(mh, self.Md)
         zeta = self.zeta_of(D) if self.C > 0.0 else np.zeros_like(D)
         return s, m, rho, u, D, zeta
 
@@ -183,6 +222,8 @@ class Isoth1D:
             return
         s0 = self.bwd(self.sh)
         m0 = self.bwd(self.mh)
+        if self.formulation != 'C':
+            m0 = np.exp(s0) * m0          # A, B: the power method runs on the SVV of C in (s, m)
         self.eps = self.svv_eps(m0 / np.exp(s0))
         self.pi_conv = None
         if self.svv_form == 'entropy' and self.eps > 0.0:
@@ -196,6 +237,9 @@ class Isoth1D:
         self.prepared = self.step
 
     def rhs(self, sh, mh):
+        if not self.legacy:
+            P, f = self.parts(sh, mh)
+            return P['ideal'][0] + P['visc'][0] + P['svv'][0], P['ideal'][1] + P['visc'][1] + P['svv'][1], f
         s, m, rho, u, D, zeta = self.fields(sh, mh)
         q = rho * zeta * D
         divm = self.ddx(mh, self.Fm)
@@ -212,6 +256,79 @@ class Isoth1D:
             fm = fm + mdh
         return fs, fm, dict(s=s, rho=rho, u=u, D=D, zeta=zeta, q=q, divm=divm, d_svv=d_svv)
 
+    def parts(self, sh, mh):
+        """Spectral tendencies (ds/dt, dm/dt) for C or (ds/dt, du/dt) for A and B, split into the ideal,
+        shock-viscosity and SVV parts, before the stage filter (Fr included for filter_rhs); and the fields."""
+        s, m, rho, u, D, zeta = self.fields(sh, mh)
+        c2, Md, ikd = self.cs ** 2, self.Md, 1j * self.kd * self.Md
+        C = self.formulation == 'C'
+        zero = np.zeros_like(sh)
+        divm = self.ddx(self.fwd(m), Md) if not C else self.ddx(mh, Md)
+        if C:
+            ideal = (self.fwd(-divm / rho), -ikd * self.fwd(rho * u * u + c2 * rho))
+        else:
+            ds = self.ddx(sh, Md)
+            sdot = -divm / rho if self.formulation == 'B' else -u * ds - D
+            ideal = (self.fwd(sdot), self.fwd(-u * D - c2 * ds))
+        # dissipative parts: d rho/dt (grid) and dm/dt (spectral) of C, then mapped to (s, u) for A and B
+        q = rho * zeta * D
+        if self.visc_form == 'flux':
+            mv = ikd * self.fwd(q)
+        else:
+            rz = rho * zeta
+            mv = self.fwd(rz * self.ddx(self.fwd(D), Md) + D * self.ddx(self.fwd(rz), Md))
+        visc = (zero, mv if C else self.fwd(self.bwd(mv) / rho))
+        d_svv = None
+        svv = (zero, zero)
+        if self.eps > 0.0:
+            if self.svv_form == 'linear':
+                lam = self.eps * self.kq2
+                rdot = self.bwd(-lam * self.fwd(rho))
+                mdh = -lam * (mh if C else self.fwd(m))
+            else:
+                rdot, mdh, d_svv = self.svv_entropy(s, rho, u, None if C else mh)
+            svv = (self.fwd(rdot / rho), mdh if C else self.fwd((self.bwd(mdh) - u * rdot) / rho))
+        P = dict(ideal=ideal, visc=visc, svv=svv)
+        if self.filter_rhs:
+            P = {k: (a, b * self.Fr) for k, (a, b) in P.items()}
+        return P, dict(s=s, rho=rho, u=u, D=D, zeta=zeta, q=q, divm=divm, d_svv=d_svv)
+
+    def budget(self, sh=None, mh=None):
+        """Semi-discrete budget at (sh, mh) (default: the current state). The tendencies of each part are mapped
+        to (d rho/dt, dm/dt) on the grid (rho ds/dt, rho du/dt + u rho ds/dt for A and B); for each part
+        dM = sum(rho dot) dV, dP = sum(m dot) dV, eps = sum(w_rho rho dot + u m dot) dV with
+        w_rho = cs^2 s - u^2/2, the dE/drho at fixed m of E = sum[rho u^2/2 + cs^2 rho (s - 1)] dV.
+        Keys <part>_<rate> after the stage filter (Fs, Fm) and <part>_<rate>_raw before it; the scales
+        A_M = sum|rho dot_ideal| dV, A_P = sum|m dot_ideal| dV, A_svv = sum|w_rho rho dot + u m dot|_svv dV (raw),
+        visc = sum(rho zeta D^2) dV, D_svv = sum(d_svv) dV; R_zeta = eps_visc + visc, R_svv = eps_svv + D_svv."""
+        sh = self.sh if sh is None else sh
+        mh = self.mh if mh is None else mh
+        P, f = self.parts(sh, mh)
+        s, rho, u = f['s'], f['rho'], f['u']
+        dV = self.L / self.Ng
+        w = self.cs ** 2 * s - 0.5 * u * u
+        out = {}
+        for tag, Fs, Fm in (('_raw', 1.0, 1.0), ('', self.Fs, self.Fm)):
+            for k, (a, b) in P.items():
+                rdot = rho * self.bwd(a * Fs)
+                b = self.bwd(b * Fm)
+                mdot = b if self.formulation == 'C' else rho * b + u * rdot
+                e = w * rdot + u * mdot
+                out[k + '_dM' + tag], out[k + '_dP' + tag] = np.sum(rdot) * dV, np.sum(mdot) * dV
+                out[k + '_eps' + tag] = np.sum(e) * dV
+                if tag == '_raw' and k == 'ideal':
+                    out['A_M'], out['A_P'] = np.sum(np.abs(rdot)) * dV, np.sum(np.abs(mdot)) * dV
+                if tag == '_raw' and k == 'svv':
+                    out['A_svv'] = np.sum(np.abs(e)) * dV
+            for r in ('dM', 'dP', 'eps'):
+                out[r + tag] = sum(out[k + '_' + r + tag] for k in P)
+        out['visc'] = np.sum(rho * f['zeta'] * f['D'] ** 2) * dV
+        out['D_svv'] = np.sum(f['d_svv']) * dV if f['d_svv'] is not None else 0.0
+        for tag in ('_raw', ''):
+            out['R_zeta' + tag] = out['visc_eps' + tag] + out['visc']
+            out['R_svv' + tag] = out['svv_eps' + tag] + out['D_svv'] if f['d_svv'] is not None else 0.0
+        return out
+
     def monitor(self, f):
         rho, u = f['rho'], f['u']
         dV = self.L / self.Ng
@@ -223,7 +340,7 @@ class Isoth1D:
             rate = max(f['zeta'].max() * self.kd2_max + e * self.lam_m, e * self.lam_s)
             dt_visc = self.cfl_visc / rate if rate > 0 else np.inf
         E = np.sum(0.5 * rho * u * u + self.cs ** 2 * rho * (f['s'] - 1.0)) * dV
-        return dict(t=self.t, M=np.sum(rho) * dV, P=np.sum(rho * u) * dV, E=E,
+        return dict(t=self.t, M=np.sum(rho) * dV, P=np.sum(rho * u) * dV, E=E, E_kin=np.sum(0.5 * rho * u * u) * dV,
                     rho_min=rho.min(), rho_max=rho.max(), zeta_max=f['zeta'].max(), D_min=f['D'].min(),
                     visc=np.sum(rho * f['zeta'] * f['D'] ** 2) * dV, eps_svv=self.eps,
                     lam_svv=self.lam_svv, F_svv=self.lam_svv / (self.eps * self.k[-1] ** 2) if self.eps > 0 else 0.0,
@@ -247,6 +364,8 @@ class Isoth1D:
         s0, m0 = self.sh, self.mh
         f0s, f0m, f = self.rhs(s0, m0)
         mon = self.monitor(f)
+        if self.track_budget:
+            mon.update(self.budget(s0, m0))
         if self.pi_conv is not None:
             mon['pi_conv'] = self.pi_conv
             if dt * self.pi_conv[0] > 2.51:

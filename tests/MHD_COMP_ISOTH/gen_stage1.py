@@ -24,6 +24,8 @@ Batches
             U4 at N = 2048 with cfl_svv = 1 (compared with shock/U4_N2048, cfl_svv = 2)
     cflmax  U2 at N = 512 with dt = f * DTMIN (f up to 3) and the CFL check relaxed
     decomp  U2 at N = 512 along x, y, z with 1, 2, 4 ranks
+    samedt  U4 with svv_form = 'linear' at the dt of the entropy-stable SVV (N = 1024, 2048) and at its own dt
+            (N = 2048; N = 1024 is scan/U4_N1024_linear), against shock/U4_N* (Stage 2)
 """
 import sys
 import os
@@ -238,8 +240,18 @@ def batch_decomp(root):
     return cases
 
 
+def batch_samedt(root):
+    # the linear and the entropy-stable SVV at the same dt, so that their U4 results differ only in the form
+    cases = []
+    for N, tag, dtmin in ((1024, 'esdt', DTMIN[('U4', 1024)]), (2048, 'esdt', DTMIN[('U4', 2048)]),
+                          (2048, 'owndt', DT512_LINEAR['U4'] * 512.0 / 2048)):
+        cases.append(riemann_case(os.path.join(root, 'U4_N%d_linear_%s' % (N, tag)), 'U4', N, dtmin=dtmin,
+                                  nproc=NPROC.get(('U4', N), 1), svv=dict(svv_form="'linear'")))
+    return cases
+
+
 BATCHES = {'smoke': batch_smoke, 'smooth': batch_smooth, 'shock': batch_shock, 'scan': batch_scan,
-           'dtconv': batch_dtconv, 'cflmax': batch_cflmax, 'decomp': batch_decomp}
+           'dtconv': batch_dtconv, 'cflmax': batch_cflmax, 'decomp': batch_decomp, 'samedt': batch_samedt}
 
 def cost(case):
     """nstep * (grid points) * log2(grid points), for listing the cases by decreasing cost."""
