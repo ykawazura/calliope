@@ -95,13 +95,16 @@ contains
     if(init_type == 'riemann') then
       call init_riemann
     endif
+    if(init_type == 'profile1d') then
+      call init_profile1d
+    endif
     if(init_type == 'restart') then
       call restart
     endif
 
     if(       init_type /= 'zero'       .and. init_type /= 'single_mode' .and. init_type /= 'random' &
         .and. init_type /= 'sound_wave' .and. init_type /= 'simple_wave' .and. init_type /= 'riemann' &
-        .and. init_type /= 'restart') then
+        .and. init_type /= 'profile1d'  .and. init_type /= 'restart') then
       print *, 'Unknown init_type: ', trim(init_type)
       stop
     endif
@@ -1236,6 +1239,153 @@ contains
     deallocate(hh_r)
     deallocate(f_r)
   end subroutine init_riemann
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    2 Nov 2026
+!! @brief   1D profile along dir ('x', 'y', or 'z') read from the ASCII table 'table', one row per grid point:
+!!            xi, rho, u_x, u_y, u_z, b_x, b_y, b_z
+!!          Blank lines and lines starting with '#' are skipped. Every rank reads the whole table and takes its
+!!          own range. The rows must be the grid points xi = (l - 1)*L/n in order, rho > 0, and b_dir must be
+!!          uniform (div B = 0).
+!-----------------------------------------------!
+  subroutine init_profile1d
+    use mp, only: proc0
+    use grid, only: nlx, nly, nlz, lx, ly, lz, xx, yy, zz
+    use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
+    use params, only: inputfile
+    use file, only: get_unused_unit
+    implicit none
+    character(1)    :: dir
+    character(256)  :: table
+    character(1024) :: line
+    real(r8) :: ll
+    real(r8), allocatable :: tab(:,:), xi(:)
+    real(r8), allocatable, dimension(:,:,:) :: s_r, den_r, f_r ! density is den_r, as in init_riemann
+    integer :: i, j, k, l, n, nrow, idir
+    integer :: unit, ierr
+    namelist /profile1d_params/ dir, table
+
+    dir   = 'x'
+    table = 'profile1d.dat'
+
+    call get_unused_unit (unit)
+    open(unit=unit,file=inputfile,status='old')
+    read(unit,nml=profile1d_params,iostat=ierr)
+        if (ierr/=0) write(*,*) "Reading profile1d_params failed"
+    close(unit)
+
+    if(dir == 'x') then
+      idir = 1; ll = lx; n = nlx
+    elseif(dir == 'y') then
+      idir = 2; ll = ly; n = nly
+    elseif(dir == 'z') then
+      idir = 3; ll = lz; n = nlz
+    else
+      if(proc0) print *, 'init_profile1d: dir must be x, y, or z'
+      stop
+    endif
+    allocate(xi(n))
+    if(idir == 1) xi = xx
+    if(idir == 2) xi = yy
+    if(idir == 3) xi = zz
+
+    allocate(tab(8, n), source=0.d0)
+    call get_unused_unit (unit)
+    open(unit=unit,file=trim(table),status='old',action='read',iostat=ierr)
+    if(ierr /= 0) then
+      if(proc0) print *, 'init_profile1d: cannot open ', trim(table)
+      stop
+    endif
+    nrow = 0
+    do
+      read(unit,'(A)',iostat=ierr) line
+      if(ierr /= 0) exit
+      line = adjustl(line)
+      if(len_trim(line) == 0 .or. line(1:1) == '#') cycle
+      nrow = nrow + 1
+      if(nrow > n) exit
+      read(line,*,iostat=ierr) tab(:, nrow)
+      if(ierr /= 0) then
+        if(proc0) print '("init_profile1d: cannot read 8 numbers from data row ", I8, " of ", A)', nrow, trim(table)
+        stop
+      endif
+    end do
+    close(unit)
+
+    if(nrow /= n) then
+      if(proc0) print '("init_profile1d: ", A, " must have ", I8, " data rows (one per grid point along ", A, ")")', &
+                      trim(table), n, dir
+      stop
+    endif
+    if(maxval(abs(tab(1, :) - xi)) > 1.d-10*ll) then
+      if(proc0) print '("init_profile1d: the first column of ", A, " is not the grid (max error ", es10.2e3, ")")', &
+                      trim(table), maxval(abs(tab(1, :) - xi))
+      stop
+    endif
+    if(minval(tab(2, :)) <= 0.d0) then
+      if(proc0) print *, 'init_profile1d: rho must be positive'
+      stop
+    endif
+    if(maxval(tab(5 + idir, :)) /= minval(tab(5 + idir, :))) then
+      if(proc0) print *, 'init_profile1d: b_dir must be uniform (div B = 0)'
+      stop
+    endif
+
+    if(proc0) then
+      print '("1D profile initialization: dir = ", A, ", table = ", A)', dir, trim(table)
+      print '("  rho in [", es12.4e3, ", ", es12.4e3, "], b_dir = ", es12.4e3)', &
+            minval(tab(2, :)), maxval(tab(2, :)), tab(5 + idir, 1)
+    endif
+
+    allocate(s_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en), source=0.d0)
+    allocate(den_r, source=s_r)
+    allocate(f_r  , source=s_r)
+
+    call fill(2); den_r = f_r
+    s_r = log(den_r)
+    call p3dfft_ftran_r2c(s_r, lnrho, 'fft'); lnrho = lnrho/nlx/nly/nlz
+
+    call fill(3); f_r = den_r*f_r; call p3dfft_ftran_r2c(f_r, mx, 'fft'); mx = mx/nlx/nly/nlz
+    call fill(4); f_r = den_r*f_r; call p3dfft_ftran_r2c(f_r, my, 'fft'); my = my/nlx/nly/nlz
+    call fill(5); f_r = den_r*f_r; call p3dfft_ftran_r2c(f_r, mz, 'fft'); mz = mz/nlx/nly/nlz
+    call fill(6);                  call p3dfft_ftran_r2c(f_r, bx, 'fft'); bx = bx/nlx/nly/nlz
+    call fill(7);                  call p3dfft_ftran_r2c(f_r, by, 'fft'); by = by/nlx/nly/nlz
+    call fill(8);                  call p3dfft_ftran_r2c(f_r, bz, 'fft'); bz = bz/nlx/nly/nlz
+
+    lnrho_old = lnrho
+    mx_old    = mx
+    my_old    = my
+    mz_old    = mz
+    bx_old    = bx
+    by_old    = by
+    bz_old    = bz
+
+    deallocate(s_r)
+    deallocate(den_r)
+    deallocate(f_r)
+    deallocate(tab)
+    deallocate(xi)
+
+  contains
+
+    !> f_r = column col of the table at the local grid points
+    subroutine fill(col)
+      integer, intent(in) :: col
+      do i = ilx_st, ilx_en
+        do k = ilz_st, ilz_en
+          do j = ily_st, ily_en
+            if(idir == 1) l = i
+            if(idir == 2) l = j
+            if(idir == 3) l = k
+            f_r(j, k, i) = tab(col, l)
+          end do
+        end do
+      end do
+    end subroutine fill
+
+  end subroutine init_profile1d
 
 
 !-----------------------------------------------!

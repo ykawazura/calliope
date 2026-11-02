@@ -46,6 +46,8 @@ module advance
   real   (r8), allocatable, dimension(:,:,:,:) :: w_r, flx_r
   real   (r8), allocatable, dimension(:,:,:)   :: rho_r, ux_r, uy_r, uz_r
   real   (r8), allocatable, dimension(:,:,:)   :: div_r, zeta_r, q_r ! D, zeta, q = rho*zeta*D
+  real   (r8), allocatable, dimension(:,:,:)   :: eta_r ! shock resistivity eta (C_eta > 0)
+  real   (r8), allocatable, dimension(:,:,:,:) :: ej_r  ! eta J, J = curl_N B (C_eta > 0)
   real   (r8), allocatable, dimension(:,:,:)   :: svv_r ! SVV term of the s equation, (d rho/dt)_svv/rho
   complex(r8), allocatable, dimension(:,:,:,:) :: svv_mh ! SVV term of m ('entropy'), filtered and normalized as the state
   complex(r8), allocatable, dimension(:,:,:,:) :: svv_uh ! F u/(nlx nly nlz) of the current stage ('entropy')
@@ -96,6 +98,7 @@ module advance
   real(r8) :: dMdt_raw  ! -sum div_N m (zero in exact arithmetic)
   real(r8) :: dMdt_abs  !  sum |div_N m| (scale of dMdt_raw)
   real(r8) :: visc_diss !  sum rho zeta D^2 (>= 0)
+  real(r8) :: eta_diss = 0.d0 !  sum eta |J|^2 (>= 0)
 
   ! SVV coefficients eps_d of the current step (set at stage 1 and fixed over the step)
   real(r8) :: eps_svv(3) = 0.d0
@@ -105,17 +108,19 @@ module advance
   real(r8) :: dt_prev = 0.d0
 
   ! Energy and mass budget accumulated over the RK stages with weights b_rk (budget.dat)
-  integer, parameter :: nbgt = 16
+  integer, parameter :: nbgt = 19
   integer, parameter :: ib_dMdt_raw = 1, ib_dMdt_proj = 2, ib_dMdt_abs = 3
   integer, parameter :: ib_eps_N    = 4, ib_eps_shock = 5, ib_visc     = 6, ib_R_zeta = 7
   integer, parameter :: ib_eps_force = 8, ib_eps_res  = 9, ib_eps_nu   = 10, ib_eps_lmd = 11
   integer, parameter :: ib_eps_svv  = 12, ib_eps_svv_b = 13 ! SVV of (rho, m) and of B
   integer, parameter :: ib_D_svv    = 14, ib_R_svv     = 15 ! D_svv and R_svv = eps_svv + D_svv ('entropy')
   integer, parameter :: ib_A_svv    = 16 ! sum |dE/dU.U_svv| dV over (rho, m): rounding scale of eps_svv
+  integer, parameter :: ib_eps_eta  = 17, ib_eta_diss = 18, ib_R_eta = 19 ! shock resistivity: R_eta = eps_eta + eta_diss
   real(r8) :: bgt(nbgt) = 0.d0
   real(r8) :: R_zeta_ratio_max = 0.d0
   real(r8) :: R_svv_ratio_max  = 0.d0
   real(r8) :: R_svv_scale_max  = 0.d0
+  real(r8) :: R_eta_ratio_max  = 0.d0
   real(r8) :: t_bgt, dt_bgt
   logical  :: bgt_pending = .false.
 
@@ -449,7 +454,7 @@ contains
     use params, only: nonlinear, shear, time_step_scheme
     use params, only: nu, nu_h, nu_h_exp, eta, eta_h, eta_h_exp, lmd, lmd_h, lmd_h_exp
     use params, only: formulation, visc_form, filter_lnrho, filter_mom, filter_mag
-    use params, only: C_shock, s_abort, budget, write_intvl_cons, svv_eps0, svv_form, cfl_svv
+    use params, only: C_shock, s_abort, budget, write_intvl_cons, svv_eps0, svv_form, cfl_svv, C_eta
     use shearing_box, only: tsc, k2t, k2t_inv
     use shock_viscosity, only: init_shock_viscosity, abort_run
     use file, only: open_output_file
@@ -467,6 +472,8 @@ contains
       call abort_run('MHD_COMP_ISOTH: nonlinear = F is not supported (mass flux and pressure are nonlinear terms)')
     if(shear .and. C_shock > 0.d0) &
       call abort_run('MHD_COMP_ISOTH: shear = T with C_shock > 0 has not been verified')
+    if(shear .and. C_eta > 0.d0) &
+      call abort_run('MHD_COMP_ISOTH: shear = T with C_eta > 0 has not been verified')
     if(shear .and. svv_eps0 > 0.d0) &
       call abort_run('MHD_COMP_ISOTH: shear = T with svv_eps0 > 0 is not implemented (the SVV kernel uses the unsheared kx)')
     if(trim(svv_form) /= 'entropy' .and. trim(svv_form) /= 'linear') &
@@ -532,8 +539,9 @@ contains
       call open_output_file (cfl_unit, 'cfl.dat')
       write(cfl_unit, '(a)') '# 1:t 2:dt 3:dt_adv 4:dt_visc 5:max(|ux|+cf_x) 6:max(|uy|+cf_y) 7:max(|uz|+cf_z) ' &
                            //'8:zeta_max 9:max(rho*zeta)/(rho_min*zeta_max) 10:eps_svv_x 11:eps_svv_y 12:eps_svv_z ' &
-                           //'13:lam_svv 14:F_svv(=13/sum_d eps_d max k_d^2 Q) 15:dt*lam_svv 16:n_iter'
-      write(cfl_unit, '(a)') '# 13-16: power method of the entropy-stable SVV (0 for svv_form = linear)'
+                           //'13:lam_svv 14:F_svv(=13/sum_d eps_d max k_d^2 Q) 15:dt*lam_svv 16:n_iter 17:eta_max'
+      write(cfl_unit, '(a)') '# 13-16: power method of the entropy-stable SVV (0 for svv_form = linear); ' &
+                           //'17: shock resistivity (0 for C_eta = 0)'
 
       if(write_intvl_cons >= 0.d0) then
         call open_output_file (cons_unit, 'conservation.dat')
@@ -547,12 +555,14 @@ contains
         call open_output_file (budget_unit, 'budget.dat')
         write(budget_unit, '(a)') '# one line per step [t, t+dt]; rates are sum_i b_i X_i over the RK stages, b = (1/4,3/16,9/16)'
         write(budget_unit, '(a)') '# 1:t 2:dt 3:dMdt_actual 4:dMdt_raw 5:dMdt_proj 6:dMdt_abs 7:dEdt_actual 8:dEdt_sum ' &
-                                //'9:err_t(=7-8) 10:eps_ideal(=eps_N-11-15-21) 11:eps_shock 12:-visc_diss 13:R_zeta ' &
+                                //'9:err_t(=7-8) 10:eps_ideal(=eps_N-11-15-21-27) 11:eps_shock 12:-visc_diss 13:R_zeta ' &
                                 //'14:max|R_zeta|/visc_diss 15:eps_force 16:eps_res 17:eps_nu 18:eps_lmd 19:E_n 20:E_n+1 ' &
                                 //'21:eps_svv(all) 22:eps_svv_B 23:-D_svv 24:R_svv(=21-22-23) 25:max|R_svv|/D_svv ' &
-                                //'26:max|R_svv|/sum|dE/dU.U_svv|dV'
+                                //'26:max|R_svv|/sum|dE/dU.U_svv|dV 27:eps_eta 28:-eta_diss 29:R_eta(=27-28) ' &
+                                //'30:max|R_eta|/eta_diss'
         write(budget_unit, '(a)') '# 23-26: entropy-stable SVV of (rho, m) (0 for svv_form = linear); 26 is relative to the ' &
                                 //'rounding scale of 21-22 (25 is not when D_svv is itself at the rounding level)'
+        write(budget_unit, '(a)') '# 27-30: shock resistivity, eta_diss = sum eta |J|^2 dV (0 for C_eta = 0)'
       endif
     endif
 
@@ -611,7 +621,7 @@ contains
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use params, only: zi, cs2va2, C_shock, cfl_visc, filter_mom, mass_correction, debug_nan_step
-    use params, only: write_intvl_cons, write_intvl_1D, cfl_svv, svv_pi_check
+    use params, only: write_intvl_cons, write_intvl_1D, cfl_svv, svv_pi_check, C_eta, filter_mag
     use dealias, only: filter
     use mp, only: proc0, max_allreduce, sum_allreduce
     use time, only: cfl, dt, tt, reset_dt
@@ -628,9 +638,9 @@ contains
                             iky_st:iky_en), intent(in) :: lnrho, mx, my, mz, bx, by, bz
     integer, intent(in) :: istage
 
-    real(r8) :: mon_pre(nmon), sums(3), maxs(8)
+    real(r8) :: mon_pre(nmon), sums(3), maxs(9)
     real(r8) :: vad2_r(3), va2_r, cf2_r, b2h_r, ptot_r
-    real(r8) :: dV, mfilt, dt_adv, dt_visc, dt_cfl, rate_visc, F_svv
+    real(r8) :: dV, mfilt, bfilt, dt_adv, dt_visc, dt_cfl, rate_visc, F_svv
     integer  :: i, j, k, n, d, pi_nit
     logical  :: first, pi_check, pi_conv
     real(r8), parameter :: rk3_lim = 2.51d0 ! real-axis stability limit of SSPRK3 (2.5127)
@@ -700,13 +710,16 @@ contains
     uz_r = w_r(:,:,:,imz)/rho_r
     !$omp end workshare
 
-    ! 3. Shock viscosity: D = div_N u, zeta, q = rho*zeta*D
+    ! 3. Shock viscosity: D = div_N u, zeta, q = rho*zeta*D; shock resistivity eta
     if(svv_es) then
       call get_div_u(ux_r, uy_r, uz_r, kxd, div_r, svv_uh)
-    elseif(C_shock > 0.d0 .or. istage <= 1) then
+    elseif(C_shock > 0.d0 .or. C_eta > 0.d0 .or. istage <= 1) then
       call get_div_u(ux_r, uy_r, uz_r, kxd, div_r)
     endif
-    if(C_shock > 0.d0) then
+    if(C_eta > 0.d0) then
+      call get_zeta(div_r, zeta_r, eta_r)
+      q_r = rho_r*zeta_r*div_r
+    elseif(C_shock > 0.d0) then
       call get_zeta(div_r, zeta_r)
       q_r = rho_r*zeta_r*div_r
     else
@@ -738,13 +751,14 @@ contains
     visc_diss = sums(3)*dV
 
     if(istage <= 1) then
-      ! maxs: max rho, -min rho, max zeta, -min D, max rho*zeta, max(|u_d| + cf_d) for d = x, y, z
+      ! maxs: max rho, -min rho, max zeta, -min D, max rho*zeta, max(|u_d| + cf_d) for d = x, y, z, max eta
       maxs(1) =  maxval(rho_r)
       maxs(2) = -minval(rho_r)
       maxs(3) =  maxval(zeta_r)
       maxs(4) = -minval(div_r)
       maxs(5) =  maxval(rho_r*zeta_r)
-      maxs(6:8) = 0.d0
+      maxs(6:9) = 0.d0
+      if(C_eta > 0.d0) maxs(9) = maxval(eta_r)
       do i = ilx_st, ilx_en
         do k = ilz_st, ilz_en
           do j = ily_st, ily_en
@@ -802,16 +816,17 @@ contains
       dt_adv = cfl/dt_adv
 
       if(svv_es) then
-        ! 1/dt_visc: shock viscosity/cfl_visc + lambda_svv/cfl_svv in (rho, m), SVV in B/cfl_visc
-        rate_visc = max(maxs(3)*kd2_max/cfl_visc + svv_lam/cfl_svv, sum(eps_svv*svv_lam_b)/cfl_visc)
+        ! 1/dt_visc: shock viscosity/cfl_visc + lambda_svv/cfl_svv in (rho, m), (SVV + eta) in B/cfl_visc
+        rate_visc = max(maxs(3)*kd2_max/cfl_visc + svv_lam/cfl_svv, (sum(eps_svv*svv_lam_b) + maxs(9)*kd2_max)/cfl_visc)
         if(rate_visc > 0.d0) then
           dt_visc = 1.d0/rate_visc
         else
           dt_visc = huge(1.d0)
         endif
       else
-        ! largest damping rate: shock viscosity + SVV in m, SVV in ln rho and in B
-        rate_visc = max(maxs(3)*kd2_max + sum(eps_svv*svv_lam_m), sum(eps_svv*svv_lam_s), sum(eps_svv*svv_lam_b))
+        ! largest damping rate: shock viscosity + SVV in m, SVV in ln rho and SVV + eta in B
+        rate_visc = max(maxs(3)*kd2_max + sum(eps_svv*svv_lam_m), sum(eps_svv*svv_lam_s), &
+                        sum(eps_svv*svv_lam_b) + maxs(9)*kd2_max)
         if(rate_visc > 0.d0) then
           dt_visc = cfl_visc/rate_visc
         else
@@ -844,7 +859,7 @@ contains
         write (unit=cfl_unit, fmt="(100es26.17e3)") tt, dt, dt_adv, dt_visc, maxs(6:8), maxs(3), &
                                                   maxs(5)/max(-maxs(2)*maxs(3), tiny(1.d0)), eps_svv, &
                                                   merge(svv_lam, 0.d0, svv_es), F_svv, &
-                                                  merge(dt*svv_lam, 0.d0, svv_es), dble(pi_nit)
+                                                  merge(dt*svv_lam, 0.d0, svv_es), dble(pi_nit), maxs(9)
         call flush(cfl_unit)
       endif
     endif
@@ -899,6 +914,34 @@ contains
       flx_r(:,:,:,iflx_s) = flx_r(:,:,:,iflx_s) + svv_r
     endif
 
+    ! Shock resistivity: J = curl_N B = F^-1 i k_d x M B^ (M: filter if filter_mag, as in D),
+    ! eta_diss = sum eta |J|^2 dV, and eta J is added to the flux B x u of the induction equation
+    if(C_eta > 0.d0) then
+      !$omp parallel do private(i, k, bfilt) schedule(static)
+      do j = iky_st, iky_en
+        do k = ikz_st, ikz_en
+          do i = ikx_st, ikx_en
+            bfilt = merge(filter(i,k,j), 1.d0, filter_mag)
+            w(i,k,j,1) = zi*(ky_d(j)*bz(i,k,j) - kz_d(k)*by(i,k,j))*bfilt
+            w(i,k,j,2) = zi*(kz_d(k)*bx(i,k,j) - kxd(i,j)*bz(i,k,j))*bfilt
+            w(i,k,j,3) = zi*(kxd(i,j)*by(i,k,j) - ky_d(j)*bx(i,k,j))*bfilt
+          enddo
+        enddo
+      enddo
+      !$omp end parallel do
+      if (proc0) call put_time_stamp(timer_fft)
+      do d = 1, 3
+        call p3dfft_btran_c2r(w(:,:,:,d), ej_r(:,:,:,d), 'tff')
+      enddo
+      if (proc0) call put_time_stamp(timer_fft)
+      eta_diss = sum(eta_r*(ej_r(:,:,:,1)**2 + ej_r(:,:,:,2)**2 + ej_r(:,:,:,3)**2))
+      call sum_allreduce(eta_diss)
+      eta_diss = eta_diss*dV
+      do d = 1, 3
+        ej_r(:,:,:,d) = eta_r*ej_r(:,:,:,d)
+      enddo
+    endif
+
     !$omp parallel do private(j, k, b2h_r, ptot_r) schedule(static)
     do i = ilx_st, ilx_en
       do k = ilz_st, ilz_en
@@ -920,6 +963,7 @@ contains
       enddo
     enddo
     !$omp end parallel do
+    if(C_eta > 0.d0) flx_r(:,:,:,iflx_bx:iflx_bz) = flx_r(:,:,:,iflx_bx:iflx_bz) + ej_r
 
     ! 5. Forward FFT
     if (proc0) call put_time_stamp(timer_fft)
@@ -1234,7 +1278,7 @@ contains
     use grid, only: ky, kz
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
-    use params, only: zi, cs2va2, C_shock, filter_mom
+    use params, only: zi, cs2va2, C_shock, filter_mom, C_eta, filter_mag
     use dealias, only: filter
     use force, only: driven, fmx, fmy, fmz
     use mp, only: sum_allreduce
@@ -1249,8 +1293,9 @@ contains
                             ikz_st:ikz_en, &
                             iky_st:iky_en), intent(in) :: lnrho, mx, my, mz, bx, by, bz
     complex(r8), allocatable, dimension(:,:,:) :: wk, qh
+    complex(r8), allocatable, dimension(:,:,:,:) :: ejh
     real   (r8), allocatable, dimension(:,:,:) :: wk_r, dEds_r
-    real(r8) :: loc(nbgt), kd, mfilt, k2r, lrate
+    real(r8) :: loc(nbgt), kd, mfilt, bfilt, k2r, lrate
     integer  :: i, j, k, n, d
 
     allocate(wk  (ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en))
@@ -1314,6 +1359,35 @@ contains
         end select
       enddo
       deallocate(qh)
+    endif
+
+    ! Shock resistivity: B.F^-1(P(-i k_d x F(eta J)))
+    if(C_eta > 0.d0) then
+      allocate(ejh(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, 3))
+      do d = 1, 3
+        wk_r = ej_r(:,:,:,d)
+        if (proc0) call put_time_stamp(timer_fft)
+        call p3dfft_ftran_r2c(wk_r, ejh(:,:,:,d), 'fft')
+        if (proc0) call put_time_stamp(timer_fft)
+      enddo
+      ejh = ejh/nlx/nly/nlz
+      do d = 1, 3
+        do j = iky_st, iky_en
+          do k = ikz_st, ikz_en
+            do i = ikx_st, ikx_en
+              bfilt = merge(filter(i,k,j), 1.d0, filter_mag)
+              select case(d)
+                case(1); wk(i,k,j) = -zi*(ky_d(j)*ejh(i,k,j,3) - kz_d(k)*ejh(i,k,j,2))*bfilt
+                case(2); wk(i,k,j) = -zi*(kz_d(k)*ejh(i,k,j,1) - kxd(i,j)*ejh(i,k,j,3))*bfilt
+                case(3); wk(i,k,j) = -zi*(kxd(i,j)*ejh(i,k,j,2) - ky_d(j)*ejh(i,k,j,1))*bfilt
+              end select
+            enddo
+          enddo
+        enddo
+        call btran_wk
+        loc(ib_eps_eta) = loc(ib_eps_eta) + sum(w_r(:,:,:,ibx+d-1)*wk_r)
+      enddo
+      deallocate(ejh)
     endif
 
     ! SVV: dE/ds.F^-1(P F svv_r) + u.F^-1(P svv_m^) (eps_svv) + B.F^-1(P(-lambda B^)) (eps_svv_b),
@@ -1413,6 +1487,10 @@ contains
     loc(ib_visc    ) = visc_diss
     loc(ib_R_zeta  ) = loc(ib_eps_shock) + visc_diss
     if(svv_es) loc(ib_R_svv) = loc(ib_eps_svv) + loc(ib_D_svv)
+    if(C_eta > 0.d0) then
+      loc(ib_eta_diss) = eta_diss
+      loc(ib_R_eta   ) = loc(ib_eps_eta) + eta_diss
+    endif
 
     if(istage == 1) then
       t_bgt  = tt
@@ -1422,6 +1500,7 @@ contains
     if(visc_diss > 0.d0) R_zeta_ratio_max = max(R_zeta_ratio_max, abs(loc(ib_R_zeta))/visc_diss)
     if(loc(ib_D_svv) > 0.d0) R_svv_ratio_max = max(R_svv_ratio_max, abs(loc(ib_R_svv))/loc(ib_D_svv))
     if(svv_es .and. loc(ib_A_svv) > 0.d0) R_svv_scale_max = max(R_svv_scale_max, abs(loc(ib_R_svv))/loc(ib_A_svv))
+    if(loc(ib_eta_diss) > 0.d0) R_eta_ratio_max = max(R_eta_ratio_max, abs(loc(ib_R_eta))/loc(ib_eta_diss))
     if(istage == 3) bgt_pending = .true.
 
     deallocate(wk, wk_r, dEds_r)
@@ -1456,7 +1535,8 @@ contains
     dMdt_act  = (mon_np1(imon_M) - mon_n(imon_M))/dt_bgt
     dEdt_act  = (E_np1 - E_n)/dt_bgt
     dEdt_sum  = bgt(ib_eps_N) + bgt(ib_eps_res) + bgt(ib_eps_nu) + bgt(ib_eps_lmd)
-    eps_ideal = bgt(ib_eps_N) - bgt(ib_eps_shock) - bgt(ib_eps_force) - bgt(ib_eps_svv) - bgt(ib_eps_svv_b)
+    eps_ideal = bgt(ib_eps_N) - bgt(ib_eps_shock) - bgt(ib_eps_force) - bgt(ib_eps_svv) - bgt(ib_eps_svv_b) &
+              - bgt(ib_eps_eta)
 
     if(proc0) then
       write (unit=budget_unit, fmt="(100es26.17e3)") t_bgt, dt_bgt, &
@@ -1465,7 +1545,7 @@ contains
             eps_ideal, bgt(ib_eps_shock), -bgt(ib_visc), bgt(ib_R_zeta), R_zeta_ratio_max, &
             bgt(ib_eps_force), bgt(ib_eps_res), bgt(ib_eps_nu), bgt(ib_eps_lmd), E_n, E_np1, &
             bgt(ib_eps_svv) + bgt(ib_eps_svv_b), bgt(ib_eps_svv_b), -bgt(ib_D_svv), bgt(ib_R_svv), R_svv_ratio_max, &
-            R_svv_scale_max
+            R_svv_scale_max, bgt(ib_eps_eta), -bgt(ib_eta_diss), bgt(ib_R_eta), R_eta_ratio_max
       call flush(budget_unit)
     endif
 
@@ -1473,6 +1553,7 @@ contains
     R_zeta_ratio_max = 0.d0
     R_svv_ratio_max  = 0.d0
     R_svv_scale_max  = 0.d0
+    R_eta_ratio_max  = 0.d0
     bgt_pending = .false.
 
   end subroutine write_budget
@@ -1481,13 +1562,15 @@ contains
 !-----------------------------------------------!
 !> @author  YK
 !! @date    31 Oct 2026
-!! @brief   ASCII output of rho, u, B, zeta, D on
-!!          the line along the first active
-!!          direction through grid index 1 of the
-!!          other directions (out1d/line_NNNNN.dat)
+!! @brief   ASCII output of rho, u, B, zeta, D
+!!          (and eta for C_eta > 0) on the line
+!!          along the first active direction
+!!          through grid index 1 of the other
+!!          directions (out1d/line_NNNNN.dat)
 !-----------------------------------------------!
   subroutine write_line
     use grid, only: nlx, nly, nlz, xx, yy, zz
+    use params, only: C_eta
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     use mp, only: proc0, sum_reduce
     use time, only: tt
@@ -1497,7 +1580,7 @@ contains
     real(r8), allocatable :: buf(:,:)
     character(len=1)   :: dir
     character(len=100) :: fn
-    integer :: i, j, k, nl, unit, ierr
+    integer :: i, j, k, nl, nc, unit, ierr
 
     if(active_x) then
       dir = 'x'; nl = nlx
@@ -1506,28 +1589,32 @@ contains
     else
       dir = 'z'; nl = nlz
     endif
-    allocate(buf(nl, 10), source=0.d0)
+    nc = merge(11, 10, C_eta > 0.d0)
+    allocate(buf(nl, nc), source=0.d0)
 
     select case(dir)
       case('x')
         if(ily_st <= 1 .and. 1 <= ily_en .and. ilz_st <= 1 .and. 1 <= ilz_en) then
           do i = ilx_st, ilx_en
-            buf(i,:) = (/xx(i), rho_r(1,1,i), ux_r(1,1,i), uy_r(1,1,i), uz_r(1,1,i), &
-                         w_r(1,1,i,ibx), w_r(1,1,i,iby), w_r(1,1,i,ibz), zeta_r(1,1,i), div_r(1,1,i)/)
+            buf(i,1:10) = (/xx(i), rho_r(1,1,i), ux_r(1,1,i), uy_r(1,1,i), uz_r(1,1,i), &
+                            w_r(1,1,i,ibx), w_r(1,1,i,iby), w_r(1,1,i,ibz), zeta_r(1,1,i), div_r(1,1,i)/)
+            if(nc == 11) buf(i,11) = eta_r(1,1,i)
           enddo
         endif
       case('y')
         if(ilz_st <= 1 .and. 1 <= ilz_en .and. ilx_st <= 1 .and. 1 <= ilx_en) then
           do j = ily_st, ily_en
-            buf(j,:) = (/yy(j), rho_r(j,1,1), ux_r(j,1,1), uy_r(j,1,1), uz_r(j,1,1), &
-                         w_r(j,1,1,ibx), w_r(j,1,1,iby), w_r(j,1,1,ibz), zeta_r(j,1,1), div_r(j,1,1)/)
+            buf(j,1:10) = (/yy(j), rho_r(j,1,1), ux_r(j,1,1), uy_r(j,1,1), uz_r(j,1,1), &
+                            w_r(j,1,1,ibx), w_r(j,1,1,iby), w_r(j,1,1,ibz), zeta_r(j,1,1), div_r(j,1,1)/)
+            if(nc == 11) buf(j,11) = eta_r(j,1,1)
           enddo
         endif
       case('z')
         if(ily_st <= 1 .and. 1 <= ily_en .and. ilx_st <= 1 .and. 1 <= ilx_en) then
           do k = ilz_st, ilz_en
-            buf(k,:) = (/zz(k), rho_r(1,k,1), ux_r(1,k,1), uy_r(1,k,1), uz_r(1,k,1), &
-                         w_r(1,k,1,ibx), w_r(1,k,1,iby), w_r(1,k,1,ibz), zeta_r(1,k,1), div_r(1,k,1)/)
+            buf(k,1:10) = (/zz(k), rho_r(1,k,1), ux_r(1,k,1), uy_r(1,k,1), uz_r(1,k,1), &
+                            w_r(1,k,1,ibx), w_r(1,k,1,iby), w_r(1,k,1,ibz), zeta_r(1,k,1), div_r(1,k,1)/)
+            if(nc == 11) buf(k,11) = eta_r(1,k,1)
           enddo
         endif
     end select
@@ -1541,9 +1628,13 @@ contains
       open(unit=unit, file=trim(fn), status='replace', iostat=ierr)
       if(ierr /= 0) call abort_run('write_line: cannot open '//trim(fn)//' (create the directory out1d)')
       write(unit, '("# t = ", es26.17e3, ", dir = ", a1, ", step = ", i10)') tt, dir, istep_adv
-      write(unit, '(a)') '# 1:'//dir//' 2:rho 3:ux 4:uy 5:uz 6:bx 7:by 8:bz 9:zeta 10:D'
+      if(nc == 11) then
+        write(unit, '(a)') '# 1:'//dir//' 2:rho 3:ux 4:uy 5:uz 6:bx 7:by 8:bz 9:zeta 10:D 11:eta'
+      else
+        write(unit, '(a)') '# 1:'//dir//' 2:rho 3:ux 4:uy 5:uz 6:bx 7:by 8:bz 9:zeta 10:D'
+      endif
       do i = 1, nl
-        write(unit, '(10es26.17e3)') buf(i,:)
+        write(unit, '(11es26.17e3)') buf(i,:)
       enddo
       close(unit)
     endif
@@ -1745,6 +1836,7 @@ contains
   subroutine allocate_advance
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use params, only: C_eta
     use shock_viscosity, only: svv_es
     implicit none
     complex(r8), allocatable, dimension(:,:,:) :: src
@@ -1781,6 +1873,10 @@ contains
     allocate(zeta_r, source=src_r)
     allocate(q_r   , source=src_r)
     allocate(svv_r , source=src_r)
+    if(C_eta > 0.d0) then
+      allocate(eta_r, source=src_r)
+      allocate(ej_r(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, 3), source=0.d0)
+    endif
     if(svv_es) then
       allocate(svv_mh(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, 3), source=(0.d0, 0.d0))
       allocate(svv_uh(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en, 3), source=(0.d0, 0.d0))
@@ -1840,6 +1936,8 @@ contains
     deallocate(zeta_r)
     deallocate(q_r   )
     deallocate(svv_r )
+    if(allocated(eta_r )) deallocate(eta_r )
+    if(allocated(ej_r  )) deallocate(ej_r  )
     if(allocated(svv_mh)) deallocate(svv_mh)
     if(allocated(svv_uh)) deallocate(svv_uh)
 

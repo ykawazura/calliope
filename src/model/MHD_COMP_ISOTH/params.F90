@@ -24,7 +24,7 @@ module params
   public  formulation, visc_form
   public  filter_lnrho, filter_mom, filter_mag
   public  cfl_visc, mass_correction, s_abort, debug_nan_step
-  public  C_shock, shock_nmax, shock_nsmooth, shock_dl, shock_selftest
+  public  C_shock, shock_nmax, shock_nsmooth, shock_dl, shock_selftest, C_eta
   public  svv_eps0, svv_mN, svv_above_kc, svv_form, cfl_svv, svv_pi_init, svv_pi_check
   public  write_intvl_1D, write_intvl_cons, budget
   private read_parameters
@@ -52,6 +52,8 @@ module params
   integer  :: shock_nmax, shock_nsmooth
   real(r8) :: shock_dl           ! Delta; <= 0 means min of the grid spacing in the active directions
   logical  :: shock_selftest     ! write zeta of an analytic D (shock_selftest.dat) for the decomposition test
+  ! shock resistivity: eta_shock = C_eta*Delta^2*S[max(0, -div u)] (the detector of zeta), dB/dt = -curl_N(eta_shock J)
+  real(r8) :: C_eta              ! <= 0: off
 
   ! spectral vanishing viscosity (Tadmor 1989) with the kernel Q(|k_d|) and eps_d = svv_eps0*dl_d*max(|u_d| + cf_d)
   ! (see shock_viscosity); B: rate lambda(k) = sum_d eps_d k_d^2 Q(|k_d|)
@@ -105,7 +107,7 @@ contains
                                    beta0, rho_min, shear, q
     namelist /numerics_parameters/ formulation, visc_form, filter_lnrho, filter_mom, filter_mag, &
                                    cfl_visc, mass_correction, s_abort, debug_nan_step
-    namelist /shock_parameters/ C_shock, shock_nmax, shock_nsmooth, shock_dl, shock_selftest
+    namelist /shock_parameters/ C_shock, shock_nmax, shock_nsmooth, shock_dl, shock_selftest, C_eta
     namelist /svv_parameters/ svv_eps0, svv_mN, svv_above_kc, svv_form, cfl_svv, svv_pi_init, svv_pi_check
     namelist /isoth_diagnostics/ write_intvl_1D, write_intvl_cons, budget
 
@@ -166,6 +168,7 @@ contains
     shock_nsmooth   = 1
     shock_dl        = 0.d0
     shock_selftest  = .false.
+    C_eta           = 0.d0
     svv_eps0        = 0.5d0
     svv_mN          = 0.5d0
     svv_above_kc    = .true.

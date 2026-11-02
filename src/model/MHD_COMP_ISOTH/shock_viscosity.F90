@@ -105,7 +105,7 @@ contains
     use dealias, only: filter
     use mp, only: proc0, max_allreduce
     use grid, only: kx_max_noprune, ky_max_noprune, kz_max_noprune
-    use params, only: C_shock, shock_dl, shock_nmax, shock_nsmooth, filter_mom, shock_selftest
+    use params, only: C_shock, shock_dl, shock_nmax, shock_nsmooth, filter_mom, shock_selftest, C_eta
     use params, only: svv_eps0, svv_mN, svv_above_kc, filter_lnrho, filter_mag, svv_form, cfl_svv
     implicit none
     real(r8) :: kmx2, kmy2, kmz2, mfilt, sfilt, bfilt
@@ -212,6 +212,7 @@ contains
              &", n_max = ", i3, ", n_smooth = ", i3)', C_shock, delta_shock, shock_nmax, shock_nsmooth
       print '("                   active (x, y, z) = ", 3l2, ", sum_d k_d,max^2 = ", es12.4)', &
              active_x, active_y, active_z, kd2_max
+      if(C_eta > 0.d0) print '("  shock resistivity: C_eta = ", es12.4, " (eta = C_eta*Delta^2*S[max(0, -D)])")', C_eta
       if(svv_on) then
         print '("  spectral vanishing viscosity: eps0 = ", es12.4, ", m_N/k_c = ", es12.4, &
                &", Q(|k| >= k_c) = ", i2)', svv_eps0, svv_mN, merge(1, 0, svv_above_kc)
@@ -768,13 +769,16 @@ contains
 !> @author  YK
 !! @date    31 Oct 2026
 !! @brief   zeta = C_shock*Delta^2*S[max(0, -D)]
+!!          and (optional) the shock resistivity
+!!          eta = C_eta*Delta^2*S[max(0, -D)]
 !-----------------------------------------------!
-  subroutine get_zeta(div_r, zeta_r)
+  subroutine get_zeta(div_r, zeta_r, eta_r)
     use grid, only: ily_st, ilz_st, ilx_st
-    use params, only: C_shock, shock_nmax, shock_nsmooth
+    use params, only: C_shock, shock_nmax, shock_nsmooth, C_eta
     implicit none
     real(r8), dimension(ily_st:, ilz_st:, ilx_st:), intent(in ) :: div_r
     real(r8), dimension(ily_st:, ilz_st:, ilx_st:), intent(out) :: zeta_r
+    real(r8), dimension(ily_st:, ilz_st:, ilx_st:), intent(out), optional :: eta_r
     integer :: n
 
     zeta_r = max(0.d0, -div_r)
@@ -790,6 +794,7 @@ contains
       if(active_x) call pass_1d(zeta_r, 'x', 's')
     enddo
 
+    if(present(eta_r)) eta_r = C_eta*delta_shock**2*zeta_r
     zeta_r = C_shock*delta_shock**2*zeta_r
 
   end subroutine get_zeta

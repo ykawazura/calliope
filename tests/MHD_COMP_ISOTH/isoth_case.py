@@ -50,7 +50,7 @@ ALIAS = {
 # init_type -> namelist of its parameters
 IC_NML = {'sound_wave': 'wave1d_params', 'simple_wave': 'wave1d_params',
           'riemann': 'riemann_params', 'single_mode': 'initial_condition_params',
-          'random': 'initial_condition_params', 'zero': None}
+          'random': 'initial_condition_params', 'profile1d': 'profile1d_params', 'zero': None}
 
 
 def fmt(v):
