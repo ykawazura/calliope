@@ -75,6 +75,7 @@ module advance
 
   integer :: cfl_unit, cons_unit, budget_unit
   integer :: nline1d = 0
+  integer :: nplanes = 0 ! number of records in out2d/plane_*.dat
 
   ! Forward FFT variables
   integer, parameter :: nftran = 10
@@ -149,12 +150,14 @@ contains
     use force, only: fmx, fmz, fmy, fmx_old, fmy_old, fmz_old, driven, update_force, get_force
     use advance_common, only: eSSPIFRK1, eSSPIFRK2, eSSPIFRK3
     use diagnostics_common, only: series_output
+    use shock_viscosity, only: tmr_on, tmr_off, itmr_step, itmr_budget
     implicit none
     real(r8) :: imp_terms_tintg0(nfields), imp_terms_tintg1(nfields)
     real(r8) :: imp_terms_tintg2(nfields), imp_terms_tintg3(nfields)
     integer :: i, j, k, n
 
     if (proc0) call put_time_stamp(timer_advance)
+    call tmr_on(itmr_step)
 
     ! initialize tmp fields
     if(counter == 0) then
@@ -176,7 +179,11 @@ contains
     if(dmass_corr /= 0.d0) call shift_mean(lnrho, dmass_corr)
 
     call get_explicit_terms(mx, my, mz, bx, by, bz)
-    if(budget) call stage_budget(1, lnrho, mx, my, mz, bx, by, bz)
+    if(budget) then
+      call tmr_on(itmr_budget)
+      call stage_budget(1, lnrho, mx, my, mz, bx, by, bz)
+      call tmr_off(itmr_budget)
+    endif
 
     !$omp parallel do private(j, k, i, n, imp_terms_tintg0, imp_terms_tintg1)
     do j = iky_st, iky_en
@@ -256,7 +263,11 @@ contains
     call get_nonlinear_terms(lnrho_tmp, mx_tmp, my_tmp, mz_tmp, bx_tmp, by_tmp, bz_tmp, 2)
 
     call get_explicit_terms(mx_tmp, my_tmp, mz_tmp, bx_tmp, by_tmp, bz_tmp)
-    if(budget) call stage_budget(2, lnrho_tmp, mx_tmp, my_tmp, mz_tmp, bx_tmp, by_tmp, bz_tmp)
+    if(budget) then
+      call tmr_on(itmr_budget)
+      call stage_budget(2, lnrho_tmp, mx_tmp, my_tmp, mz_tmp, bx_tmp, by_tmp, bz_tmp)
+      call tmr_off(itmr_budget)
+    endif
 
     !$omp parallel do private(j, k, i, n, imp_terms_tintg0, imp_terms_tintg2)
     do j = iky_st, iky_en
@@ -316,7 +327,11 @@ contains
     call get_nonlinear_terms(lnrho_tmp, mx_tmp, my_tmp, mz_tmp, bx_tmp, by_tmp, bz_tmp, 3)
 
     call get_explicit_terms(mx_tmp, my_tmp, mz_tmp, bx_tmp, by_tmp, bz_tmp)
-    if(budget) call stage_budget(3, lnrho_tmp, mx_tmp, my_tmp, mz_tmp, bx_tmp, by_tmp, bz_tmp)
+    if(budget) then
+      call tmr_on(itmr_budget)
+      call stage_budget(3, lnrho_tmp, mx_tmp, my_tmp, mz_tmp, bx_tmp, by_tmp, bz_tmp)
+      call tmr_off(itmr_budget)
+    endif
 
     !$omp parallel do private(j, k, i, n, imp_terms_tintg0, imp_terms_tintg2, imp_terms_tintg3)
     do j = iky_st, iky_en
@@ -436,6 +451,7 @@ contains
     ! Monitor and line output of the final state (the RHS is not evaluated)
     if(istep_adv == nstep) call get_nonlinear_terms(lnrho, mx, my, mz, bx, by, bz, 0)
 
+    call tmr_off(itmr_step)
     if (proc0) call put_time_stamp(timer_advance)
   end subroutine solve
 
@@ -547,8 +563,9 @@ contains
         call open_output_file (cons_unit, 'conservation.dat')
         write(cons_unit, '(a)') '# 1:t 2:dt 3:M 4:(M-M0)/M0 5:Px 6:Py 7:Pz 8:E_kin 9:E_mag 10:E_int 11:E ' &
                               //'12:rho_min 13:rho_max 14:zeta_max 15:D_min 16:sum(rho*zeta*D^2)dV ' &
-                              //'17:dmass_corr 18:dmass_corr_tot'
+                              //'17:dmass_corr 18:dmass_corr_tot 19:rms(div_N B)/(k_N rms|B|) 20:max|div_N B|/(k_N max|B|)'
         write(cons_unit, '(a)') '# M and E are before the mass correction of this step; M0 = M at the first step of this run'
+        write(cons_unit, '(a)') '# 19, 20: k_N = sqrt(sum_d max k_d^2) (19, 20 <= 1)'
       endif
 
       if(budget) then
@@ -622,6 +639,7 @@ contains
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use params, only: zi, cs2va2, C_shock, cfl_visc, filter_mom, mass_correction, debug_nan_step
     use params, only: write_intvl_cons, write_intvl_1D, cfl_svv, svv_pi_check, C_eta, filter_mag
+    use params, only: write_intvl_planes
     use dealias, only: filter
     use mp, only: proc0, max_allreduce, sum_allreduce
     use time, only: cfl, dt, tt, reset_dt
@@ -631,6 +649,7 @@ contains
     use shock_viscosity, only: active_x, active_y, active_z, is_nonfinite, abort_run
     use shock_viscosity, only: svv_on, kq2x, kq2y, kq2z, svv_lam_m, svv_lam_s, svv_lam_b, get_svv_eps
     use shock_viscosity, only: svv_es, get_svv_es, svv_power, svv_lam
+    use shock_viscosity, only: tmr_on, tmr_off, itmr_zeta, itmr_svv_es, itmr_svv_pi, itmr_planes
     use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan
     implicit none
     complex(r8), dimension (ikx_st:ikx_en, &
@@ -638,7 +657,7 @@ contains
                             iky_st:iky_en), intent(in) :: lnrho, mx, my, mz, bx, by, bz
     integer, intent(in) :: istage
 
-    real(r8) :: mon_pre(nmon), sums(3), maxs(9)
+    real(r8) :: mon_pre(nmon), sums(3), maxs(9), divb_err(2)
     real(r8) :: vad2_r(3), va2_r, cf2_r, b2h_r, ptot_r
     real(r8) :: dV, mfilt, bfilt, dt_adv, dt_visc, dt_cfl, rate_visc, F_svv
     integer  :: i, j, k, n, d, pi_nit
@@ -711,6 +730,7 @@ contains
     !$omp end workshare
 
     ! 3. Shock viscosity: D = div_N u, zeta, q = rho*zeta*D; shock resistivity eta
+    call tmr_on(itmr_zeta)
     if(svv_es) then
       call get_div_u(ux_r, uy_r, uz_r, kxd, div_r, svv_uh)
     elseif(C_shock > 0.d0 .or. C_eta > 0.d0 .or. istage <= 1) then
@@ -726,6 +746,7 @@ contains
       zeta_r = 0.d0
       q_r    = 0.d0
     endif
+    call tmr_off(itmr_zeta)
 
     ! div_N m (w is used as a work array; its content is destroyed by btran anyway)
     !$omp parallel do private(i, k, mfilt) schedule(static)
@@ -786,8 +807,11 @@ contains
     pi_nit   = 0
     pi_check = .false.
     if(svv_es .and. istage >= 1) then
+      call tmr_on(itmr_svv_es)
       call get_svv_es(w_r(:,:,:,ilnrho), rho_r, ux_r, uy_r, uz_r, eps_svv, svv_r, svv_mh, svv_diss, svv_uh)
+      call tmr_off(itmr_svv_es)
       if(istage == 1) then
+        call tmr_on(itmr_svv_pi)
         pi_check = svv_pi_check > 0 .and. istep_adv > 0 .and. mod(istep_adv, svv_pi_check) == 0
         if(pi_check) then
           call svv_power(w_r(:,:,:,ilnrho), rho_r, w_r(:,:,:,imx), w_r(:,:,:,imy), w_r(:,:,:,imz), eps_svv, &
@@ -798,6 +822,7 @@ contains
           call svv_power(w_r(:,:,:,ilnrho), rho_r, w_r(:,:,:,imx), w_r(:,:,:,imy), w_r(:,:,:,imz), eps_svv, &
                          svv_r, svv_mh, 1, 0.d0, pi_nit, pi_conv)
         endif
+        call tmr_off(itmr_svv_pi)
       endif
     endif
 
@@ -868,15 +893,21 @@ contains
     if(istage <= 1) then
       if(write_intvl_cons == 0.d0 .or. (write_intvl_cons > 0.d0 .and. &
          (first .or. istage == 0 .or. write_due(write_intvl_cons)))) then
+        call get_divb_err(bx, by, bz, divb_err)
         if(proc0) then
           write (unit=cons_unit, fmt="(100es26.17e3)") tt, dt, mon_pre(imon_M), (mon_pre(imon_M) - mass0)/mass0, &
                 mon_pre(imon_px:imon_pz), mon_pre(imon_ek:imon_ei), sum(mon_pre(imon_ek:imon_ei)), &
-                -maxs(2), maxs(1), maxs(3), -maxs(4), visc_diss, dmass_corr, dmass_corr_tot
+                -maxs(2), maxs(1), maxs(3), -maxs(4), visc_diss, dmass_corr, dmass_corr_tot, divb_err
           call flush(cons_unit)
         endif
       endif
 
       if(write_intvl_1D > 0.d0 .and. (first .or. istage == 0 .or. write_due(write_intvl_1D))) call write_line
+      if(write_intvl_planes > 0.d0 .and. (first .or. istage == 0 .or. write_due(write_intvl_planes))) then
+        call tmr_on(itmr_planes)
+        call write_planes
+        call tmr_off(itmr_planes)
+      endif
     endif
 
     if(istage == 0) then
@@ -1647,6 +1678,191 @@ contains
 
 !-----------------------------------------------!
 !> @author  YK
+!! @date    3 Nov 2026
+!! @brief   Error of div B of the state at tt
+!!            err(1) = rms(div_N B)/(k_N rms|B|)
+!!            err(2) = max|div_N B|/(k_N max|B|)
+!!          with div_N = F^-1 i k_d M F as in
+!!          curl_N of the induction equation and
+!!          k_N = sqrt(kd2_max), so err <= 1.
+!!          B in real space must be in w_r.
+!!          w(:,:,:,1) and flx_r(:,:,:,iflx_bx)
+!!          are used as work arrays.
+!-----------------------------------------------!
+  subroutine get_divb_err(bx, by, bz, err)
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use params, only: zi, filter_mag
+    use dealias, only: filter
+    use mp, only: proc0, sum_allreduce, max_allreduce
+    use time_stamp, only: put_time_stamp, timer_fft
+    use shock_viscosity, only: ky_d, kz_d, kd2_max
+    implicit none
+    complex(r8), dimension (ikx_st:ikx_en, &
+                            ikz_st:ikz_en, &
+                            iky_st:iky_en), intent(in) :: bx, by, bz
+    real(r8), intent(out) :: err(2)
+    real(r8) :: sums(2), maxs(2), bfilt, kn
+    integer :: i, j, k
+
+    !$omp parallel do private(i, k, bfilt) schedule(static)
+    do j = iky_st, iky_en
+      do k = ikz_st, ikz_en
+        do i = ikx_st, ikx_en
+          bfilt = merge(filter(i,k,j), 1.d0, filter_mag)
+          w(i,k,j,1) = zi*(kxd(i,j)*bx(i,k,j) + ky_d(j)*by(i,k,j) + kz_d(k)*bz(i,k,j))*bfilt
+        enddo
+      enddo
+    enddo
+    !$omp end parallel do
+    if (proc0) call put_time_stamp(timer_fft)
+    call p3dfft_btran_c2r(w(:,:,:,1), flx_r(:,:,:,iflx_bx), 'tff')
+    if (proc0) call put_time_stamp(timer_fft)
+
+    sums(1) = sum(flx_r(:,:,:,iflx_bx)**2)
+    sums(2) = sum(w_r(:,:,:,ibx)**2 + w_r(:,:,:,iby)**2 + w_r(:,:,:,ibz)**2)
+    maxs(1) = maxval(abs(flx_r(:,:,:,iflx_bx)))
+    maxs(2) = sqrt(maxval(w_r(:,:,:,ibx)**2 + w_r(:,:,:,iby)**2 + w_r(:,:,:,ibz)**2))
+    call sum_allreduce(sums)
+    call max_allreduce(maxs)
+
+    kn = sqrt(max(kd2_max, tiny(1.d0)))
+    err(1) = sqrt(sums(1)/max(sums(2), tiny(1.d0)))/kn
+    err(2) = maxs(1)/max(maxs(2), tiny(1.d0))/kn
+
+  end subroutine get_divb_err
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    3 Nov 2026
+!! @brief   Binary output of rho, ux, uy, uz, bx,
+!!          by, bz, zeta, D, eta (0 for C_eta = 0)
+!!          of the state at tt on the planes
+!!            y = yy(1): out2d/plane_y0.dat,
+!!                       arrays (nlx, nlz)
+!!            z = zz(1): out2d/plane_z0.dat,
+!!                       arrays (nlx, nly), nly > 2 only
+!!          Each call appends one record of the 10
+!!          arrays (real*8, x fastest, MPI-IO);
+!!          record number, t and step are written
+!!          to out2d/plane_time.dat.
+!-----------------------------------------------!
+  subroutine write_planes
+    use grid, only: nlx, nly, nlz
+    use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
+    use params, only: C_eta
+    use mp, only: proc0
+    use time, only: tt
+    use file, only: get_unused_unit
+    use shock_viscosity, only: active_y, abort_run
+    implicit none
+    integer, parameter :: nq = 10
+    real(r8), allocatable :: buf(:,:,:)
+    logical :: own
+    integer :: i, j, k, unit, ierr
+
+    ! y = yy(1)
+    own = ily_st <= 1 .and. 1 <= ily_en
+    if(own) then
+      allocate(buf(ilx_st:ilx_en, ilz_st:ilz_en, nq), source=0.d0)
+      do k = ilz_st, ilz_en
+        do i = ilx_st, ilx_en
+          buf(i,k,1:9) = (/rho_r(1,k,i), ux_r(1,k,i), uy_r(1,k,i), uz_r(1,k,i), &
+                           w_r(1,k,i,ibx), w_r(1,k,i,iby), w_r(1,k,i,ibz), zeta_r(1,k,i), div_r(1,k,i)/)
+          if(C_eta > 0.d0) buf(i,k,10) = eta_r(1,k,i)
+        enddo
+      enddo
+    else
+      allocate(buf(1, 1, nq), source=0.d0)
+    endif
+    call put_plane('out2d/plane_y0.dat', (/nlx, nlz/), (/ilx_en - ilx_st + 1, ilz_en - ilz_st + 1/), &
+                   (/ilx_st - 1, ilz_st - 1/), own, buf)
+    deallocate(buf)
+
+    ! z = zz(1)
+    if(active_y) then
+      own = ilz_st <= 1 .and. 1 <= ilz_en
+      if(own) then
+        allocate(buf(ilx_st:ilx_en, ily_st:ily_en, nq), source=0.d0)
+        do j = ily_st, ily_en
+          do i = ilx_st, ilx_en
+            buf(i,j,1:9) = (/rho_r(j,1,i), ux_r(j,1,i), uy_r(j,1,i), uz_r(j,1,i), &
+                             w_r(j,1,i,ibx), w_r(j,1,i,iby), w_r(j,1,i,ibz), zeta_r(j,1,i), div_r(j,1,i)/)
+            if(C_eta > 0.d0) buf(i,j,10) = eta_r(j,1,i)
+          enddo
+        enddo
+      else
+        allocate(buf(1, 1, nq), source=0.d0)
+      endif
+      call put_plane('out2d/plane_z0.dat', (/nlx, nly/), (/ilx_en - ilx_st + 1, ily_en - ily_st + 1/), &
+                     (/ilx_st - 1, ily_st - 1/), own, buf)
+      deallocate(buf)
+    endif
+
+    if(proc0) then
+      call get_unused_unit(unit)
+      if(nplanes == 0) then
+        open(unit=unit, file='out2d/plane_time.dat', status='replace', iostat=ierr)
+        if(ierr == 0) write(unit, '(a)') '# 1:record (from 0) 2:t 3:step; 10 arrays per record: ' &
+                                       //'rho ux uy uz bx by bz zeta D eta'
+      else
+        open(unit=unit, file='out2d/plane_time.dat', status='old', position='append', iostat=ierr)
+      endif
+      if(ierr /= 0) call abort_run('write_planes: cannot open out2d/plane_time.dat')
+      write(unit, '(i8, es26.17e3, i10)') nplanes, tt, istep_adv
+      close(unit)
+    endif
+    nplanes = nplanes + 1
+
+  end subroutine write_planes
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    3 Nov 2026
+!! @brief   Write the record nplanes of the plane
+!!          file fn (collective). Ranks with
+!!          own = F write nothing (count 0).
+!!          The file is truncated at the first
+!!          record of the run.
+!-----------------------------------------------!
+  subroutine put_plane(fn, sizes, subsizes, starts, own, buf)
+    use MPI
+    use shock_viscosity, only: abort_run
+    implicit none
+    character(len=*), intent(in) :: fn
+    integer, intent(in) :: sizes(2), subsizes(2), starts(2)
+    logical, intent(in) :: own
+    real(r8), intent(in) :: buf(:,:,:)
+    integer :: fh, newtype, cnt, q, ierr
+    integer(kind=MPI_OFFSET_KIND) :: disp
+
+    call MPI_FILE_OPEN(MPI_COMM_WORLD, fn, MPI_MODE_CREATE + MPI_MODE_WRONLY, MPI_INFO_NULL, fh, ierr)
+    if(ierr /= MPI_SUCCESS) call abort_run('write_planes: cannot open '//fn//' (create the directory out2d)')
+    if(nplanes == 0) call MPI_FILE_SET_SIZE(fh, 0_MPI_OFFSET_KIND, ierr)
+
+    ! the view of a rank without data is a valid 1 x 1 subarray; it writes 0 elements
+    if(own) then
+      call MPI_TYPE_CREATE_SUBARRAY(2, sizes, subsizes, starts, MPI_ORDER_FORTRAN, MPI_REAL8, newtype, ierr)
+      cnt = subsizes(1)*subsizes(2)
+    else
+      call MPI_TYPE_CREATE_SUBARRAY(2, sizes, (/1, 1/), (/0, 0/), MPI_ORDER_FORTRAN, MPI_REAL8, newtype, ierr)
+      cnt = 0
+    endif
+    call MPI_TYPE_COMMIT(newtype, ierr)
+    do q = 1, size(buf, 3)
+      disp = (int(nplanes, MPI_OFFSET_KIND)*size(buf, 3) + (q - 1))*sizes(1)*sizes(2)*8
+      call MPI_FILE_SET_VIEW(fh, disp, MPI_REAL8, newtype, 'native', MPI_INFO_NULL, ierr)
+      call MPI_FILE_WRITE_ALL(fh, buf(:,:,q), cnt, MPI_REAL8, MPI_STATUS_IGNORE, ierr)
+    enddo
+    call MPI_TYPE_FREE(newtype, ierr)
+    call MPI_FILE_CLOSE(fh, ierr)
+
+  end subroutine put_plane
+
+
+!-----------------------------------------------!
+!> @author  YK
 !! @date    15 Jul 2021
 !! @brief   Output series modes
 !-----------------------------------------------!
@@ -1906,6 +2122,11 @@ contains
 !! @brief   Deallocates arrays for this module
 !-----------------------------------------------!
   subroutine deallocate_advance
+    use fields, only: lnrho
+    use fields, only: mx, my, mz
+    use fields, only: bx, by, bz
+    use time, only: nstep
+    use terminate, only: terminated
     implicit none
 
     if (is_allocated) then
@@ -1913,6 +2134,10 @@ contains
     else
       return
     endif
+
+    ! Monitor and line output of the final state when check_terminate stopped the run before nstep
+    ! (solve does it at istep_adv = nstep); this also writes the budget row of the last step
+    if(terminated .and. istep_adv < nstep) call get_nonlinear_terms(lnrho, mx, my, mz, bx, by, bz, 0)
 
     deallocate(lnrho_new)
     deallocate(   mx_new)

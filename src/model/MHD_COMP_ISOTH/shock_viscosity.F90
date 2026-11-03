@@ -68,6 +68,8 @@ module shock_viscosity
   public is_nonfinite, abort_run
   public svv_on, kq2x, kq2y, kq2z, svv_lam_m, svv_lam_s, svv_lam_b, get_svv_eps
   public svv_es, get_svv_es, svv_power, svv_lam
+  public tmr_on, tmr_off, report_timers
+  public itmr_step, itmr_zeta, itmr_svv_es, itmr_svv_pi, itmr_budget, itmr_planes
 
   logical  :: initialized = .false.
   real(r8), allocatable :: kx_d(:), ky_d(:), kz_d(:) ! wavenumbers for derivatives (0 at Nyquist)
@@ -85,6 +87,13 @@ module shock_viscosity
   complex(r8), allocatable :: sgx(:), sgy(:), sgz(:)  ! sig_d = i k_d sqrt(Q) (|k_d| sqrt(Q) at Nyquist); 0 if inactive
   real(r8) :: svv_lam = 0.d0                          ! power-method estimate of the largest |eigenvalue| (svv_power)
   real(r8), allocatable :: pi_v(:,:,:,:)              ! power-method vector (s, mx, my, mz) in real space
+
+  ! wall-clock time [s] of parts of the step, summed over the run on each rank (see report_timers)
+  integer, parameter :: ntmr = 6
+  integer, parameter :: itmr_step = 1, itmr_zeta = 2, itmr_svv_es = 3, itmr_svv_pi = 4, itmr_budget = 5, itmr_planes = 6
+  character(len=28), parameter :: tmr_name(ntmr) = [character(len=28) :: &
+    'step (solve)', 'div u, zeta, eta (halo)', 'get_svv_es', 'svv_power', 'stage_budget', 'write_planes']
+  real(r8) :: tmr(ntmr) = 0.d0, tmr_t0(ntmr) = 0.d0
 
 contains
 
@@ -1007,5 +1016,55 @@ contains
     call MPI_Abort(MPI_COMM_WORLD, 1, ierr)
 
   end subroutine abort_run
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    3 Nov 2026
+!! @brief   Start and stop the timer i (MPI_Wtime
+!!          on each rank; no synchronization)
+!-----------------------------------------------!
+  subroutine tmr_on(i)
+    implicit none
+    integer, intent(in) :: i
+
+    tmr_t0(i) = MPI_Wtime()
+
+  end subroutine tmr_on
+
+  subroutine tmr_off(i)
+    implicit none
+    integer, intent(in) :: i
+
+    tmr(i) = tmr(i) + (MPI_Wtime() - tmr_t0(i))
+
+  end subroutine tmr_off
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    3 Nov 2026
+!! @brief   Print the min and max over the ranks
+!!          of the timers (collective)
+!-----------------------------------------------!
+  subroutine report_timers
+    use mp, only: proc0, max_reduce, min_reduce
+    implicit none
+    real(r8) :: tmin(ntmr), tmax(ntmr)
+    integer :: i
+
+    tmin = tmr
+    tmax = tmr
+    call min_reduce(tmin, 0)
+    call max_reduce(tmax, 0)
+    if(proc0) then
+      print '(/, " MHD_COMP_ISOTH timers [s] (min, max over ranks; % of max step)")'
+      do i = 1, ntmr
+        print '(3x, a28, 2es12.4, f8.2, " %")', tmr_name(i), tmin(i), tmax(i), &
+              100.d0*tmax(i)/max(tmax(itmr_step), tiny(1.d0))
+      enddo
+    endif
+
+  end subroutine report_timers
 
 end module shock_viscosity

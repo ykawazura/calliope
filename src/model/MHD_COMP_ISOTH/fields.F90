@@ -1435,7 +1435,10 @@ contains
 !! @brief   Finalization of Fields
 !-----------------------------------------------!
   subroutine finish_fields
+    use shock_viscosity, only: report_timers
     implicit none
+
+    call report_timers
 
     deallocate(lnrho)
     deallocate(mx)

@@ -50,10 +50,15 @@ ALIAS = {
 # init_type -> namelist of its parameters
 IC_NML = {'sound_wave': 'wave1d_params', 'simple_wave': 'wave1d_params',
           'riemann': 'riemann_params', 'single_mode': 'initial_condition_params',
-          'random': 'initial_condition_params', 'profile1d': 'profile1d_params', 'zero': None}
+          'random': 'initial_condition_params', 'profile1d': 'profile1d_params', 'zero': None,
+          'restart': None}
 
 
 def fmt(v):
+    if hasattr(v, 'item') and not isinstance(v, (list, tuple, str)):
+        # numpy scalar: np.float64 passes isinstance(v, float), but numpy >= 2 gives repr 'np.float64(x)', which
+        # the namelist read rejects (time.F90 then keeps the defaults of the whole group)
+        v = v.item()
     if isinstance(v, bool):
         return 'T' if v else 'F'
     if isinstance(v, float):

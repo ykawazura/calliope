@@ -26,7 +26,7 @@ module params
   public  cfl_visc, mass_correction, s_abort, debug_nan_step
   public  C_shock, shock_nmax, shock_nsmooth, shock_dl, shock_selftest, C_eta
   public  svv_eps0, svv_mN, svv_above_kc, svv_form, cfl_svv, svv_pi_init, svv_pi_check
-  public  write_intvl_1D, write_intvl_cons, budget
+  public  write_intvl_1D, write_intvl_cons, budget, write_intvl_planes
   private read_parameters
 
   logical  :: nonlinear
@@ -71,6 +71,7 @@ module params
   real(r8) :: write_intvl_1D     ! interval of line output (out1d/); <= 0: off
   real(r8) :: write_intvl_cons   ! interval of conservation.dat; 0: every step, < 0: off
   logical  :: budget             ! output energy/mass budget at every RK stage (budget.dat)
+  real(r8) :: write_intvl_planes ! interval of plane output of rho, u, B, zeta, D, eta (out2d/plane_*.dat); <= 0: off
 
 contains
 
@@ -109,7 +110,7 @@ contains
                                    cfl_visc, mass_correction, s_abort, debug_nan_step
     namelist /shock_parameters/ C_shock, shock_nmax, shock_nsmooth, shock_dl, shock_selftest, C_eta
     namelist /svv_parameters/ svv_eps0, svv_mN, svv_above_kc, svv_form, cfl_svv, svv_pi_init, svv_pi_check
-    namelist /isoth_diagnostics/ write_intvl_1D, write_intvl_cons, budget
+    namelist /isoth_diagnostics/ write_intvl_1D, write_intvl_cons, budget, write_intvl_planes
 
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
     !v    used only when the corresponding value   v!
@@ -179,6 +180,7 @@ contains
     write_intvl_1D  = 0.d0
     write_intvl_cons = 0.d0
     budget          = .false.
+    write_intvl_planes = 0.d0
     !^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^!
 
     call get_unused_unit (unit)
