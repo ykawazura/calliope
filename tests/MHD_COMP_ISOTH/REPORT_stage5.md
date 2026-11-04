@@ -1,14 +1,15 @@
-# MHD_COMP_ISOTH の再生: Stage 5（M_s ≈ 4 の密度の穴の解析と 128³ の解像度試験）の報告
+# MHD_COMP_ISOTH の再生: Stage 5（M_s ≈ 4 の密度の穴の解析、128³ の解像度試験、64³ での M_s の上限）の報告
 
 - 日付: 2026-11-04
-- branch: `feature/isoth-logrho-shock`（Stage 4 の commit 3b784b1 の上）
-- 対象: `tests/MHD_COMP_ISOTH/` の新規 3 ファイル（ES-SVV の 3D の静的解析、128³ のケース生成、その解析）。Fortran は変えていない
-- 計算機: ps1 の A_dev キュー（128 コア × 30 分のジョブ 2 本）と、ps1 のログインノード（静的解析）
+- branch: `feature/isoth-logrho-shock`（Stage 4 の commit 3b784b1 の上。12 章は Stage 5 の commit 328f488 の上）
+- 対象: `tests/MHD_COMP_ISOTH/` の新規 3 ファイル（ES-SVV の 3D の静的解析、128³ と 64³ のケース生成、その解析）と、12 章のための `gen_stage4.py` への追記。Fortran は変えていない
+- 計算機: ps1 の A_dev キュー（6 章は 128 コア × 30 分のジョブ 2 本、12 章は 16 コア × 10 分と 128 コア × 30 分のジョブ 1 本ずつ）と、ps1 のログインノード（静的解析と時系列の解析）
 
 ## 1. 結論
 
 Stage 4 では、M_s = 4 の 3D 減衰乱流（`turb4`、`turb4b`）で ρ が格子 1 点の幅の穴で 0 に向かい、ES-SVV の剛性 F_svv が 1/ρ_min に比例して増えて、dt が 2e-8 以下に縮んだ（Stage 4 の 8.3 節）。
 Stage 5 では、ES-SVV を Python に移して穴での F_svv の機構を静的に調べ、現行の方式のまま 2 本を 128³ で走らせて、穴が解像不足によるものかを確かめた。
+さらに、M_s = 2 と 3 を 64³ で走らせ、3τ0 まで走りきれる M_s の上限を調べた。
 F_svv は λ_svv をその状態の線形の上限 λ_lin（一様な状態の λ_svv、cfl.dat の 13 列目を 14 列目で割った値）で割った値で、一様な状態で 1 になる。
 
 - 穴の点の剛性（4 章）
@@ -29,6 +30,12 @@ F_svv は λ_svv をその状態の線形の上限 λ_lin（一様な状態の �
   - Stage 4 の 11.1 節は、λ_svv ∝ ρ_min^(−3/2) を「ρ の重みによる F_svv ∝ 1/ρ_min」と「箱全体で決まる ε_d による ρ_min^(−1/2)」の積と推定した。
     冪の分け方は静的解析と合うが、1/ρ_min の因子は ρ の重みでなく、エントロピー変数のヤコビアン ∂w/∂U ~ 1/ρ_h から来る（重みを定数にしても冪は −1.10）。
   - `turb4` の穴が 1 格子点の厚さなのは x 方向（B0 に垂直）で、B0 の方向に薄いのは `turb4b` だけである。
+- 64³ での M_s の上限（12 章）
+  - M_s = 2 と 3 の `turb2b` と `turb3b`（`turb1`、`turb4b` と同じ乱数の種と δB で、u の振幅だけを変えたもの）を、`turb4b_N64` と同じ設定で走らせた。
+  - 2 本とも ρ_min が 1e-2 程度まで下がったところで dt が dt0/10 を切り、3e-6（dt0 の 1/171 と 1/67）まで縮んだ。ρ_min は 1e-3 を切らなかった（最小は 1.51e-3 と 2.04e-3）。非有限値はない。
+  - 事前に決めた基準では、2 本とも「走りきる」にも「穴で止まる」にも当たらない。M_s = 1 は走りきり、4 は穴で止まったので、この初期場を 64³ で既定の散逸設定で走らせたときに 3τ0 まで走りきれる M_s の上限は、1 と 2 の間にある。
+  - dt は dt_visc で決まり、ρ_min が 2e-3 と 3e-2 の間で dt_visc ∝ ρ_min^(1.03–1.18) である。同じ ρ_min での dt は M_s = 2–4 で 1.8 倍以内に揃う。
+  - 2 本は、ユーザーの判断で 1 本目のジョブ（t = 0.61τ0 と 0.41τ0）で打ち切った。dt = 3e-6 のまま t_end まで続けると、30 分のジョブがさらに約 28 本と約 20 本要る。
 
 元の指示の評価項目のうち、安定性、MPI 分割、CFL の条件、既定値は Stage 4 から変わっていない（Fortran を変えていない）。
 密度の床、圧力の床、一様な粘性は足していない。
@@ -38,11 +45,12 @@ F_svv は λ_svv をその状態の線形の上限 λ_lin（一様な状態の �
 | ファイル | 変更内容 |
 |---|---|
 | `tests/MHD_COMP_ISOTH/svv3d.py`（新規） | ES-SVV（`svv_form = 'entropy'`）の 3D の写し。`advance.F90` の ε_d と `get_svv_eps`、`shock_viscosity.F90` の `svv_es_core`、`svv_G`、`svv_power` を numpy で書き直し、係数の変種（ε_d の局所化、ρ の重みの局所最小と定数）を足した。λ_svv は ARPACK（scipy）で求める。合成の状態と restart での F_svv、穴の点の dρ/dt の内訳、凍結した作用素の下限（4 章） |
-| `tests/MHD_COMP_ISOTH/gen_stage5.py`（新規） | 128³ のケース `runs/stage5/res/turb4_N128_a`、`turb4b_N128` の生成（6.1 節） |
-| `tests/MHD_COMP_ISOTH/analyze_stage5.py`（新規） | 64³ と 128³ の ρ_min、dt、F_svv の時系列、ρ_min が閾値を切る時刻、out3d と restart での穴の形（`res`、`plot`）と、cfl.dat の F_svv と svv3d.py の F_svv の照合（`fcheck`）（3.3 節、6.2 節） |
-| `tests/MHD_COMP_ISOTH/fig/stage5_res.png` | 6.2 節の図。Stage 4 の図と同じく `.gitignore` の `*.png` で commit から外れる |
+| `tests/MHD_COMP_ISOTH/gen_stage5.py`（新規） | 128³ のケース `runs/stage5/res/turb4_N128_a`、`turb4b_N128` の生成（`res`、6.1 節）と、64³ の `turb2b`、`turb3b` の較正と本番のケースの生成（`calib`、`ms`、12.1 節）。既にあるケースは作り直さない |
+| `tests/MHD_COMP_ISOTH/analyze_stage5.py`（新規） | 64³ と 128³ の ρ_min、dt、F_svv の時系列、ρ_min が閾値を切る時刻、out3d と restart での穴の形（`res`、`plot`）、cfl.dat の F_svv と svv3d.py の F_svv の照合（`fcheck`）、M_s = 1–4 の 64³ の比較と 12.1 節の基準での判定（`ms`、`msplot`）（3.3 節、6.2 節、12 章） |
+| `tests/MHD_COMP_ISOTH/gen_stage4.py` | `TURB_PROBS` に `turb2b`（M_s = 2）と `turb3b`（M_s = 3）を足し、`batch_calib` が問題の組と見出しを引数で受けるようにした。既定は今までの組で、既存の較正のケースの生成結果は変わらない（12.1 節） |
+| `tests/MHD_COMP_ISOTH/fig/stage5_res.png`、`fig/stage5_ms.png` | 6.2 節と 12.2 節の図。Stage 4 の図と同じく `.gitignore` の `*.png` で commit から外れる |
 
-Fortran、ジョブスクリプト、Stage 1–4 の Python は変えていない。
+Fortran とジョブスクリプトは変えていない。Stage 1–4 の Python で変えたのは `gen_stage4.py` だけである。
 svv3d.py は scipy（手元 1.17.1、ps1 1.13.1。どちらも既に入っていたもの）を使う。ほかの 2 本は numpy と matplotlib だけを使う。
 
 ## 3. ES-SVV の 3D の写しと検証
@@ -420,6 +428,8 @@ N を 2 倍にすると薄い軸の物理の幅も半分になり、F_svv の 1/
   対象は合成の状態（32³）と、`turb4_N64_a`、`turb4b_N64`、`turb1_N64` の最後の restart である。
 - 128³ の `turb4_N128_a` と `turb4b_N128` を現行の方式で t = 0.111 と 0.216 まで走らせた（A_dev のジョブ 2 本）。
   ρ_min、dt、F_svv の時系列、穴の形、最後の restart での穴の点の収支を 64³ と比べ、cfl.dat と svv3d.py の F_svv の一致を確かめた（6 章、3.3 節）。
+- 64³ の `turb2b`（M_s = 2）と `turb3b`（M_s = 3）の較正と本番を、A_dev のジョブ 1 本ずつで t = 0.61τ0 と 0.41τ0 まで走らせ、M_s = 1 と 4 の既存の実行と同じ基準で比べた（12 章）。
+  `analyze_stage5.py res` の 1 ケース分の処理を関数に分け、`res` の出力が既存の res.json、res.log とバイト単位で一致することを確かめた。
 
 ### 8.2 実装しなかったもの、走らせなかったもの
 
@@ -427,6 +437,8 @@ N を 2 倍にすると薄い軸の物理の幅も半分になり、F_svv の 1/
 - 変種で t = 0 から走らせる試験。凍結した状態の見積もり（5 章、6.2 節）だけで、穴のでき方が変わるかは分かっていない。
 - 128³ の 2 本を t_end まで走らせること。dt が 4e-8 と 4e-7 まで縮んだ時点で、計画どおり 2 本目のジョブで打ち切った。
 - 256³ の試験。
+- `turb2b` と `turb3b` を t_end まで走らせること。dt が dt0/10 を切って「走りきる」に当たらないことが決まった時点で、ユーザーの判断で 1 本目のジョブで打ち切った。
+- M_s = 1.5 の実行と、dt が再び増えられる設定（increase_dt を有限にする）での実行。`turb3b` の最後では dt_cfl が dt の 4.5 倍あった。
 
 ## 9. 未解決の問題
 
@@ -439,6 +451,7 @@ N を 2 倍にすると薄い軸の物理の幅も半分になり、F_svv の 1/
   `turb4b` の 128³ では local/rho が穴を埋める。どちらも 1 時刻の凍結した状態の見積もりで、変種で t = 0 から走らせた試験はしていない。
 - 穴の点の収支は最後の restart でしか求めていない。`turb4b` の 128³ で移流と SVV の向きがいつ、なぜ入れ替わったかは調べていない。
 - 64³ と 128³ の ρ_min(t) は ρ_min ≈ 0.3–0.5 より下で解像度について収束しておらず、穴のできる時刻も N に対して一定の向きに動かない。
+- 64³ で走りきれる M_s の上限が 1 と 2 の間のどこにあるかは決めていない。`turb2b` が続けると ρ_min < 1e-3 に至るか、`turb3b` の ρ_min が再び下がるかも分からない（12 章）。
 
 ## 10. 再現手順
 
@@ -475,6 +488,18 @@ python3 tests/MHD_COMP_ISOTH/analyze_stage5.py fcheck \
   runs/stage4/turb/turb4_N64_a runs/stage5/ana/eig_turb4_N64_a.json runs/stage4/turb/turb4b_N64 runs/stage5/ana/eig_turb4b_N64.json \
   runs/stage5/res/turb4_N128_a runs/stage5/ana/eig_turb4_N128_a.json runs/stage5/res/turb4b_N128 runs/stage5/ana/eig_turb4b_N128.json \
   runs/stage4/turb/turb1_N64 runs/stage5/ana/eig_turb1_N64.json
+# 64³ での M_s の上限（12 章）
+python3 tests/MHD_COMP_ISOTH/gen_stage5.py calib
+qsub -N isoth_mscal -l select=1:ncpus=16:mem=32gb:mpiprocs=16:ompthreads=1 -l walltime=00:10:00 \
+     -v CASES="runs/stage5/calib/turb3b_N64_np8 runs/stage5/calib/turb2b_N64_np8",PAR=16,EXE=bin/calliope_isoth_s4b,BUDGET=7 \
+     tests/MHD_COMP_ISOTH/job.pbs-ps-fes-dev
+python3 tests/MHD_COMP_ISOTH/gen_stage5.py ms     # dt0 は runs/stage5/calib の cfl.dat から決まる
+qsub -N isoth_ms -l select=2:ncpus=64:mem=64gb:mpiprocs=64:ompthreads=1 -l place=scatter -l walltime=00:30:00 \
+     -v CASES="runs/stage5/ms/turb3b_N64 runs/stage5/ms/turb2b_N64",PAR=128,EXE=bin/calliope_isoth_s4b \
+     tests/MHD_COMP_ISOTH/job.pbs-ps-fes-dev
+python3 tests/MHD_COMP_ISOTH/check_seams.py runs/stage5/ms/turb2b_N64 runs/stage5/ms/turb3b_N64
+python3 tests/MHD_COMP_ISOTH/analyze_stage5.py ms runs --json runs/stage5/ana/ms.json
+python3 tests/MHD_COMP_ISOTH/analyze_stage5.py msplot runs/stage5/ana/ms.json runs/stage5/ana/ms.png
 ```
 
 実行ファイルは Stage 4 の `bin/calliope_isoth_s4b` で、ps1 の src のチェックサムが 3b784b1 と一致することを確かめてから使った。
@@ -492,10 +517,114 @@ dt はさらに縮むので、これは下限である。
 
 | 候補 | 得られるもの | 代償 |
 |---|---|---|
-| 対象を M_s ≲ 1–2 に限る | コードを変えずに使える。M_s ≈ 1 の `turb1` は Stage 4 で t_end に達した | M_s ≈ 4 は扱えない。M_s ≈ 2 は試していないので、上限は試験で決める必要がある |
+| 対象を M_s ≲ 1–2 に限る | コードを変えずに使える。M_s ≈ 1 の `turb1` は Stage 4 で t_end に達した | M_s ≈ 4 は扱えない。12 章の試験では、この初期場の 64³ で走りきれる上限は M_s = 1 と 2 の間で、M_s = 2 でも dt が dt0 の 1/171 まで縮んだ |
 | 穴での質量流束を制限する（FCT 型の正値性の制限子など） | ρ を正に保ちつつ、SVV の埋め戻しに頼らずに穴の流出を止められる可能性がある | 方式の大きな変更で、穴でだけ働く点で密度の床に近い。元の指示により、入れる前にユーザーの承認が要る |
 | 変種（local/rho、min<n>）を Fortran に入れ、64³ で t = 0 から走らせる | 5 章の凍結した状態の見積もりを、穴のでき方の変化を含めて確かめられる | 64³ の 2 つと `turb4` の 128³ の見積もりどおりなら、穴の ρ が有限の時間で 0 になって止まる（`turb4b` の 128³ では local/rho が穴を埋めた）。Fortran の変更（既定オフ）と A_dev の 64³ のジョブ数本 |
 | 256³ で走らせる | 薄い軸の幅がさらに半分になるかを確かめられる | 6 章の結果からは dt の縮みは止まらないと予想する。費用は 128³ の約 16 倍（格子点 8 倍、dt 1/2）で、元の合意（3D は 256³ まで）の上限に当たる |
+
+## 12. 64³ での M_s の上限
+
+### 12.1 設定
+
+11 章の表の 1 行目（対象を M_s ≲ 1–2 に限る）を選ぶには、64³ で走りきれる M_s の上限が要る。
+それまでの 64³ の結果は、3τ0 まで走りきった M_s = 1 の `turb1_N64` と、穴で止まった M_s = 4 の `turb4b_N64` だけだった。
+その間を埋めるため、M_s = 2 と 3 の `turb2b` と `turb3b` を 64³ で走らせた（`gen_stage5.py calib` と `ms`、ケースは `runs/stage5/ms/turb2b_N64` と `turb3b_N64`）。
+
+- 初期値は `turb1` と `turb4b` と同じ乱数の種と δB（rms|δB| = B0）で、u の振幅だけを変えて M_s を 2 と 3 にした。ic/ の B は `turb4b_N64` と一致し、m は `turb4b_N64` の 0.5 倍と 0.75 倍である（差は 2.4e-16 以下）。
+- 係数と方式は `turb4b_N64` と同じである（C_shock = 2、C_eta = 0、svv_eps0 = 0.5、ES-SVV、cfl_svv = 2.0、reset_method = 'decrement'、increase_dt = 1e10、t_end = 3τ0、τ0 = π/M_s）。calliope.in の差は dt、nstep、出力の間隔だけである。
+- 最初の dt（以下 dt0）は 64³ の規則（自分の較正の実行の min(dt_adv, dt_visc) の 0.5 倍）で決めた。
+  較正の実行（`runs/stage5/calib/turb2b_N64_np8` と `turb3b_N64_np8`、8 rank で 100 step）の min(dt_adv, dt_visc) は 1.03e-3 と 4.01e-4 で、どちらも dt_visc で決まった。dt0 は 5.142e-4 と 2.005e-4 である。
+  比べる 2 本の dt0 は、`turb1_N64` が 1.321e-3、`turb4b_N64` が `turb4` の較正から決めた 6.914e-5 である（`turb4b` 自身の t = 0 の dt_visc は 1.89e-4）。
+- 各ケースを 64 rank（1 ホスト）で、`bin/calliope_isoth_s4b` で走らせた。conservation.dat、budget.dat、cfl.dat は毎 step、out3d は 0.1τ0 ごとに書いた。
+- ジョブは A_dev の 482999（較正、16 コア × 10 分）と 483006（本番、128 コア × 30 分）の 1 本ずつである。本番では、2 本とも nstep を使い切ったあと、同じジョブの中で restart から続けた。
+
+判定の基準は、結果を見る前に次のように固定した。
+
+- 走りきる（S）: 3τ0 に達し、その間 dt ≥ dt0/10 を保つ。
+- 穴で止まる（H）: ρ_min < 1e-3 かつ dt < dt0/10 になる。M_s = 4 では両方が同時に起きた。
+
+dt は reset_dt で減るだけで、dt_cfl が increase_dt（1e10）を超えない限り増えない（`time.F90`）。
+したがって、一度 dt < dt0/10 になったケースは S にならない。H に当たらないままそうなったケースは「S でない」と判定する。
+
+### 12.2 結果
+
+ρ_min、dt/dt0、F_svv の時間発展を `fig/stage5_ms.png` に示し、4 本の値を次の表に示す（`analyze_stage5.py ms`）。
+
+| M_s | ケース | dt0 | 最後の t/τ0 | step 数 | dt の最小/dt0 | ρ_min の最小（t/τ0） | F_svv の最大 | dt < dt0/10 になった t/τ0（その時の ρ_min） | 判定 |
+|---|---|---|---|---|---|---|---|---|---|
+| 1 | `turb1_N64` | 1.321e-3 | 3.000 | 7134 | 1 | 8.52e-2（0.875） | 1.23 | — | S |
+| 2 | `turb2b_N64` | 5.142e-4 | 0.613 | 45402 | 5.8e-3 | 1.51e-3（0.587） | 64.4 | 0.477（1.52e-2） | S でない |
+| 3 | `turb3b_N64` | 2.005e-4 | 0.409 | 46255 | 1.5e-2 | 2.04e-3（0.312） | 66.0 | 0.245（1.13e-2） | S でない |
+| 4 | `turb4b_N64` | 6.914e-5 | 0.234 | 50733 | 2.9e-4 | 1.18e-4（0.234） | 3.06e3 | 0.213（2.46e-3） | H |
+
+4 本とも非有限値はなく、質量の相対変化は 8.3e-8、7.0e-9、6.6e-10、1.2e-10、div B の指標の最大は 1.1e-17 以下である。
+`turb2b` と `turb3b` は `check_seams.py` でつなぎ目のエネルギー収支を確かめ、残差 0 で PASS した。
+
+ρ_min が 0.1 を切る時刻は、M_s = 1、2、3、4 で 0.643τ0、0.430τ0、0.205τ0、0.173τ0 で、M_s が大きいほど早い。
+M_s = 2–4 では、そのあと 0.03–0.06τ0 で ρ_min が 1e-2 を切った（0.486τ0、0.247τ0、0.204τ0）。
+M_s = 1 では ρ_min は 8.5e-2 より下がらず、dt は一度も縮まなかった。
+`turb2b` の ρ_min は 0.587τ0 で最小の 1.51e-3 になり、最後は 2.27e-3 である。
+`turb3b` の ρ_min は 0.312τ0 で最小の 2.04e-3 になったあと、最後は 1.03e-2 まで戻った。
+2 本とも dt は 3e-6（dt0 の 1/171 と 1/67）まで縮み、そこで 1 本目のジョブが終わった。
+
+out3d と最後の restart での穴の形は次のとおりである（6.2 節と同じ幅の定義。各ケースで ρ_min が最も低い記録と最後の記録）。
+
+| ケース | t/τ0 | ρ_min | x の幅 | y の幅 | z（B0）の幅 |
+|---|---|---|---|---|---|
+| `turb2b` | 0.600 | 1.74e-3 | 2.23 | 2.61 | 1.73 |
+| | 0.613（最後） | 2.27e-3 | 2.29 | 2.49 | 1.73 |
+| `turb3b` | 0.300 | 2.54e-3 | 1.79 | 4.66 | 1.57 |
+| | 0.409（最後） | 1.03e-2 | 1.73 | 3.36 | 1.24 |
+| `turb4b` | 0.234（最後） | 1.18e-4 | 2.86 | 3.45 | 1.09 |
+
+3 本とも穴は z（B0 の方向）に最も薄く、その幅は M_s = 2 で 1.73 格子点、3 で 1.24–1.57 格子点、4 で 1.09 格子点である。
+`turb3b` の穴は `turb4b` の穴から x に 4–6 格子点、y と z に 2 格子点以内の場所にでき、`turb2b` の穴は別の場所にできた。
+
+### 12.3 ρ_min と dt の関係
+
+M_s = 2–4 の 3 本では、dt_cfl = min(dt_adv, dt_visc) は全 step で dt_visc で決まる。
+dt_adv/dt_visc は全 step で 2.6 以上、ρ_min < 0.1 の step で 3.2 以上で、ρ_min が 2e-3 と 3e-2 の間の記録での中央値は 36–56 である。
+ρ_min が各値を最初に切った step の dt_cfl は次のとおりである（cfl.dat）。
+
+| ρ_min | M_s = 2 | M_s = 3 | M_s = 4 |
+|---|---|---|---|
+| 0.1 | 4.52e-4 | 2.57e-4 | 1.60e-4 |
+| 3e-2 | 1.33e-4 | 1.07e-4 | 1.16e-4 |
+| 1e-2 | 4.14e-5 | 2.57e-5 | 4.49e-5 |
+| 3e-3 | 5.31e-6 | 5.22e-6 | 9.08e-6 |
+| 1e-3 | — | — | 2.10e-6 |
+
+ρ_min ≤ 3e-2 では、同じ ρ_min での dt_cfl は M_s = 2–4 で 1.8 倍以内に揃う。
+ρ_min が 2e-3 と 3e-2 の間の記録に冪を合わせると、dt_visc ∝ ρ_min^(1.03–1.18) である。
+dt_visc は cfl_svv/λ_svv（λ_svv = λ_lin F_svv）なので、この冪は F_svv ∝ ρ_min^(−0.69 から −0.75) と λ_lin ∝ ρ_min^(−0.30 から −0.46) に分かれる。
+λ_lin は ε_d/Δ² に比例し、ε_d は穴の点の v_A とともに増える（6.2 節）。λ_lin の冪が −1/2 に近いのはこのためと考えられる（Stage 4 の 11.1 節）。
+同じ ρ_min での F_svv と λ_lin も、M_s によって大きくは変わらない。
+F_svv ρ_min の中央値は、ρ_min が 1e-2 と 0.1 の間の記録で 0.10–0.32（M_s = 1–4）、1e-3 と 1e-2 の間の記録で 0.11–0.18（M_s = 2–4）である。
+λ_lin は、ρ_min が 1e-2 を切った step で 2398–4246、3e-3 を切った step で 4134–7313 である。
+
+dt が dt0 の何分の 1 になるかは、ρ_min がどこまで下がるかと dt0 で決まる。
+dt_cfl が dt0/10 を切ったときの ρ_min は、M_s = 2、3、4 で 1.27e-2、8.30e-3、2.44e-3 である。
+M_s が大きいほどこの ρ_min が低いのは、dt0 が小さいからである。
+t = 0 の F_svv と λ_lin はどちらも M_s とともに大きく（M_s = 1–4 で F_svv が 0.78、2.09、4.14、7.0、λ_lin が 616、900、1200、1507）、較正の dt_visc がその分小さい。
+M_s = 1 も余裕は小さく、ρ_min が 0.1 を切った step の dt_cfl は 1.35e-3 で、dt0 の 1.02 倍だった。
+
+### 12.4 判定
+
+`turb2b`（M_s = 2）と `turb3b`（M_s = 3）は、どちらも S でなく、H でもない。
+dt は 0.477τ0 と 0.245τ0 で dt0/10 を切り、その後は増えないので S にはならない。
+ρ_min の最小は 1.51e-3 と 2.04e-3 で 1e-3 を切っていないので、H にも当たらない。
+最後の step の dt_cfl は、`turb2b` で dt0 の 7.2e-3 と dt の 1.2 倍で、dt は dt_cfl に抑えられている。
+`turb3b` では ρ_min が 1.03e-2 まで戻って dt_cfl は dt の 4.5 倍（dt0 の 6.7e-2）になったが、dt は増えない規則で 3e-6 のままである。
+
+M_s = 1 は S、4 は H なので、この初期場を 64³ で既定の散逸設定（C_shock = 2、C_eta = 0、svv_eps0 = 0.5）で走らせたとき、3τ0 まで dt ≥ dt0/10 のまま走りきれる M_s の上限は 1 と 2 の間にある。
+M_s を上げると ρ_min が 1e-2 程度まで下がるようになり、dt は M_s によらずほぼ ρ_min に比例して縮む。
+他の解像度、初期場、係数には、この結論を広げていない。M_s = 1.5 は走らせていない。
+
+dt0/10 の基準は計算の費用の基準で、`turb2b` と `turb3b` は保存と div B の点では健全に進んでいる。
+t_end までの残りの t は 3.75 と 2.71 で、dt = 3e-6 のまま続けると 1.25e6 と 9.0e5 step になる。
+483006 の 1 本あたりの step 数（45402 と 46255）で割ると、30 分のジョブがさらに約 28 本と約 20 本要る。
+dt はこれより大きくならないので、この本数は下限である。
+ユーザーの判断で、2 本とも 1 本目のジョブで打ち切り（計画の上限は本番 3 本）、理由を各ケースの exit_status に書いた。
 
 ## 文献
 

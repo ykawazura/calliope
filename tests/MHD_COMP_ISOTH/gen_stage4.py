@@ -145,8 +145,9 @@ TURB_SEED = 20261103
 TURB_GRID = 16   # the random modes (|k| <= 4) are drawn on this grid, so that they do not depend on N
 # turbulence problems: name -> (M_s = rms|u|, rms|dB|); rms|dB| = M_s is E_M = E_K. turb4b keeps the dB of turb1
 # (rms|dB| = B0): with E_M = E_K at M_s = 4 the mean p_B is 8.5 against p_th = 1, and turb4_N64_a stopped at
-# t = 0.13 on a hole of rho in one cell (REPORT_stage4 8.3)
-TURB_PROBS = {'turb1': (1.0, 1.0), 'turb4': (4.0, 4.0), 'turb4b': (4.0, 1.0)}
+# t = 0.13 on a hole of rho in one cell (REPORT_stage4 8.3). turb2b and turb3b lie between turb1 and turb4b
+# (same seed and dB, u scaled) for the upper limit of M_s on 64^3 (gen_stage5.py ms)
+TURB_PROBS = {'turb1': (1.0, 1.0), 'turb4': (4.0, 4.0), 'turb4b': (4.0, 1.0), 'turb2b': (2.0, 1.0), 'turb3b': (3.0, 1.0)}
 
 
 def turb_label(prob):
@@ -204,21 +205,24 @@ def problem_fields(prob, g):
     return turb_fields(g, *TURB_PROBS[prob])
 
 
-def batch_calib(root):
+CALIB_PROBS = (('ot', 256, 16), ('ot', 1024, 256), ('ot', 2048, 256),
+               ('turb4', 64, 8), ('turb4', 128, 64), ('turb4', 256, 256), ('turb1', 64, 8))
+
+
+def batch_calib(root, probs=CALIB_PROBS, header='Stage 4 cost calibration (gen_stage4.py calib)'):
     """100 steps of the OT vortex (x-z) and of the turbulence for the cost per step (timers of
     calliope.out.std) and dt_adv, dt_visc at the start; dt = 0.5 dt_adv(t = 0) of the initial fields,
-    reset_method = 'multiply', FFTW_MEASURE (as the production runs). Run one case at a time (no PAR)."""
+    reset_method = 'multiply', FFTW_MEASURE (as the production runs). Run one case at a time (no PAR).
+    probs: (problem, N, ranks) of the cases."""
     cases = []
-    for prob, N, P in (('ot', 256, 16), ('ot', 1024, 256), ('ot', 2048, 256),
-                       ('turb4', 64, 8), ('turb4', 128, 64), ('turb4', 256, 256), ('turb1', 64, 8)):
+    for prob, N, P in probs:
         box = box_2d(N) if prob == 'ot' else box_3d(N)
         g = gen_ic.Grid(box['nlx'], box['nly'], box['nlz'])
         fields, info = problem_fields(prob, g)
         dt = float('%.1e' % (0.5*cfl_dt(g, *fields)))
         cases.append(ic_case(os.path.join(root, '%s_N%d_np%d' % (prob, N, P)), g,
                              gen_ic.state_from_real(g, *fields), P, box, estimate=False,
-                             header='Stage 4 cost calibration (gen_stage4.py calib)',
-                             info=dict(info, batch='calib', dt=dt),
+                             header=header, info=dict(info, batch='calib', dt=dt),
                              time=dict(dt=dt, nstep=100, reset_method="'multiply'"),
                              isoth_diag=dict(write_intvl_cons=0.0, budget=True)))
     return cases
