@@ -706,33 +706,43 @@ TURB_PILOT = 0.5      # N = 64: dt = TURB_PILOT x the min dt_cfl of the calib ru
 TURB_DT_SAFETY = 0.85
 TURB_DECOMP_P = (1, 8, 64)
 TURB_DECOMP_NSTEP = 1000   # the long decomposition runs (M_s = 4, against the run on 64 ranks)
+TRACK_NMAX = 10  # upper bound of nstep in units of t_end/dt0 for turb_case(track=True) up to t_end
 
 
 def turb_case(root, name, prob, N, nstep, nproc, info, nrun=None, planes=None, cons=TURB_CONS, out3d=TURB_3D,
-              adaptive=False):
+              adaptive=False, track=False):
     """Decaying turbulence prob (TURB_PROBS) on N^3 over TURB_NTAU tau0 with dt = t_end/nstep (nrun
     steps: default nstep), reset_method = 'stop', FFTW_MEASURE. planes, cons, out3d in units of tau0
     (planes: default TURB_PLANES tau0; an explicit value is taken as is, e.g. from line_intvl).
     adaptive: reset_method = 'decrement' and the file t_end, with which the job script chains the run up to
-    t_end with the dt of the last step (dt = t_end/nstep at the start)."""
+    t_end with the dt of the last step (dt = t_end/nstep at the start).
+    track (Stage 6): reset_method = 'track' (dt follows dt_cfl, src/time.F90) from dt = t_end/nstep; with nrun the
+    run takes nrun steps, without nrun it stops at t_end of calliope.in (also in the file t_end for the chain) and
+    nstep = TRACK_NMAX nstep is only an upper bound."""
     box = box_3d(N)
     g = gen_ic.Grid(N, N, N)
     fields, tinfo = problem_fields(prob, g)
     tau0 = math.pi/tinfo['Ms']
     t_end = TURB_NTAU*tau0
     dt = t_end/nstep
-    nrun = nstep if nrun is None else nrun
+    to_t_end = track and nrun is None
+    nrun = (TRACK_NMAX*nstep if to_t_end else nstep) if nrun is None else nrun
     planes = TURB_PLANES*tau0 if planes is None else planes
     time = dict(dt=dt, nstep=nrun, reset_method="'decrement'") if adaptive else dict(dt=dt, nstep=nrun)
+    if track:
+        time['reset_method'] = "'track'"
+        if to_t_end:
+            time['t_end'] = t_end
     path = ic_case(os.path.join(root, name), g, gen_ic.state_from_real(g, *fields), nproc, box, estimate=False,
                    header='Stage 4 decaying isothermal MHD turbulence (gen_stage4.py turb)',
                    info=dict(info, **tinfo, batch='turb', problem=prob, N=N, tau0=tau0, t_end=t_end,
-                             nstep=nstep, nrun=nrun, dt=dt, planes=planes, adaptive=adaptive),
+                             nstep=nstep, nrun=nrun, dt=dt, planes=planes, adaptive=adaptive,
+                             **(dict(track=True, to_t_end=to_t_end) if track else {})),
                    time=time,
                    shock=dict(C_shock=2.0, C_eta=0.0), svv=dict(svv_eps0=0.5),
                    isoth_diag=dict(write_intvl_planes=planes, write_intvl_cons=cons*tau0, budget=True),
                    diag=dict(write_intvl_3D=out3d*tau0 if out3d > 0 else 0.0))
-    if adaptive:
+    if adaptive or to_t_end:
         with open(os.path.join(path, 't_end'), 'w') as f:
             f.write(repr(t_end) + '\n')
     return path

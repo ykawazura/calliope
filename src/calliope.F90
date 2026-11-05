@@ -3,7 +3,7 @@ program calliope
   use params, only: init_params
   use terminate, only: init_terminate, monitor_terminate, check_terminate, terminated
   use grid, only: init_grid
-  use time, only: init_time, tt, nstep, dt
+  use time, only: init_time, tt, nstep, dt, t_end_reached
   use fields, only: init_fields, finish_fields
   use dealias, only: init_filter
   use diagnostics_common, only: write_intvl, write_intvl_2D, write_intvl_3D
@@ -83,6 +83,8 @@ program calliope
     endif
 
     if(check_write_now(write_intvl) .and. proc0) write(*, "('step = ', I10, '/', I10, ',  time = ', f15.8)") istep, nstep, tt
+
+    if(t_end_reached()) exit
 
     if(monitor_terminate) then
       call check_terminate

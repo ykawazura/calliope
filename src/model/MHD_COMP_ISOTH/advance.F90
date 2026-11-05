@@ -142,7 +142,7 @@ contains
     use fields, only: bx_old, by_old, bz_old
     use grid, only: kx, ky, kz
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
-    use time, only: dt, tt, nstep
+    use time, only: dt, tt, nstep, t_end_reached
     use time_stamp, only: put_time_stamp, timer_advance
     use mp, only: proc0
     use params, only: shear, budget
@@ -448,8 +448,8 @@ contains
 
     istep_adv = istep_adv + 1
 
-    ! Monitor and line output of the final state (the RHS is not evaluated)
-    if(istep_adv == nstep) call get_nonlinear_terms(lnrho, mx, my, mz, bx, by, bz, 0)
+    ! Monitor and line output of the final state (the RHS is not evaluated): after nstep steps or at t_end
+    if(istep_adv == nstep .or. t_end_reached()) call get_nonlinear_terms(lnrho, mx, my, mz, bx, by, bz, 0)
 
     call tmr_off(itmr_step)
     if (proc0) call put_time_stamp(timer_advance)
@@ -806,6 +806,7 @@ contains
     if(istage == 1) call get_svv_eps(maxs(6:8), eps_svv)
     pi_nit   = 0
     pi_check = .false.
+    pi_conv  = .false.
     if(svv_es .and. istage >= 1) then
       call tmr_on(itmr_svv_es)
       call get_svv_es(w_r(:,:,:,ilnrho), rho_r, ux_r, uy_r, uz_r, eps_svv, svv_r, svv_mh, svv_diss, svv_uh)
@@ -862,7 +863,8 @@ contains
       dt_cfl = min(dt_adv, dt_visc)
       if(is_nonfinite(dt_cfl) .or. dt_cfl <= 0.d0) call abort_run('get_nonlinear_terms: invalid dt_cfl')
 
-      call reset_dt(dt_cfl, counter)
+      ! reset_method = 'track' raises dt only with the converged lambda_svv
+      call reset_dt(dt_cfl, counter, (pi_check .and. pi_conv) .or. .not. svv_es)
       n = 0
       do while(dt_cfl < dt .and. n < 100)
         call reset_dt(dt_cfl, counter)

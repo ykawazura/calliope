@@ -170,23 +170,30 @@ def readback(root):
     return dict(cases=out, ok=ok_all)
 
 
+def regress_pair(old, new):
+    """Statuses and the files of the run old compared with those of new: columns 1-18 of conservation.dat,
+    cfl.dat, budget.dat, shock_selftest.dat and out1d/* byte for byte."""
+    r = dict(status=(status(old), status(new)))
+    d = {}
+    a, b = load(os.path.join(old, 'conservation.dat')), load(os.path.join(new, 'conservation.dat'))
+    if a is not None and b is not None:
+        d['conservation.dat[1:18]'] = a.shape[0] == b.shape[0] and np.array_equal(a[:, :18], b[:, :18])
+        d['conservation.dat ncol'] = (a.shape[1], b.shape[1])
+    for f in ['cfl.dat', 'budget.dat', 'shock_selftest.dat'] + sorted(os.path.relpath(p, old) for p in glob.glob(os.path.join(old, 'out1d', '*'))):
+        if os.path.exists(os.path.join(old, f)):
+            d[f] = same_bytes(os.path.join(old, f), os.path.join(new, f))
+    r['same'] = d
+    r['ok'] = r['status'][0] == r['status'][1] and all(v for k, v in d.items() if k != 'conservation.dat ncol')
+    return r
+
+
 def regress(root):
     out = {}
     ok_all = True
     for old in sorted(glob.glob(os.path.join(root, '*_old'))):
-        new = old[:-4] + '_new'
         name = os.path.basename(old)[:-4]
-        r = dict(status=(status(old), status(new)))
-        d = {}
-        a, b = load(os.path.join(old, 'conservation.dat')), load(os.path.join(new, 'conservation.dat'))
-        if a is not None and b is not None:
-            d['conservation.dat[1:18]'] = a.shape[0] == b.shape[0] and np.array_equal(a[:, :18], b[:, :18])
-            d['conservation.dat ncol'] = (a.shape[1], b.shape[1])
-        for f in ['cfl.dat', 'budget.dat', 'shock_selftest.dat'] + sorted(os.path.relpath(p, old) for p in glob.glob(os.path.join(old, 'out1d', '*'))):
-            if os.path.exists(os.path.join(old, f)):
-                d[f] = same_bytes(os.path.join(old, f), os.path.join(new, f))
-        r['same'] = d
-        r['ok'] = r['status'][0] == r['status'][1] and all(v for k, v in d.items() if k != 'conservation.dat ncol')
+        r = regress_pair(old, old[:-4] + '_new')
+        d = r['same']
         out[name] = r
         ok_all &= r['ok']
         bad = [k for k, v in d.items() if v is False]
@@ -1335,14 +1342,16 @@ def turb_run(case, m):
     bud = np.concatenate(load_runs(case, 'budget.dat'))
     cfl = np.concatenate(load_runs(case, 'cfl.dat'))
     r['t_last'] = float(cons[-1, 0])
-    if m.get('adaptive'):
-        # dt reduced by reset_dt: the chain ends within dt/2 of t_end (file t_end), as in the job script
+    if m.get('adaptive') or m.get('to_t_end'):
+        # dt changed by reset_dt: the chain ends within dt/2 of t_end (file t_end), as in the job script
         te = float(open(os.path.join(case, 't_end')).read())
         r['complete'] = abs(r['t_last'] - te) <= 0.5*cfl[-1, 1] + 1e-12*te
     else:
         te = m['nrun']*m['dt']
         r['complete'] = abs(r['t_last'] - te) <= 1e-9*te
     r['t_end'] = te
+    # largest dt of the run, for the match of output records to the times a tau0 ('track' raises dt above dt0)
+    dtmax = max(m['dt'], float(cfl[:, 1].max()))
     st = ast3.stats(case, dict(dir='x', case=dict(N=N)), [])
     st['R_svv_A'] = svv_res_rel(case)
     r['stats'] = {k: st.get(k) for k in ('drift_M', 'drift_Px', 'drift_Py', 'drift_Pz', 'rho_min', 'rho_max',
@@ -1379,7 +1388,7 @@ def turb_run(case, m):
         if not recs or t > r['t_last'] + 1e-9:
             continue
         tr, path, rec = min(recs, key=lambda x: abs(x[0] - t))
-        if abs(tr - t) > 2*m['dt']:
+        if abs(tr - t) > 2*dtmax:
             continue
         sp, so = shell_spectra_3d(g, out3d_at(g, path, rec))
         key = '%.2f' % a
@@ -1393,7 +1402,7 @@ def turb_run(case, m):
             if not recs or t > r['t_last'] + 1e-9:
                 continue
             tr, step, path, rec = min(recs, key=lambda x: abs(x[0] - t))
-            if abs(tr - t) <= 2*m['dt']:
+            if abs(tr - t) <= 2*dtmax:
                 r['zeta'][pl]['%.2f' % a] = dict(t=tr, **zeta_stats(plane_at(g, path, rec, pl)))
     return r
 
@@ -1558,6 +1567,41 @@ def turb_figures(root, runs):
     plt.close(fig)
 
 
+def turb_print(name, status, r, superseded_by=None):
+    """One run of turb_run (with its residual r['R']): stability, drifts, dissipation, dt limit, s_out, zeta."""
+    st, sh, dl = r['stats'], r['share'], r['dt_lim']
+    print('%-12s %-12s t %.4f/%.4f dM %.1e dP %.1e R %.1e dt/lim %.2f dt*lam %.2f rho [%.4f, %.4f] divB %.1e '
+          'eps_peak %.4f at %.3f share visc %.3f svv %.3f svv_b %.3f ideal %.3f err_t %.1e'
+          % (name, status, r['t_last'], r['t_end'],
+             st['drift_M'], max(st['drift_Px'], st['drift_Py'], st['drift_Pz']), r['R'],
+             st['max_dt_over_limit'], st['max_dt_lam_svv'], st['rho_min'], st['rho_max'], st['divb_max'],
+             r['eps_peak']['eps'], r['eps_peak']['t'], sh['visc'], sh['svv'], sh['svv_b'], sh['ideal'],
+             st['time_err']))
+    if superseded_by:
+        print('   superseded by %s (not judged)' % superseded_by)
+    print('   dt limit: min %.3e at t = %.4f (adv %.3e visc %.3e lam_svv %.3e), max dt*lam %.2f'
+          % (dl['min'], dl['t'], dl['adv'], dl['visc'], dl['lam_svv'], dl['max_dt_lam']))
+    print('   s_out %s' % {k: '%.1e' % v for k, v in r['s_out'].items()})
+    for pl in TURB_PLANES:
+        print('   %s zeta frac %s a90 %s' % (pl, {k: round(z['frac'], 4) for k, z in r['zeta'][pl].items()},
+                                            {k: (round(z['a90'], 5) if z.get('a90') else None)
+                                             for k, z in r['zeta'][pl].items()}))
+
+
+def turb_print_conv(conv):
+    for name, c in conv.items():
+        print('conv %s: Ns %s pairs %s' % (name, c['Ns'], c['pairs']))
+        for k in ('state_t', 'state', 'eps_peak', 't_peak', 'share_visc', 'keff_ratio', 'a90_last', 'ok'):
+            if k in c:
+                print('   %s %s' % (k, c[k]))
+
+
+def turb_residual(r):
+    """Largest residual of the budget (R_zeta, R_svv_A, R_eta) of a turb_run result."""
+    st = r['stats']
+    return max(v for v in (st['R_zeta'], st['R_svv_A'], st['R_eta'], 0.0) if v is not None)
+
+
 def turb(root):
     cases, runs = {}, {}
     for f in sorted(glob.glob(os.path.join(root, '*', 'case.json'))):
@@ -1570,7 +1614,7 @@ def turb(root):
     checks = {}
     for name, r in runs.items():
         st = r['stats']
-        r['R'] = res = max(v for v in (st['R_zeta'], st['R_svv_A'], st['R_eta'], 0.0) if v is not None)
+        r['R'] = res = turb_residual(r)
         if cases[name]['superseded_by']:
             continue
         checks['run ' + name] = dict(complete=r['complete'], status=cases[name]['status'], R=res,
@@ -1588,28 +1632,8 @@ def turb(root):
         if 'ok' in c:
             checks['conv ' + name] = dict(ok=c['ok'])
     for name, r in sorted(runs.items(), key=lambda x: (x[1]['info']['problem'], x[1]['info']['N'])):
-        st, sh, dl = r['stats'], r['share'], r['dt_lim']
-        print('%-12s %-12s t %.4f/%.4f dM %.1e dP %.1e R %.1e dt/lim %.2f dt*lam %.2f rho [%.4f, %.4f] divB %.1e '
-              'eps_peak %.4f at %.3f share visc %.3f svv %.3f svv_b %.3f ideal %.3f err_t %.1e'
-              % (name, cases[name]['status'], r['t_last'], r['t_end'],
-                 st['drift_M'], max(st['drift_Px'], st['drift_Py'], st['drift_Pz']), r['R'],
-                 st['max_dt_over_limit'], st['max_dt_lam_svv'], st['rho_min'], st['rho_max'], st['divb_max'],
-                 r['eps_peak']['eps'], r['eps_peak']['t'], sh['visc'], sh['svv'], sh['svv_b'], sh['ideal'],
-                 st['time_err']))
-        if cases[name]['superseded_by']:
-            print('   superseded by %s (not judged)' % cases[name]['superseded_by'])
-        print('   dt limit: min %.3e at t = %.4f (adv %.3e visc %.3e lam_svv %.3e), max dt*lam %.2f'
-              % (dl['min'], dl['t'], dl['adv'], dl['visc'], dl['lam_svv'], dl['max_dt_lam']))
-        print('   s_out %s' % {k: '%.1e' % v for k, v in r['s_out'].items()})
-        for pl in TURB_PLANES:
-            print('   %s zeta frac %s a90 %s' % (pl, {k: round(z['frac'], 4) for k, z in r['zeta'][pl].items()},
-                                                {k: (round(z['a90'], 5) if z.get('a90') else None)
-                                                 for k, z in r['zeta'][pl].items()}))
-    for name, c in conv.items():
-        print('conv %s: Ns %s pairs %s' % (name, c['Ns'], c['pairs']))
-        for k in ('state_t', 'state', 'eps_peak', 't_peak', 'share_visc', 'keff_ratio', 'a90_last', 'ok'):
-            if k in c:
-                print('   %s %s' % (k, c[k]))
+        turb_print(name, cases[name]['status'], r, cases[name]['superseded_by'])
+    turb_print_conv(conv)
     for name, d in dec.items():
         print('decomp %s: n10 %s' % (name, {k: '%.1e' % v['max'] for k, v in d.get('n10', {}).items()}))
         if 'cons' in d:

@@ -35,7 +35,9 @@
 # reset_method = 'decrement'): a continuation takes dt of the last step from the last row of cfl.dat (written
 # at every step in full precision; its t + dt must equal t of restart/time.dat) and nstep =
 # int((t_end - t)/dt + 0.5), a run that ends without error before t_end - dt/2 (its dt was reduced) is
-# "incomplete", and a change of dt does not give "dt_changed".
+# "incomplete", and a change of dt does not give "dt_changed".  When calliope.in also sets t_end
+# (&time_parameters, e.g. with reset_method = 'track', which raises dt as well), the run stops at t_end
+# itself and a continuation keeps nstep of calliope.in (an upper bound) in place of the steps left.
 # A case with any other exit_status is skipped; remove exit_status (and chunk_*) to run it from the start.
 # A case with a directory ic/ (initial condition in the restart format, e.g. from gen_ic.py) starts
 # from it: ic/* is copied to restart/ when the case runs from the start.
@@ -113,7 +115,11 @@ run_once() {
         echo "exit t_end: t + dt of the last row of cfl.dat is not t of restart/time.dat" > ${c}/exit_status
         return
       fi
-      nleft=$(awk -v t=${tt} -v d=${d1} -v e=${tend} 'BEGIN{printf "%d", (e - t)/d + 0.5}')
+      if [ -n "$(nml t_end ${c}/calliope.in)" ]; then
+        nleft=$(nml nstep ${c}/calliope.in)
+      else
+        nleft=$(awk -v t=${tt} -v d=${d1} -v e=${tend} 'BEGIN{printf "%d", (e - t)/d + 0.5}')
+      fi
       sub="${sub};s/^\( *dt *=\).*/\1 ${d1}/"
     else
       nleft=$(awk -v t=${tt} -v d=$(nml dt ${c}/calliope.in) -v n=$(nml nstep ${c}/calliope.in) \
