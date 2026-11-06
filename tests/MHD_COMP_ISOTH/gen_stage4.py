@@ -710,7 +710,7 @@ TRACK_NMAX = 10  # upper bound of nstep in units of t_end/dt0 for turb_case(trac
 
 
 def turb_case(root, name, prob, N, nstep, nproc, info, nrun=None, planes=None, cons=TURB_CONS, out3d=TURB_3D,
-              adaptive=False, track=False):
+              adaptive=False, track=False, C_shock=2.0, svv_eps0=0.5, t_stop=None):
     """Decaying turbulence prob (TURB_PROBS) on N^3 over TURB_NTAU tau0 with dt = t_end/nstep (nrun
     steps: default nstep), reset_method = 'stop', FFTW_MEASURE. planes, cons, out3d in units of tau0
     (planes: default TURB_PLANES tau0; an explicit value is taken as is, e.g. from line_intvl).
@@ -718,13 +718,15 @@ def turb_case(root, name, prob, N, nstep, nproc, info, nrun=None, planes=None, c
     t_end with the dt of the last step (dt = t_end/nstep at the start).
     track (Stage 6): reset_method = 'track' (dt follows dt_cfl, src/time.F90) from dt = t_end/nstep; with nrun the
     run takes nrun steps, without nrun it stops at t_end of calliope.in (also in the file t_end for the chain) and
-    nstep = TRACK_NMAX nstep is only an upper bound."""
+    nstep = TRACK_NMAX nstep is only an upper bound.
+    C_shock, svv_eps0 (Stage 8): the coefficients (C_eta = 0). t_stop (Stage 8, units of tau0): the run stops at
+    t_stop tau0 in place of TURB_NTAU tau0 (t_end of calliope.in and the file t_end); dt is still TURB_NTAU tau0/nstep."""
     box = box_3d(N)
     g = gen_ic.Grid(N, N, N)
     fields, tinfo = problem_fields(prob, g)
     tau0 = math.pi/tinfo['Ms']
-    t_end = TURB_NTAU*tau0
-    dt = t_end/nstep
+    dt = TURB_NTAU*tau0/nstep
+    t_end = TURB_NTAU*tau0 if t_stop is None else t_stop*tau0
     to_t_end = track and nrun is None
     nrun = (TRACK_NMAX*nstep if to_t_end else nstep) if nrun is None else nrun
     planes = TURB_PLANES*tau0 if planes is None else planes
@@ -739,7 +741,7 @@ def turb_case(root, name, prob, N, nstep, nproc, info, nrun=None, planes=None, c
                              nstep=nstep, nrun=nrun, dt=dt, planes=planes, adaptive=adaptive,
                              **(dict(track=True, to_t_end=to_t_end) if track else {})),
                    time=time,
-                   shock=dict(C_shock=2.0, C_eta=0.0), svv=dict(svv_eps0=0.5),
+                   shock=dict(C_shock=C_shock, C_eta=0.0), svv=dict(svv_eps0=svv_eps0),
                    isoth_diag=dict(write_intvl_planes=planes, write_intvl_cons=cons*tau0, budget=True),
                    diag=dict(write_intvl_3D=out3d*tau0 if out3d > 0 else 0.0))
     if adaptive or to_t_end:

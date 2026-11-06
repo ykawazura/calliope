@@ -277,11 +277,18 @@ def tail_stats(rho, s, nb_lm=None):
 
 
 def tail(root, N):
-    case = os.path.join(root, CASES[N])
+    res = tail_case(os.path.join(root, CASES[N]), TAIL_T + (TAIL_T256 if N == 256 else ()))
+    write_json(root, 'tail_N%d.json' % N, res)
+    return res
+
+
+def tail_case(case, times):
+    """tail_stats of the out3d records of case nearest to times (tau0)."""
     g, op = svv3d.from_case(case)
+    N = g.nlx
     cons = cons_table(case)
     res = dict(N=N, case=case, snaps=[])
-    for tt in TAIL_T + (TAIL_T256 if N == 256 else ()):
+    for tt in times:
         r = pick(case, tt)
         if r is None:
             print('N %d t/tau0 %.4f: no record' % (N, tt))
@@ -295,7 +302,6 @@ def tail(root, N):
               % (N, st['t_tau'], st['rho_min'], st['rho_max'], st['sigma_s'], st['F_V']['0.1'], st['n']['0.05'],
                  '/'.join(str(st['nmin'][str(x)]) for x in NHOLE_THR), st['cons']['dt'], st['cons']['rel']))
         sys.stdout.flush()
-    write_json(root, 'tail_N%d.json' % N, res)
     return res
 
 
@@ -390,9 +396,8 @@ def fields(op, sn):
     return dict(rho=sn.rho, s=sn.s, Pth=op.cs2*sn.rho, PB=0.5*B2, Ptot=op.cs2*sn.rho + 0.5*B2, Bor=np.sqrt(B2)/sn.rho)
 
 
-def check_ref(N, tt, snap):
-    """The comparison with CHECK (5 significant digits) at (N, t_req)."""
-    ref = CHECK.get((N, tt))
+def check_ref(ref, snap):
+    """The comparison with ref (a value of CHECK, 5 significant digits), or None without ref."""
     if ref is None:
         return None
     h = snap['holes'][0]
@@ -406,14 +411,22 @@ def check_ref(N, tt, snap):
 
 
 def hole(root, N):
-    case = os.path.join(root, CASES[N])
+    res = hole_case(os.path.join(root, CASES[N]), HOLE_T[N], {t: v for (n, t), v in CHECK.items() if n == N})
+    write_json(root, 'hole_N%d.json' % N, res)
+    return res
+
+
+def hole_case(case, times, refs=None):
+    """The holes of the out3d records of case nearest to times (tau0); refs: {t_req: value of CHECK}."""
     g, op = svv3d.from_case(case)
+    N = g.nlx
+    refs = refs or {}
     cons = cons_table(case)
     dl = g.Lx/g.nlx
     bands_k = band_masks(g, num(read_nml(os.path.join(case, 'calliope.in')).get('svv_mn', '0.5')))
     res = dict(N=N, case=case, cs2=op.cs2, dl=dl, snaps=[])
     prev = None
-    for tt in HOLE_T[N]:
+    for tt in times:
         r = pick(case, tt)
         if r is None:
             print('N %d t/tau0 %.4f: no record' % (N, tt))
@@ -447,11 +460,10 @@ def hole(root, N):
             snap['track'] = dict(dt=dtt, move=pdist(p0, p1, g.nlx)*dl, u_prev_dt=prev['u']*dtt, u_now_dt=h0['u']*dtt,
                                  rho_prev_at_now=float(prev['rho_arr'][p1]), rho_now_at_prev=float(sn.rho[p0]))
         prev = dict(p=h0['p'], t=r[0], u=h0['u'], rho_arr=sn.rho)
-        snap['check'] = check_ref(N, tt, snap)
+        snap['check'] = check_ref(refs.get(tt), snap)
         res['snaps'].append(snap)
         print_snap(N, snap)
         del F, G, bands, divm, rdot, rL, rH, sk
-    write_json(root, 'hole_N%d.json' % N, res)
     return res
 
 
