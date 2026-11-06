@@ -9,8 +9,7 @@ equation, from the out3d records and conservation.dat of the existing runs (no j
     python3 analyze_stage9.py judge ROOT        gate 2, criteria, figures -> ROOT/stage9/summary.json, fig/*.png
     python3 analyze_stage9.py cancel ROOT       diagnostic of the s and u parts -> ROOT/stage9/cancel.json
 
-ROOT is the runs directory, label a key of CASES (default: all). judge stops unless the cases of the verdict
-(JUDGED) passed closure.
+ROOT is the runs directory, label a key of CASES (default: all). judge stops unless closure passed for all cases.
 
 With filter_lnrho = F and mass_correction = F (checked on the runs) d rho/dt = -div m + T, and T = d rho/dt of
 svv_es_core splits exactly into (svv_split; G_d = sig_d m_L, G_H,d = sig_d m_H, kap_d = e_d/(c^2 + max|u|^2))
@@ -44,10 +43,11 @@ Criteria (tasks/todo.md, Stage 9, fixed before any budget was computed):
     mechanism  u: A_u < 0 and (A_s >= 0 or |A_u| >= 2|A_s|); s: A_s < 0 and (A_u >= 0 or |A_s| >= 2|A_u|); both
 Sensitivity (reported, not used): RTH, YTH and the windows of WIN_ALT.
 
-Gate 1 was fixed for all six cases; closure failed on one row of e0.5_C4, so before any label was seen it was
-narrowed to the two cases of the verdict, with the threshold unchanged (REPORT_stage9.md). fieldmin is the
-diagnostic of that row and not a criterion: the min of a neighbouring row is the min over all cells of
-s(x) + h ds/dt(x), so it shows a change of the cell of the min; its a is taken at the min of the record only.
+Gate 1 is fixed for all six cases and closure failed on one row of e0.5_C4, so Stage 9 has no verdict. The tables
+of REPORT_stage9.md come from judge at 600c0fa, with the gate narrowed to the cases of the verdict (JUDGED); that
+change was not accepted. fieldmin is the diagnostic of that row and not a criterion: the min of a neighbouring
+row is the min over all cells of s(x) + h ds/dt(x), so it shows a change of the cell of the min; its a is taken at
+the min of the record only.
 """
 import json
 import os
@@ -508,8 +508,8 @@ def hole_aux(b, times):
 
 def judge(root):
     cl, fm = read_json(root, 'closure.json'), read_json(root, 'fieldmin.json')
-    if cl is None or not all(cl[JUDGED[N]]['PASS'] for N in JUDGED):
-        sys.exit('judge: gate 1 did not pass for a case of the verdict (or closure was not run); see closure.json')
+    if cl is None or not cl['PASS']:
+        sys.exit('judge: gate 1 did not pass (or closure was not run); see closure.json')
     B = {k: read_json(root, 'budget_%s.json' % k) for k in CASES}
     main = {N: regions_of(B[JUDGED[N]], WIN[N]) for N in JUDGED}
     lab = {N: {r: label(main[N][r]) for r in REGIONS} for N in JUDGED}
