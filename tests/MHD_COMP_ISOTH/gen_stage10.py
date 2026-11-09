@@ -35,11 +35,11 @@ def md5s(d):
     return out
 
 
-def check_control(case, control):
-    """Stops unless calliope.in differs from the control in ALLOWED only and ic/ is the same; returns the changes."""
+def check_control(case, control, allowed=ALLOWED):
+    """Stops unless calliope.in differs from the control in allowed only and ic/ is the same; returns the changes."""
     a, b = read_nml(os.path.join(case, 'calliope.in')), read_nml(os.path.join(control, 'calliope.in'))
     diff = {k: (a.get(k), b.get(k)) for k in sorted(set(a) | set(b)) if a.get(k) != b.get(k)}
-    if set(diff) != ALLOWED:
+    if set(diff) != set(allowed):
         raise SystemExit('%s: differs from the control in %s' % (case, sorted(diff)))
     ma, mb = md5s(os.path.join(case, 'ic')), md5s(os.path.join(control, 'ic'))
     if ma != mb:

@@ -72,8 +72,8 @@ H_FD = 1e-7  # svv_power
 class SVV:
     """Operators on the grid g (gen_ic.Grid; real arrays [i, k, j] = (x, z, y), Fourier (nkx, nkz, nky))."""
 
-    def __init__(self, g, cs2, eps0=0.5, mN=0.5, above_kc=True, filter_mom=True):
-        self.g, self.cs2, self.eps0, self.filter_mom = g, cs2, eps0, filter_mom
+    def __init__(self, g, cs2, eps0=0.5, mN=0.5, above_kc=True, filter_mom=True, mass=True):
+        self.g, self.cs2, self.eps0, self.filter_mom, self.mass = g, cs2, eps0, filter_mom, mass
         self.shape = (g.nlx, g.nlz, g.nly)
         self.ntot = g.ntot
         self.active = [g.nlx > 2, g.nly > 2, g.nlz > 2]
@@ -149,23 +149,28 @@ class SVV:
 
     def tend(self, s, u, W, eps, parts=False):
         """svv_es_core: (d rho/dt, dm/dt (3 real arrays), D_svv as the grid sum); with parts also the
-        A_L and A_H parts of d rho/dt."""
+        A_L and A_H parts of d rho/dt. mass = False (svv_mass = F): f_r = f_h = 0 and f_m = b g_m."""
         cs2 = self.cs2
         umax2 = float(np.max(sum(x**2 for x in u)))
-        wk = self.fft(cs2*s - 0.5*sum(x**2 for x in u))
+        wk = self.fft(cs2*s - 0.5*sum(x**2 for x in u)) if self.mass else None
         uk = [self.fft(x) for x in u]
-        rL = np.zeros_like(wk)
-        rH = np.zeros_like(wk)
-        mk = [np.zeros_like(wk) for _ in range(3)]
+        rL = np.zeros_like(uk[0])
+        rH = np.zeros_like(uk[0])
+        mk = [np.zeros_like(uk[0]) for _ in range(3)]
         dsum = 0.0
         for d in range(3):
             e = eps[d]
             if np.all(np.asarray(e) == 0):
                 continue
-            gr = self._grad(wk, d, True)
             gm = [self._grad(x, d, True) for x in uk]
-            a = e*W/cs2
             b = e*W
+            if not self.mass:
+                dsum += float(np.sum(b*(gm[0]**2 + gm[1]**2 + gm[2]**2)))
+                for c in range(3):
+                    mk[c] -= self._adj(b*gm[c], d, True)
+                continue
+            gr = self._grad(wk, d, True)
+            a = e*W/cs2
             t = gr + u[0]*gm[0] + u[1]*gm[1] + u[2]*gm[2]
             dsum += float(np.sum(a*t**2 + b*(gm[0]**2 + gm[1]**2 + gm[2]**2)))
             fr = a*t
@@ -192,17 +197,22 @@ class SVV:
         return [rdot/rho] + mdot
 
     def v0(self):
-        """Initial vector of svv_power (s part; m = 0)."""
+        """Initial vector of svv_power: the s part, and m = 0 except for mass = False, where each m component is
+        prod_d cos(2 pi K_d i_d/nl_d + 1) with K_d = (nl_d - 1)//3, the top index kept by the 2/3 filter on m."""
         g = self.g
         amp = np.ones(self.shape)
+        pm = np.ones(self.shape)
         nsg = np.zeros(self.shape, dtype=int)
         idx = np.indices(self.shape)  # (i, k, j)
         for d, ax, n in ((0, 0, g.nlx), (1, 2, g.nly), (2, 1, g.nlz)):
             if self.active[d]:
                 amp += 0.3*np.cos(2*np.pi*idx[ax]/n + 1.0)
                 nsg += idx[ax]
+                pm *= np.cos(2*np.pi*(((n - 1)//3)*idx[ax])/n + 1.0)
         v = np.zeros((4,) + self.shape)
         v[0] = np.where(nsg % 2 == 0, 1.0, -1.0)*amp
+        if not self.mass:
+            v[1:] = pm
         return v
 
     def norm(self, v):
@@ -227,6 +237,16 @@ class SVV:
             if conv:
                 break
         return lam, it, conv, v, hist
+
+    def lam_first(self, s, m, eps, wkind, h, v=None, wconst=None):
+        """lambda of one power iteration from v (default v0) with the finite-difference step h instead of H_FD:
+        it scales as 1/h if J v is round-off (v in the null space of J)."""
+        global H_FD
+        h0, H_FD = H_FD, h
+        try:
+            return self.power(s, m, eps, wkind, niter=1, v=v, wconst=wconst)[0]
+        finally:
+            H_FD = h0
 
     def eig(self, s, m, eps, wkind, wconst=None, k=3, tol=1e-6, ncv=24, maxiter=2000):
         """Largest |eigenvalue| of the finite-difference Jacobian (the J v of svv_power) by ARPACK
@@ -290,7 +310,8 @@ def from_case(case):
                     num(d.get('lx', '1.0')), num(d.get('ly', '1.0')), num(d.get('lz', '1.0')))
     lg = {'.true.': True, '.false.': False, 't': True, 'f': False}
     op = SVV(g, num(d.get('beta0', '1.0'))/2, num(d.get('svv_eps0', '0.5')), num(d.get('svv_mn', '0.5')),
-             lg[d.get('svv_above_kc', '.true.').lower()], lg[d.get('filter_mom', '.true.').lower()])
+             lg[d.get('svv_above_kc', '.true.').lower()], lg[d.get('filter_mom', '.true.').lower()],
+             lg[d.get('svv_mass', '.true.').lower()])
     assert strv(d.get('svv_form', "'entropy'")) == 'entropy'
     assert lg[d.get('filter_lnrho', '.false.').lower()] is False
     return g, op
@@ -396,7 +417,101 @@ def selftest():
     good = out < 1e-14
     ok &= good
     print('mask of dm/dt: max outside / max = %.1e  %s' % (out, 'PASS' if good else 'FAIL'))
+    ok &= selftest_nomass()
     print('all PASS' if ok else 'some FAIL')
+    return ok
+
+
+def selftest_nomass():
+    """mass = False (svv_mass = F): uniform state lambda = max over the mask of m of sum_d eps_d k_d^2 Q_d (not
+    F = 1: lam_lin includes the modes |k_d| >= k_c of ln rho, which have no SVV here; Stage 13 corrected this
+    criterion with the approval of the user, F - 1 is printed as well); on the smooth state rdot = 0,
+    sum u.mdot = -D_svv, D_svv = sum_d sum b |A_L u|^2 > 0, sum mdot = 0; lambda of 50 power iterations from v0
+    differs from mass = True; on a state with s = 0 and u, B below the SVV band, J v = 0 for the s part of v0 (one
+    iteration gives lambda ~ 1/h), not for v0 (its m part), and 50 iterations reach lambda_mask."""
+    ok = True
+    # 1. uniform state with u != 0 and B != 0: J_mm = sum_d eps_d A_L^* A_L, whose largest eigenvalue is the max
+    # over the mask of m (2/3 rule) of sum_d eps_d k_d^2 Q_d
+    g = gen_ic.Grid(16, 16, 16)
+    op = SVV(g, 1.0, mass=False)
+    rho0, u0, b0 = 1.3, (0.7, -0.4, 1.1), (0.3, 0.2, 1.0)
+    lk, mk, bk = gen_ic.state_from_real(g, np.full(op.shape, np.log(rho0)), tuple(np.full(op.shape, x) for x in u0),
+                                        tuple(np.full(op.shape, x) for x in b0))
+    s, m, rho, u, b = real_state(g, lk, mk, bk)
+    for ek, wk in [('global', 'rho'), ('local', 'rho'), ('global', 'min2'), ('local', 'min2'),
+                   ('global', 'const%.17g' % rho0)]:
+        r = lam_variant(op, s, m, rho, u, b, ek, wk, niter=300, tol=1e-9)
+        eps = op.eps(rho, u, b, local=(ek == 'local'))
+        lam_mask = float(np.max(op.mL*sum(np.max(np.asarray(eps[d]))*op.kq2[d] for d in range(3))))
+        res = r['lam']/lam_mask - 1
+        good = abs(res) < 1e-6
+        ok &= good
+        print('mass=F uniform 16^3  eps %-6s weight %-8s lambda/lambda_mask - 1 = %+.2e (%d it)  F - 1 = %+.4f  %s'
+              % (ek, wk, res, r['nit'], r['F'] - 1, 'PASS' if good else 'FAIL'))
+    # 2. smooth state
+    for N in (16, 24):
+        g = gen_ic.Grid(N, N, N)
+        op = SVV(g, 1.0, mass=False)
+        s, m, rho, u, b = real_state(g, *smooth_state(g))
+        for ek, wk in [('global', 'rho'), ('local', 'rho'), ('global', 'min1'), ('global', 'min3'), ('local', 'min2'),
+                       ('global', 'const1')]:
+            eps = op.eps(rho, u, b, local=(ek == 'local'))
+            W = op.weight(rho, wk)
+            rdot, mdot, dsum = op.tend(s, u, W, eps)
+            prod = sum(u[c]*mdot[c] for c in range(3))
+            res = (np.sum(prod) + dsum)/np.sum(np.abs(prod))
+            cons = max(abs(np.sum(x)) for x in mdot)/sum(np.sum(np.abs(x)) for x in mdot)
+            dref = sum(float(np.sum(eps[d]*W*sum(op._grad(op.fft(x), d, True)**2 for x in u))) for d in range(3))
+            dd = abs(dsum - dref)/dref
+            good = bool(np.all(rdot == 0)) and abs(res) < 1e-12 and cons < 1e-13 and dsum > 0 and dd < 1e-12
+            ok &= good
+            print('mass=F smooth %2d^3  eps %-6s weight %-6s  max|rdot| = %.0e  (sum u.G + D)/sum|u.G| = %+.1e  '
+                  'max|sum G|/sum|G| = %.1e  |D/D_ref - 1| = %.1e  D = %.4e  %s'
+                  % (N, ek, wk, np.max(np.abs(rdot)), res, cons, dd, dsum, 'PASS' if good else 'FAIL'))
+    # 3. lambda after 50 iterations from v0 (as at the first step of the code) with and without the mass fluxes
+    g = gen_ic.Grid(16, 16, 16)
+    s, m, rho, u, b = real_state(g, *smooth_state(g))
+    lam = {}
+    for mass in (True, False):
+        op = SVV(g, 1.0, mass=mass)
+        lm, _, _, _, hist = op.power(s, m, op.eps(rho, u, b), 'rho', niter=50)
+        lam[mass] = lm
+        conv = abs(hist[-1] - hist[-2])/hist[-1]
+        good = conv <= 1e-3
+        ok &= good
+        print('smooth 16^3 mass=%s: lambda_50 = %.10f  |lambda_50/lambda_49 - 1| = %.1e  %s'
+              % ('TF'[not mass], lm, conv, 'PASS' if good else 'FAIL'))
+    diff = abs(lam[False] - lam[True])/lam[True]
+    good = diff >= 1e-4
+    ok &= good
+    print('smooth 16^3 |lambda(F)/lambda(T) - 1| = %.3e (>= 1e-4)  %s' % (diff, 'PASS' if good else 'FAIL'))
+    # 4. s = 0, u and B at |k_d| <= 2 < svv_mN k_c = 4 (24^3): A_L(u v_s) = 0, so J v = 0 for the s part of v0;
+    # (a) shows that the test (b) of v0 can fail
+    g = gen_ic.Grid(24, 24, 24)
+    X, Y, Z = g.X, g.Y, g.Z
+    u = (0.8*np.sin(Z + 2*Y + 0.2), 0.5*np.cos(2*X - Z), 0.4*np.sin(X + Y + 1))
+    b = (0.6*np.cos(Y - 2*Z), 0.6*np.sin(X + Z), 1.0 + 0.3*np.cos(X - Y))
+    s, m, rho, u, b = real_state(g, *gen_ic.state_from_real(g, np.zeros(X.shape), u, b))
+    op = SVV(g, 1.0, mass=False)
+    eps = op.eps(rho, u, b)
+    vs = op.v0()
+    vs[1:] = 0.0
+    l7, l5 = op.lam_first(s, m, eps, 'rho', 1e-7, v=vs), op.lam_first(s, m, eps, 'rho', 1e-5, v=vs)
+    good = l7 > 10*l5
+    ok &= good
+    print('low-k 24^3 mass=F, s part of v0: lambda_1(h=1e-7) = %.3e  lambda_1(h=1e-5) = %.3e  ratio %.3g (> 10)  %s'
+          % (l7, l5, l7/l5, 'PASS' if good else 'FAIL'))
+    l7, l5 = op.lam_first(s, m, eps, 'rho', 1e-7), op.lam_first(s, m, eps, 'rho', 1e-5)
+    good = abs(l7/l5 - 1) <= 1e-6
+    ok &= good
+    print('low-k 24^3 mass=F, v0: lambda_1(h=1e-7) = %.10f  |lambda_1(1e-7)/lambda_1(1e-5) - 1| = %.1e (<= 1e-6)  %s'
+          % (l7, abs(l7/l5 - 1), 'PASS' if good else 'FAIL'))
+    lm = op.power(s, m, eps, 'rho', niter=50)[0]
+    lam_mask = float(np.max(op.mL*sum(np.max(np.asarray(eps[d]))*op.kq2[d] for d in range(3))))
+    good = abs(lm/lam_mask - 1) <= 1e-6
+    ok &= good
+    print('low-k 24^3 mass=F, v0: lambda_50 = %.10f  lambda_50/lambda_mask - 1 = %+.1e (|.| <= 1e-6)  %s'
+          % (lm, lm/lam_mask - 1, 'PASS' if good else 'FAIL'))
     return ok
 
 

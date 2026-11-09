@@ -470,7 +470,7 @@ contains
     use params, only: nonlinear, shear, time_step_scheme
     use params, only: nu, nu_h, nu_h_exp, eta, eta_h, eta_h_exp, lmd, lmd_h, lmd_h_exp
     use params, only: formulation, visc_form, filter_lnrho, filter_mom, filter_mag
-    use params, only: C_shock, s_abort, budget, write_intvl_cons, svv_eps0, svv_form, cfl_svv, C_eta
+    use params, only: C_shock, s_abort, budget, write_intvl_cons, svv_eps0, svv_form, cfl_svv, C_eta, svv_mass
     use shearing_box, only: tsc, k2t, k2t_inv
     use shock_viscosity, only: init_shock_viscosity, abort_run
     use file, only: open_output_file
@@ -496,6 +496,8 @@ contains
       call abort_run('MHD_COMP_ISOTH: svv_form = '//trim(svv_form)//' is not implemented (use entropy or linear)')
     if(trim(svv_form) == 'entropy' .and. cfl_svv <= 0.d0) &
       call abort_run('MHD_COMP_ISOTH: cfl_svv must be > 0')
+    if(.not. svv_mass .and. trim(svv_form) /= 'entropy') &
+      call abort_run('MHD_COMP_ISOTH: svv_mass = F is implemented for svv_form = entropy only')
     if(pruned .and. .not. (filter_lnrho .and. filter_mom .and. filter_mag)) &
       call abort_run('MHD_COMP_ISOTH: pruned = T truncates every field; set filter_lnrho = filter_mom = filter_mag = T')
     if(s_abort > 7.d2) &
@@ -639,7 +641,7 @@ contains
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use params, only: zi, cs2va2, C_shock, cfl_visc, filter_mom, mass_correction, debug_nan_step
     use params, only: write_intvl_cons, write_intvl_1D, cfl_svv, svv_pi_check, C_eta, filter_mag
-    use params, only: write_intvl_planes
+    use params, only: write_intvl_planes, svv_mass, svv_pi_init
     use dealias, only: filter
     use mp, only: proc0, max_allreduce, sum_allreduce
     use time, only: cfl, dt, tt, reset_dt
@@ -648,7 +650,7 @@ contains
     use shock_viscosity, only: get_div_u, get_zeta, ky_d, kz_d, kd2_max
     use shock_viscosity, only: active_x, active_y, active_z, is_nonfinite, abort_run
     use shock_viscosity, only: svv_on, kq2x, kq2y, kq2z, svv_lam_m, svv_lam_s, svv_lam_b, get_svv_eps
-    use shock_viscosity, only: svv_es, get_svv_es, svv_power, svv_lam
+    use shock_viscosity, only: svv_es, get_svv_es, svv_power, svv_lam, svv_seed_nomass
     use shock_viscosity, only: tmr_on, tmr_off, itmr_zeta, itmr_svv_es, itmr_svv_pi, itmr_planes
     use, intrinsic :: ieee_arithmetic, only: ieee_value, ieee_quiet_nan
     implicit none
@@ -660,8 +662,8 @@ contains
     real(r8) :: mon_pre(nmon), sums(3), maxs(9), divb_err(2)
     real(r8) :: vad2_r(3), va2_r, cf2_r, b2h_r, ptot_r
     real(r8) :: dV, mfilt, bfilt, dt_adv, dt_visc, dt_cfl, rate_visc, F_svv
-    integer  :: i, j, k, n, d, pi_nit
-    logical  :: first, pi_check, pi_conv
+    integer  :: i, j, k, n, d, pi_nit, pi_nit0
+    logical  :: first, pi_check, pi_conv, pi_seeded
     real(r8), parameter :: rk3_lim = 2.51d0 ! real-axis stability limit of SSPRK3 (2.5127)
     character(len=256) :: msg
 
@@ -813,6 +815,14 @@ contains
       call tmr_off(itmr_svv_es)
       if(istage == 1) then
         call tmr_on(itmr_svv_pi)
+        ! svv_mass = F: svv_seed_nomass sets the initial vector (also in m) before svv_power would (s only), and
+        ! svv_pi_init - 1 iterations here and the call below make the svv_pi_init of svv_power's first call
+        if(.not. svv_mass .and. .not. all(eps_svv == 0.d0)) then
+          pi_nit0 = 0
+          call svv_seed_nomass(pi_seeded)
+          if(pi_seeded) call svv_power(w_r(:,:,:,ilnrho), rho_r, w_r(:,:,:,imx), w_r(:,:,:,imy), w_r(:,:,:,imz), &
+                                       eps_svv, svv_r, svv_mh, svv_pi_init - 1, 0.d0, pi_nit0, pi_conv)
+        endif
         pi_check = svv_pi_check > 0 .and. istep_adv > 0 .and. mod(istep_adv, svv_pi_check) == 0
         if(pi_check) then
           call svv_power(w_r(:,:,:,ilnrho), rho_r, w_r(:,:,:,imx), w_r(:,:,:,imy), w_r(:,:,:,imz), eps_svv, &
@@ -824,6 +834,13 @@ contains
                          svv_r, svv_mh, 1, 0.d0, pi_nit, pi_conv)
         endif
         call tmr_off(itmr_svv_pi)
+        ! svv_mass = F: J has no ln rho row, so the initial vector is also in m (J v = 0 is then not expected);
+        ! lambda_svv = 0 would drop the SVV limit on dt
+        if(.not. svv_mass .and. .not. all(eps_svv == 0.d0)) then
+          pi_nit = pi_nit + pi_nit0
+          if(svv_lam == 0.d0) &
+            call abort_run('get_nonlinear_terms: svv_mass = F and lambda_svv = 0; the SVV would not limit dt')
+        endif
       endif
     endif
 

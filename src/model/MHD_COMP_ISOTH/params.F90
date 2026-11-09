@@ -25,7 +25,7 @@ module params
   public  filter_lnrho, filter_mom, filter_mag
   public  cfl_visc, mass_correction, s_abort, debug_nan_step
   public  C_shock, shock_nmax, shock_nsmooth, shock_dl, shock_selftest, C_eta
-  public  svv_eps0, svv_mN, svv_above_kc, svv_form, cfl_svv, svv_pi_init, svv_pi_check
+  public  svv_eps0, svv_mN, svv_above_kc, svv_form, svv_mass, cfl_svv, svv_pi_init, svv_pi_check
   public  write_intvl_1D, write_intvl_cons, budget, write_intvl_planes
   private read_parameters
 
@@ -62,6 +62,8 @@ module params
   logical  :: svv_above_kc       ! Q = 1 (T) or 0 (F) for |k_d| >= k_c,d (only ln rho has such modes, when filter_lnrho = F)
   character(20) :: svv_form      ! rho and m: 'entropy' (flux form in the entropy variables; dE/dt <= 0 for any state)
                                  !            or 'linear' (-lambda(k) applied to m and, mass-conserving, to rho)
+  logical  :: svv_mass           ! 'entropy': T keeps the mass fluxes; F (test only) drops them, so that rho gets no SVV
+                                 !            and m gets the flux eps rho A_L u alone (dE/dt <= 0 still holds)
   real(r8) :: cfl_svv            ! 'entropy': dt <= cfl_svv/lambda_svv, lambda_svv by the power method (<= 2.51 of eSSPIFRK3)
   integer  :: svv_pi_init        ! 'entropy': power iterations at the first step (one per step afterwards)
   integer  :: svv_pi_check       ! 'entropy': every svv_pi_check steps the power method is run until converged and
@@ -109,7 +111,7 @@ contains
     namelist /numerics_parameters/ formulation, visc_form, filter_lnrho, filter_mom, filter_mag, &
                                    cfl_visc, mass_correction, s_abort, debug_nan_step
     namelist /shock_parameters/ C_shock, shock_nmax, shock_nsmooth, shock_dl, shock_selftest, C_eta
-    namelist /svv_parameters/ svv_eps0, svv_mN, svv_above_kc, svv_form, cfl_svv, svv_pi_init, svv_pi_check
+    namelist /svv_parameters/ svv_eps0, svv_mN, svv_above_kc, svv_form, svv_mass, cfl_svv, svv_pi_init, svv_pi_check
     namelist /isoth_diagnostics/ write_intvl_1D, write_intvl_cons, budget, write_intvl_planes
 
     !vvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvvv!
@@ -174,6 +176,7 @@ contains
     svv_mN          = 0.5d0
     svv_above_kc    = .true.
     svv_form        = 'entropy'
+    svv_mass        = .true.
     cfl_svv         = 2.d0
     svv_pi_init     = 50
     svv_pi_check    = 100

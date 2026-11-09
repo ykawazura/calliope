@@ -54,6 +54,11 @@
 !!            (filter_lnrho = F). The explicit step is limited by the
 !!            largest |eigenvalue| of the Jacobian of this term, estimated by
 !!            the power method (svv_power).
+!!          svv_mass = F (test only) drops the mass fluxes, f_r = f_h = 0, so
+!!            that d rho/dt has no SVV term and f_m = b g_m. Then
+!!              D_svv = sum_d sum b |g_m|^2 dV >= 0,
+!!            mass and momentum are still conserved, but ln rho is not
+!!            dissipated by the SVV.
 !-----------------------------------------------!
 module shock_viscosity
   use p3dfft
@@ -67,7 +72,7 @@ module shock_viscosity
   public delta_shock, active_x, active_y, active_z
   public is_nonfinite, abort_run
   public svv_on, kq2x, kq2y, kq2z, svv_lam_m, svv_lam_s, svv_lam_b, get_svv_eps
-  public svv_es, get_svv_es, svv_power, svv_lam
+  public svv_es, get_svv_es, svv_power, svv_lam, svv_seed_nomass
   public tmr_on, tmr_off, report_timers
   public itmr_step, itmr_zeta, itmr_svv_es, itmr_svv_pi, itmr_budget, itmr_planes
 
@@ -115,7 +120,7 @@ contains
     use mp, only: proc0, max_allreduce
     use grid, only: kx_max_noprune, ky_max_noprune, kz_max_noprune
     use params, only: C_shock, shock_dl, shock_nmax, shock_nsmooth, filter_mom, shock_selftest, C_eta
-    use params, only: svv_eps0, svv_mN, svv_above_kc, filter_lnrho, filter_mag, svv_form, cfl_svv
+    use params, only: svv_eps0, svv_mN, svv_above_kc, filter_lnrho, filter_mag, svv_form, cfl_svv, svv_mass
     implicit none
     real(r8) :: kmx2, kmy2, kmz2, mfilt, sfilt, bfilt
     integer :: i, j, k
@@ -229,6 +234,8 @@ contains
                svv_lam_m, svv_lam_s
         if(svv_es) then
           print '("                   rho and m: entropy-stable flux form, cfl_svv = ", es12.4)', cfl_svv
+          if(.not. svv_mass) &
+            print '("                   svv_mass = F: no mass fluxes (no SVV in ln rho, f_m = eps rho A_L u)")'
         else
           print '("                   rho and m: linear form, -lambda(k)")'
         endif
@@ -444,13 +451,15 @@ contains
 !!          direction: 4 (5 with A_H) inverse and
 !!          4 (5) forward FFTs; in addition 1
 !!          forward (w_r) and 1 inverse (d rho/dt).
+!!          svv_mass = F: 3 inverse and 3 forward
+!!          per direction, nothing else.
 !-----------------------------------------------!
   subroutine svv_es_core(s_r, rho_r, ux_r, uy_r, uz_r, uh, eps, rdot_r, mdh, dsum)
     use grid, only: nlx, nly, nlz
     use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
     use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
     use dealias, only: filter
-    use params, only: cs2va2, filter_mom
+    use params, only: cs2va2, filter_mom, svv_mass
     use mp, only: proc0, max_allreduce
     use time_stamp, only: put_time_stamp, timer_fft
     implicit none
@@ -476,12 +485,14 @@ contains
     umax2 = maxval(ux_r**2 + uy_r**2 + uz_r**2)
     call max_allreduce(umax2)
 
-    ! w_r = cs^2 s - u^2/2
-    gr = cs2va2*s_r - 0.5d0*(ux_r**2 + uy_r**2 + uz_r**2)
-    if (proc0) call put_time_stamp(timer_fft)
-    call p3dfft_ftran_r2c(gr, wh, 'fft')
-    if (proc0) call put_time_stamp(timer_fft)
-    wh = wh/nlx/nly/nlz
+    ! w_r = cs^2 s - u^2/2 (not needed without the mass fluxes)
+    if(svv_mass) then
+      gr = cs2va2*s_r - 0.5d0*(ux_r**2 + uy_r**2 + uz_r**2)
+      if (proc0) call put_time_stamp(timer_fft)
+      call p3dfft_ftran_r2c(gr, wh, 'fft')
+      if (proc0) call put_time_stamp(timer_fft)
+      wh = wh/nlx/nly/nlz
+    endif
 
     rdh  = 0.d0
     mdh  = 0.d0
@@ -490,39 +501,56 @@ contains
       if(eps(d) == 0.d0) cycle ! inactive direction or svv off
 
       ! gradients g_r = A_L w_r, g_m = A_L u, g_h = A_H w_r
-      call grad(wh, .true., gr)
+      if(svv_mass) call grad(wh, .true., gr)
       do c = 1, 3
         call grad(uh(:,:,:,c), .true., gm(:,:,:,c))
       enddo
-      if(filter_mom) call grad(wh, .false., gh)
+      if(svv_mass .and. filter_mom) call grad(wh, .false., gh)
 
       ! fluxes (overwrite the gradients) and the dissipation density
-      kap = eps(d)/(cs2va2 + umax2)
-      do i = ilx_st, ilx_en
-        do k = ilz_st, ilz_en
-          do j = ily_st, ily_en
-            a = eps(d)*rho_r(j,k,i)/cs2va2
-            b = eps(d)*rho_r(j,k,i)
-            t = gr(j,k,i) + ux_r(j,k,i)*gm(j,k,i,1) + uy_r(j,k,i)*gm(j,k,i,2) + uz_r(j,k,i)*gm(j,k,i,3)
-            dsum = dsum + a*t**2 + b*(gm(j,k,i,1)**2 + gm(j,k,i,2)**2 + gm(j,k,i,3)**2)
-            gr(j,k,i) = a*t
-            gm(j,k,i,1) = ux_r(j,k,i)*gr(j,k,i) + b*gm(j,k,i,1)
-            gm(j,k,i,2) = uy_r(j,k,i)*gr(j,k,i) + b*gm(j,k,i,2)
-            gm(j,k,i,3) = uz_r(j,k,i)*gr(j,k,i) + b*gm(j,k,i,3)
+      if(svv_mass) then
+        kap = eps(d)/(cs2va2 + umax2)
+        do i = ilx_st, ilx_en
+          do k = ilz_st, ilz_en
+            do j = ily_st, ily_en
+              a = eps(d)*rho_r(j,k,i)/cs2va2
+              b = eps(d)*rho_r(j,k,i)
+              t = gr(j,k,i) + ux_r(j,k,i)*gm(j,k,i,1) + uy_r(j,k,i)*gm(j,k,i,2) + uz_r(j,k,i)*gm(j,k,i,3)
+              dsum = dsum + a*t**2 + b*(gm(j,k,i,1)**2 + gm(j,k,i,2)**2 + gm(j,k,i,3)**2)
+              gr(j,k,i) = a*t
+              gm(j,k,i,1) = ux_r(j,k,i)*gr(j,k,i) + b*gm(j,k,i,1)
+              gm(j,k,i,2) = uy_r(j,k,i)*gr(j,k,i) + b*gm(j,k,i,2)
+              gm(j,k,i,3) = uz_r(j,k,i)*gr(j,k,i) + b*gm(j,k,i,3)
+            enddo
           enddo
         enddo
-      enddo
-      if(filter_mom) then
-        dsum = dsum + sum(kap*rho_r*gh**2)
-        gh = kap*rho_r*gh
+        if(filter_mom) then
+          dsum = dsum + sum(kap*rho_r*gh**2)
+          gh = kap*rho_r*gh
+        endif
+      else
+        ! f_r = f_h = 0, f_m = b g_m
+        do i = ilx_st, ilx_en
+          do k = ilz_st, ilz_en
+            do j = ily_st, ily_en
+              b = eps(d)*rho_r(j,k,i)
+              dsum = dsum + b*(gm(j,k,i,1)**2 + gm(j,k,i,2)**2 + gm(j,k,i,3)**2)
+              gm(j,k,i,1) = b*gm(j,k,i,1)
+              gm(j,k,i,2) = b*gm(j,k,i,2)
+              gm(j,k,i,3) = b*gm(j,k,i,3)
+            enddo
+          enddo
+        enddo
       endif
 
       ! adjoints: d rho/dt -= A_L^* f_r + A_H^* f_h, dm/dt -= A_L^* f_m
-      call grad_adj(gr, .true.)
-      rdh = rdh - fh
-      if(filter_mom) then
-        call grad_adj(gh, .false.)
+      if(svv_mass) then
+        call grad_adj(gr, .true.)
         rdh = rdh - fh
+        if(filter_mom) then
+          call grad_adj(gh, .false.)
+          rdh = rdh - fh
+        endif
       endif
       do c = 1, 3
         call grad_adj(gm(:,:,:,c), .true.)
@@ -530,9 +558,13 @@ contains
       enddo
     enddo
 
-    if (proc0) call put_time_stamp(timer_fft)
-    call p3dfft_btran_c2r(rdh, rdot_r, 'tff')
-    if (proc0) call put_time_stamp(timer_fft)
+    if(svv_mass) then
+      if (proc0) call put_time_stamp(timer_fft)
+      call p3dfft_btran_c2r(rdh, rdot_r, 'tff')
+      if (proc0) call put_time_stamp(timer_fft)
+    else
+      rdot_r = 0.d0
+    endif
 
     deallocate(gr, gh, gm, wh, fh, rdh)
 
@@ -772,6 +804,74 @@ contains
     end function norm
 
   end subroutine svv_power
+
+
+!-----------------------------------------------!
+!> @author  YK
+!! @date    9 Nov 2026
+!! @brief   Initial vector of svv_power for
+!!          svv_mass = F
+!! @details If pi_v is not allocated, allocates it,
+!!          puts the vector below in it and returns
+!!          seeded = .true.; otherwise leaves it and
+!!          returns seeded = .false.
+!!          Called for svv_mass = F only, before
+!!          svv_power, which then finds pi_v allocated.
+!!          In s the vector is the initial vector of
+!!          svv_power, and in m it is
+!!            prod_d cos(2 pi K_d (i_d - 1)/nl_d + 1)
+!!          over the active d, K_d = (nl_d - 1)/3 the
+!!          top index kept by the 2/3 filter on m.
+!-----------------------------------------------!
+  subroutine svv_seed_nomass(seeded)
+    use grid, only: nlx, nly, nlz
+    use grid, only: ilx_st, ily_st, ilz_st, ilx_en, ily_en, ilz_en
+    use params, only: pi
+    implicit none
+    logical, intent(out) :: seeded
+    real(r8) :: amp
+    integer  :: i, j, k, nsg
+
+    seeded = .not. allocated(pi_v)
+    if(.not. seeded) return
+
+    ! svv_mass = F: J = [[0, 0], [J_ms, J_mm]] has no ln rho row, and J v = 0 for the vector of svv_power (s only)
+    ! if A_L(u v_s) = 0 (e.g. s = 0 and u only at |k_d| <= svv_mN k_c,d); the iteration would then start from
+    ! round-off, which depends on the decomposition. The m part: for uniform rho it is an eigenvector of J_mm with
+    ! the largest eigenvalue on the mask, and in general J_mm v_m = 0 only if A_L,d(v_m/rho) = 0 for all d
+    ! (<v_m/rho, J_mm v_m> = -sum_d eps_d sum W |A_L,d(v_m/rho)|^2).
+    ! The s part repeats the formula of svv_power, which is not changed here: a change of its source (even a
+    ! separate loop for m) changed its ifx -O3 code and the default lambda_svv in the last bits (Stage 13)
+    allocate(pi_v(ily_st:ily_en, ilz_st:ilz_en, ilx_st:ilx_en, 4))
+    do i = ilx_st, ilx_en
+      do k = ilz_st, ilz_en
+        do j = ily_st, ily_en
+          amp = 1.d0
+          nsg = 0
+          if(active_x) then
+            amp = amp + 0.3d0*cos(2.d0*pi*dble(i - 1)/dble(nlx) + 1.d0)
+            nsg = nsg + i - 1
+          endif
+          if(active_y) then
+            amp = amp + 0.3d0*cos(2.d0*pi*dble(j - 1)/dble(nly) + 1.d0)
+            nsg = nsg + j - 1
+          endif
+          if(active_z) then
+            amp = amp + 0.3d0*cos(2.d0*pi*dble(k - 1)/dble(nlz) + 1.d0)
+            nsg = nsg + k - 1
+          endif
+          pi_v(j,k,i,1) = merge(1.d0, -1.d0, mod(nsg, 2) == 0)*amp
+
+          amp = 1.d0
+          if(active_x) amp = amp*cos(2.d0*pi*dble(((nlx - 1)/3)*(i - 1))/dble(nlx) + 1.d0)
+          if(active_y) amp = amp*cos(2.d0*pi*dble(((nly - 1)/3)*(j - 1))/dble(nly) + 1.d0)
+          if(active_z) amp = amp*cos(2.d0*pi*dble(((nlz - 1)/3)*(k - 1))/dble(nlz) + 1.d0)
+          pi_v(j,k,i,2:4) = amp
+        enddo
+      enddo
+    enddo
+
+  end subroutine svv_seed_nomass
 
 
 !-----------------------------------------------!
