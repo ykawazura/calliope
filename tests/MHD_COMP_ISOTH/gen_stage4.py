@@ -146,8 +146,10 @@ TURB_GRID = 16   # the random modes (|k| <= 4) are drawn on this grid, so that t
 # turbulence problems: name -> (M_s = rms|u|, rms|dB|); rms|dB| = M_s is E_M = E_K. turb4b keeps the dB of turb1
 # (rms|dB| = B0): with E_M = E_K at M_s = 4 the mean p_B is 8.5 against p_th = 1, and turb4_N64_a stopped at
 # t = 0.13 on a hole of rho in one cell (REPORT_stage4 8.3). turb2b and turb3b lie between turb1 and turb4b
-# (same seed and dB, u scaled) for the upper limit of M_s on 64^3 (gen_stage5.py ms)
-TURB_PROBS = {'turb1': (1.0, 1.0), 'turb4': (4.0, 4.0), 'turb4b': (4.0, 1.0), 'turb2b': (2.0, 1.0), 'turb3b': (3.0, 1.0)}
+# (same seed and dB, u scaled) for the upper limit of M_s on 64^3 (gen_stage5.py ms). turb05 is turb1 with u and dB
+# scaled by 0.5 (Stage 15, M_s = 0.5 with E_M = E_K)
+TURB_PROBS = {'turb1': (1.0, 1.0), 'turb4': (4.0, 4.0), 'turb4b': (4.0, 1.0), 'turb2b': (2.0, 1.0),
+              'turb3b': (3.0, 1.0), 'turb05': (0.5, 0.5)}
 
 
 def turb_label(prob):
@@ -710,7 +712,7 @@ TRACK_NMAX = 10  # upper bound of nstep in units of t_end/dt0 for turb_case(trac
 
 
 def turb_case(root, name, prob, N, nstep, nproc, info, nrun=None, planes=None, cons=TURB_CONS, out3d=TURB_3D,
-              adaptive=False, track=False, C_shock=2.0, svv_eps0=0.5, t_stop=None, svv_mass=None):
+              adaptive=False, track=False, C_shock=2.0, svv_eps0=0.5, t_stop=None, svv_mass=None, phys=None, num=None):
     """Decaying turbulence prob (TURB_PROBS) on N^3 over TURB_NTAU tau0 with dt = t_end/nstep (nrun
     steps: default nstep), reset_method = 'stop', FFTW_MEASURE. planes, cons, out3d in units of tau0
     (planes: default TURB_PLANES tau0; an explicit value is taken as is, e.g. from line_intvl).
@@ -721,7 +723,9 @@ def turb_case(root, name, prob, N, nstep, nproc, info, nrun=None, planes=None, c
     nstep = TRACK_NMAX nstep is only an upper bound.
     C_shock, svv_eps0 (Stage 8): the coefficients (C_eta = 0). t_stop (Stage 8, units of tau0): the run stops at
     t_stop tau0 in place of TURB_NTAU tau0 (t_end of calliope.in and the file t_end); dt is still TURB_NTAU tau0/nstep.
-    svv_mass (Stage 13): written to svv_parameters unless None (None: not written, the default T of params.F90)."""
+    svv_mass (Stage 13): written to svv_parameters unless None (None: not written, the default T of params.F90).
+    phys, num (Stage 15): entries of physical_parameters and numerics_parameters (nu, eta, *_h, filter_lnrho)
+    over the defaults of isoth_case.py."""
     box = box_3d(N)
     g = gen_ic.Grid(N, N, N)
     fields, tinfo = problem_fields(prob, g)
@@ -745,7 +749,8 @@ def turb_case(root, name, prob, N, nstep, nproc, info, nrun=None, planes=None, c
                    shock=dict(C_shock=C_shock, C_eta=0.0),
                    svv=dict(svv_eps0=svv_eps0, **({} if svv_mass is None else dict(svv_mass=svv_mass))),
                    isoth_diag=dict(write_intvl_planes=planes, write_intvl_cons=cons*tau0, budget=True),
-                   diag=dict(write_intvl_3D=out3d*tau0 if out3d > 0 else 0.0))
+                   diag=dict(write_intvl_3D=out3d*tau0 if out3d > 0 else 0.0),
+                   **({} if phys is None else dict(phys=phys)), **({} if num is None else dict(num=num)))
     if adaptive or to_t_end:
         with open(os.path.join(path, 't_end'), 'w') as f:
             f.write(repr(t_end) + '\n')
