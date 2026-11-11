@@ -1,7 +1,7 @@
 # tests/MHD_COMP_ISOTH
 
 等温圧縮性 MHD のモデル `src/model/MHD_COMP_ISOTH` の検証の入力、スクリプト、報告を置く。
-論文の試験ごとのフォルダ（`Euler1D`、`MHD1D`、`Smooth_wave`、`OT2D`、`Turb3D`）に、その試験の全ケースの入力と説明（`README.md`）を置く。
+論文の試験ごとのフォルダ（`Euler1D`、`MHD1D`、`Smooth_wave`、`OT2D`、`Turb3D`）に、その試験の全ケースの入力、説明（`README.md`）、図のスクリプト（`plot_<試験>.py`）を置く。
 Stage ごとの生成と解析のスクリプト、報告（`REPORT_stage*.md`）、共通の部品は `stages/` に置く。
 計算の出力は git の管理外で、ps1 の `~/work/calliope_isoth/runs/` と手元の `runs/` にある。
 各スクリプトの使い方は、その docstring に書いてある。
@@ -107,6 +107,34 @@ ps1 では、`profile1d.dat` の 266 ケースと、`ic/` の md5 の組 57 か�
 589 本の `calliope.in` が使う namelist の変数は、いまの `src` がすべて宣言している（静的な照合）。
 いまの版で走らせたときに元と同じ結果になることは、最終版で走らせたケースのほかは確かめていない。
 
+## 図
+
+各試験のフォルダの `plot_<試験>.py`（`Euler1D/plot_euler1d.py` など）が、論文に載せる図をそのフォルダの `fig/<名前>.pdf` に書く。
+図の一覧と中身は、各フォルダの README の「図」の節にある。
+スタイルは gallope の strong scaling の図（`~/Dropbox/Codes/scaling/gallope/flow/strong scaling/202610/plot_flow.py`）に合わせ、`stages/figstyle.py` にまとめた。
+LaTeX の Times（newtx）、30 pt の字、内向きの目盛り、Okabe–Ito の色で、PDF に書く。
+
+コマンドは、リポジトリの根で次のとおりである（例は Euler1D で、ほかのフォルダも同じ形である）。
+
+```sh
+python3 tests/MHD_COMP_ISOTH/Euler1D/plot_euler1d.py list              # 図と入力の一覧
+python3 tests/MHD_COMP_ISOTH/Euler1D/plot_euler1d.py fetch             # ps1 にしかない入力を runs/ に持ち帰る
+python3 tests/MHD_COMP_ISOTH/Euler1D/plot_euler1d.py [plot] [名前 ...]  # 図を書く（名前を省くとすべて）
+```
+
+`--runs` で入力の根（既定 `runs`）を、`--host` と `--remote` で fetch の相手（既定 `ps1` の `~/work/calliope_isoth`）を変えられる。
+入力のない図は、足りないファイルを表示して飛ばし、最後に飛ばした図を並べる。
+
+- fetch は ps1 に何も書かず、手元にあるファイルを上書きしない（あれば飛ばす）。
+- 小さいファイル（要約の JSON、out1d の行）は、ssh と tar で、ps1 と同じパスで手元の `runs/` に写す。
+- 大きい出力（2D と 3D の面、`cfl.dat`、平面問題の分布）からは、要る配列だけを取り出す。`stages/figdata.py` を ssh の標準入力で ps1 に送って走らせ、npz を標準出力で `runs/figdata/<試験>/` に受け取る。
+- 取り出しは、ps1 の作業ディレクトリにある解析のモジュール（`analyze_stage1.py`、`analyze_stage4.py`、`gen_ic.py`、`gen_stage4.py`、`riemann_exact.py`、`cp_stability.py`）を import する。ps1 の `tests/` は古い配置なので、`tests/MHD_COMP_ISOTH/stages`、`tests/MHD_COMP_ISOTH` の順に探す。md5 が手元の `stages/` のものと違えば止まる。
+- fetch が持ち帰る量は、Euler1D が 2.7 MB、Smooth_wave が 0.8 MB、OT2D が 20 MB、Turb3D が 14 MB である。解析の要約（Stage 3 の FV の参照、Stage 7–8、13–16 の JSON など）は、各 Stage の解析で手元の `runs/` に置いたものを読み、fetch の対象にしていない。MHD1D の図は、これだけで描ける。
+
+図は手元でしか描けない。newtx が要り、ps1 にはないからである。
+各スクリプトは、描いた量の主な数値（収束の次数、最大値、判定の値）を標準出力に書く。REPORT の表と照らすためである。
+PDF は、リポジトリの根の `.gitignore` の `*.pdf` で git から外れる。`fig/` はスクリプトが作る。
+
 ## stages/
 
 ### Stage ごとのファイル
@@ -143,6 +171,8 @@ Stage 3 の表と図のスクリプト（`stage3_table.py`、`stage3_aux.py`）�
 - `fftw_shim.c`: p3dfft が FFTW に渡す計画の flag を stderr に書き出し、`FFTW_SHIM_ESTIMATE=1` のときは FFTW_ESTIMATE に置き換える LD_PRELOAD の shim。FFTW_MEASURE では同じ入力の 2 回の実行が 1e-13 程度ずれるので、ビット一致の試験に使う。ケースに `fftw_estimate` があると、ジョブスクリプトがこれをビルドして使う。
 - `stage3_nstep.json`: Stage 3 の試作の実行が t_end に届いたときの step 数と dt。`gen_stage3.py nstep` が書き、Stage 3 の Fortran のケースはこの dt で走る。
 - `incomp_regress.in`: MHD_INCOMP の回帰試験の入力。`gen_stage6.py` と `gen_stage13.py` の batch `regress` が使う。
+- `figstyle.py`: 試験のフォルダの図のスタイル（上の「図」の節）。rc の設定、色、線の太さ、パネルと地図の配置、`fig/` への書き出しを持つ。
+- `figdata.py`: 図のスクリプトが共有するコマンドライン（`plot`、`fetch`、`list`）と fetch。ps1 で走らせて出力から配列を取り出す部分も、このファイルにある。
 
 ## 整理の記録
 

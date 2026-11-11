@@ -58,3 +58,20 @@ REPORT_stage1 の 11.2 節にある `smoke/collide_U2_N512_chain` は、restart 
 - fast 波の判定、試作との照合（最初の 1000 ステップ）、SVV の冪乗法と dt の統計は、後処理 `post_stage1_es.sh` で求めた。
   これと fast 波の解析 `fast_wave.py` は ca9a205 で消したので、`git show cf9bb60:tests/MHD_COMP_ISOTH/<file> > <file>` で取り出して使う。
   `post_stage1_es.sh` は `T=tests/MHD_COMP_ISOTH` の下の `proto1d.py` と `fast_wave.py` を呼ぶので、取り出した 2 本は `stages/` に置き、`T` を `stages/` に直す。
+
+## 図
+
+`plot_euler1d.py` が `fig/<名前>.pdf` を書く。コマンドと fetch は `../README.md` の「図」の節による。
+入力は、Stage 1 の判定表 `runs/stage1_es/judge.json`（`judge_stage1.py` が書く）と、`shock` の N = 512、2048 の t_end の out1d の行である。
+`fetch` は、手元にないものを ps1 から写す（合わせて 2.7 MB）。
+図の実行は、上に書いたとおり最終版で走らせ直していない。
+
+| 図 | 中身 | REPORT_stage1 |
+|---|---|---|
+| `euler_profiles` | Sod、U1、U2、U4 の t_end の ρ（対数軸）と u。N = 512、2048 と厳密解 | 7.1 節 |
+| `euler_l1` | 4 問題の ρ の L1 誤差と N（256–4096）。N⁻¹ の線を添える | 7.1 節 |
+| `euler_simple` | 砕ける前の単純波（t = t_b/2）の max\|u − u_exact\| と N（32–512）。C_shock = 0 の SVV なしとあり、C_shock = 2 の 3 通り。N⁻² の線を添える | 7.3 節 |
+| `euler_dt` | U2（N = 512、t = 0.2）の質量の誤差 max\|M/M_0 − 1\| と、最小の dt の実行との ρ の差を、dt に対して描く。dt³ の線を添える | 7.4 節 |
+
+- `euler_profiles` は、ρ の L1 誤差と中間状態の密度を `analyze_stage1.riemann_analysis` で計算し直し、`judge.json` の値と並べて標準出力に書く。
+- 単純波の C_shock = 0 の誤差は、N = 256 で 2.1e-11 に達し、N = 512 でも下がらない。この値は時間積分の誤差で決まる。C_shock = 2 の誤差は N⁻² で下がる。

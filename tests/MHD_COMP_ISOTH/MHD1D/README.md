@@ -72,3 +72,22 @@ Stage 16 の conv は、完走（CV1）し、Stage 3 の実行と全 21 行で�
 - conv: `MPLBACKEND=Agg python3 tests/MHD_COMP_ISOTH/stages/analyze_stage16.py conv` で完走と旧との一致を調べ、`analyze_stage16.py table` で N = 256–8192 の表を作る。
   後者は、N ≤ 2048 を `runs/stage14/mhd1d/*_last` から、4096 と 8192 を `runs/stage16/conv_last` から読む。
 - 旧との比較（`analyze_stage14.py mhd1d`、`proto`、`records`）は、ps1 にある Stage 3 の実行（`runs/stage3_f`）と試作の実行（`runs/stage3`）を読むので、それらがない環境では使えない。
+
+## 図
+
+`plot_mhd1d.py` が `fig/<名前>.pdf` を書く。コマンドは `../README.md` の「図」の節による。
+入力はすべて手元の `runs/` にあり、fetch は要らない。
+読むのは、Stage 14 の最後の状態（`stage14/mhd1d/suite_last`、`eta_suite_last`）、Stage 16 の表（`stage16/conv_table.json`）、Stage 3 の FV の参照（`stage3/fvref`、N = 65536 など）と収束した FV の解（`stage3/fvwin`）である。
+数値解はどれも最終版（s13d）の実行である。
+REPORT の欄の Stage 3 の節は、設定と議論の節を指す。
+
+| 図 | 中身 | REPORT |
+|---|---|---|
+| `mhd1d_coplanar` | F1、F2、S1、S2、I1 の t_end の ρ と B_y を、厳密解の衝撃波からの距離 x − x_s に対して描く。N = 256、1024 と厳密解 | Stage 3 の 9 章、10.2 節 |
+| `mhd1d_compound` | C1、C3 の t = 0.1 の ρ と B_y（x < 1/2）。N = 512、2048 と FV の参照 | Stage 3 の 13 章 |
+| `mhd1d_rd` | RDh、RDp（w = 0、8 格子）と RDpc の 1 周期後（t = 1）の B_y と \|B_t\|。N = 512 と厳密解（初期値を 1 周期動かしたもの） | Stage 3 の 11 章 |
+| `mhd1d_reversal` | I1（衝撃波の近く、t_end）と RDpc（t = 1）の ρ、u_y、B_y。N = 1024 の C_η = 0、2 と、収束した FV の解と理想の解（I1 は厳密解、RDpc は初期値を 1 周期動かしたもの） | Stage 3 の 10.3、10.4 節、15.2 節 |
+| `mhd1d_conv` | I1 と RDpc の ρ の L1 誤差と N（256–8192）。収束した FV の解との差（実線）と N と 2N の差（破線）を、C_η = 0、2 で描く。点線は FV の解の N = 4096 と 16384 の差 | Stage 16 の 3.2 節 |
+| `mhd1d_c2`（限界） | C2 の t = 0.1 の ρ と B_y（x < 1/2）。N = 256、1024、4096 と FV の参照を、C_η = 0（上）と 2（下）で描く | Stage 3 の 13 章 |
+
+- `mhd1d_conv` の点線は、FV の解そのものの誤差の目安である（I1 で 9.4e-4、RDpc で 1.5e-3）。FV の解との差がこれに近づいた N では、その差は FV の解の誤差を含む。

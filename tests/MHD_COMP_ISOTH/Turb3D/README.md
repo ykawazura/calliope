@@ -136,3 +136,29 @@ ROOT は `runs` である。
 | 16 | `analyze_stage16.py hf <batch>`、`spec_hf`、`rejudge`、`judge1` | `stage16/hf*`、Stage 15 の `spec.json` |
 
 各コマンドの引数と出力は、スクリプトの docstring と REPORT の再現手順の章にある。
+
+## 図
+
+`plot_turb3d.py` が `fig/<名前>.pdf` を書く。コマンドと fetch は `../README.md` の「図」の節による。
+とくに断らなければ turb1（M_s = 1）の図で、時刻は τ0 を単位とする。
+
+入力の多くは、上の解析が書いて手元の `runs/` に置いた要約である（`stage6q/turb/summary.json`、`stage7/tail_N*.json`、`stage8/{rhomin,summary}.json`、`stage13d/rhomin.json`、`stage15/{spec,judge}.json`、`stage16/judge_tm.json`）。
+`fetch` は、残りの 3 つを ps1 から持ち帰る（合わせて 14 MB）。
+`turb_slice` の面（256³、t = τ0、z = 0 の ρ、ζ、D）と `turb_track` の `cfl.dat` の表（4 本）は ps1 の出力から取り出し、`turb_ms` の `stage5/ana/{res,ms}.json` は写す。
+
+| 図 | 論文 | 中身 | REPORT |
+|---|---|---|---|
+| `turb_eps` | 本文 | ε(t) = −dE/dt（実線）と、そのうちの衝撃波粘性の分（破線）。N = 64、128、256 | Stage 6 の 8.3 節 |
+| `turb_spec` | 本文 | t = 1、3 の E(k) = E_{√ρu}(k) + E_B(k)（殻の和）。N = 64、128、256。k = N/3 の点線を添える | Stage 6 の 8.4 節 |
+| `turb_slice` | 本文 | 256³ の t = 1 の z = 0 の面の ln ρ と、衝撃波粘性の係数 ζ = C_shock Δ² S[max(0, −div u)] | Stage 6 の 8.6 節 |
+| `turb_track` | 本文 | dt/dt_cfl（dt_cfl = min(dt_adv, dt_visc)、毎ステップ）。N = 64、128 の Stage 4 の実行（固定の dt と 'decrement'）と 'track' の実行。点線は track_safety（0.8）と track_raise（0.7） | Stage 6 の 7 章 |
+| `turb_rho_pdf` | 本文 | t = 0.5、1 の s = ln ρ の体積 PDF。N = 64、128、256。破線は N = 256 の s の平均と標準偏差をもつ Gauss 分布 | Stage 7 の 6.2 節 |
+| `turb_K_spec` | 本文 | 窓 W1 = [0.75, 1.25]、W2 = [1.5, 2] で平均した E_B(n) と E_m(n)（m = ρu）。128³ の ES、H(8)（B*）、L(1)、L(2) と、ES-256（灰色） | Stage 15 の 6.1 節 |
+| `turb_K` | 本文 | W1、W2 の ln T(n)、T = E_128(n)/E_ES-256(n)。灰色の帯は \|ln T\| ≤ ln 1.25、丸は ES と B* の k_× | Stage 15 の 6.1 節 |
+| `turb_kappa` | 本文 | ES と B* の記録ごとの κ。同じ時刻の ES-256 の記録に対して求めた（時刻をそろえた事後の判定）。横棒は窓で求めた κ | Stage 16 の 4.2 節 |
+| `turb_coef` | 付録 | Stage 8 の 128³ の 5 本の ρ_min(t) と ln(ρ_min/ρ_min,対照)。灰色は窓 [0.6, 1.2]、横棒は R = L − L_対照（L は窓での ln ρ_min の時間平均）、点線は R = ±0.1 | Stage 8 の 5.1 節、6.3 節 |
+| `turb_nomass` | 限界 | svv_mass = F と対照（128³）の ρ_min(t) と、dt と ρ_min の関係。ρ_min^1.5 の線を添える | Stage 13 の 7 章 |
+| `turb_ms` | 限界 | 64³ の M_s = 1–4（turb1、turb2b、turb3b、turb4b）と 128³ の M_s = 4（turb4b、破線）の ρ_min と dt/dt0（dt0 は各実行の最初の dt）。点線は ρ_min = 1e-3 と dt0/10（判定 H と S の閾値） | Stage 5 の 6 章、12 章 |
+
+- K の量は REPORT_stage15 の 3 章による。T(n) の |ln T| が初めて ln 1.25 を超える殻を k_× とし、κ = k_×/k_c（k_c = 128/3）とする。判定と、参照が ES-256 だけであることの印は、上の「本文」の節のとおりである。
+- 最終版（s13d）の実行は、`turb_K_spec`、`turb_K`、`turb_kappa` の 128³ の実行と、`turb_nomass` の svv_mass = F の実行である。ES-256 と `turb_nomass` の対照は s6、ほかの図は s4、s4b、s6 の実行である。

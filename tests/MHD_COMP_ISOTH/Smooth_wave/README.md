@@ -74,3 +74,25 @@ REPORT_stage4 では、これを CP 波の線形不安定で説明した（5.3 �
 
 `python3 tests/MHD_COMP_ISOTH/stages/analyze_stage4.py <batch> [base]`（`<batch>` は `alfven`、`cpdiag`、`planar`。base の既定値は `runs/stage4`）で、判定と数値を標準出力と `<base>/<batch>/summary.json` に書く。
 `planar` は、base の隣にある Stage 3 の 1D の実行（`runs/stage3_f`）も読むので、それがない環境では物理の比較の一部を使えない。
+
+## 図
+
+`plot_smooth_wave.py` が `fig/<名前>.pdf` を書く。コマンドと fetch は `../README.md` の「図」の節による。
+入力は、上の解析が書いた `stage4/{alfven,cpdiag,planar}/summary.json` と `stage4/alfven/cp_rates.json`、平面問題の k = (1,2)、N = 256 の最後の分布（`runs/figdata/Smooth_wave/`）である。
+`fetch` は、要約を ps1 から写し、分布を ps1 の出力から取り出す（合わせて 0.8 MB）。
+C2 の FV の参照は、手元の `runs/stage3/fvref` から読む。
+図の実行は、上に書いたとおり最終版で走らせ直していない。
+
+成長率 γ は、ω0 = |k0| v_A を単位とする。
+
+| 図 | 中身 | REPORT_stage4 |
+|---|---|---|
+| `cp_error` | (a) 振幅 0.1、ideal、N = 16 の max\|B − B_ex\|/A と周期の数 m。固有モードを RK3 で解いた解（破線）と、それとの差（白抜き、丸め誤差）を添える。(b) 振幅 1 の 2D k = (1,2)（N = 64）と 3D k = (1,1,2)（N = 32）の、ideal と default の RK3 の解との差と、ideal に当てはめた exp(2πγm) | 5.2、5.3 節 |
+| `cp_dt` | default の 1 周期後の誤差と 1 周期のステップ数 n_p（振幅 0.1、1）。RK3 が 1 周期で失う振幅 1 − \|R\|^{n_p} ≈ (2π)⁴/(24 n_p³) を添える | 5.2 節 |
+| `cp_growth` | 振幅 1、10 周期の γ と N（3 つの k0）。ideal（丸）、Galerkin の最大の成長率（破線）、default（四角。成長が測れないものは下端の三角）と、格子の上の物理の最大の成長率とその 1.25 倍（灰色。N ≥ 32 の default の上限） | 5.3、5.4 節 |
+| `cp_diag` | 振幅 1、10 周期の γ を、同じ散逸を入れた Galerkin の支配的な族の成長率で割った比。散逸の項を 1 つずつ入れた `cpdiag` の実行 | 5.4 節 |
+| `planar_profiles` | F1、C2、TDS_w1、RDpc の t_end の分布を法線に沿って描く。2D の k = (1,2)、N = 256 と、N/2 点（`_1dh`）と N 点（`_1d`）の 1D の実行に、厳密解（F1）か FV の参照（C2）を添える | 6.2、6.3 節 |
+
+- `cp_dt` の誤差は時間積分の誤差だけで決まり、k0 にも振幅にもよらない。3D ではその 0.91 倍で、これは (1 − k_x²/|k0|²)^{1/2} = 0.913 にあたる（誤差は成分の最大で測るため）。
+- N ≥ 32 の default で、γ が上限（格子の上の物理の最大の 1.25 倍）を超えたのは、3D の k = (1,1,2)、N = 32 だけである（γ = 0.132、物理の最大 0.098）。REPORT_stage4 の 5.4 節は、その原因を η_shock の項と記録し、判定を緩めていない。
+- `planar_profiles` は、6 変数の L1 誤差を計算し直し、`planar/summary.json` の値と並べて標準出力に書く。
