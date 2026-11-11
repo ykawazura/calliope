@@ -10,8 +10,8 @@ read from runs/stage4 next to base.
 Batches
     regress   bitwise regression of the change of src/time.F90 (reset_method = 'track', t_end) and
               src/calliope.F90: the cases of gen_stage4.batch_regress run by EXE_OLD and EXE_NEW, turb1 on 64^3
-              in which 'decrement' reduces dt (DEC_*), and the MHD_INCOMP input of tests/MHD_INCOMP_regression
-              run by INCOMP_OLD and INCOMP_NEW; FFTW_ESTIMATE
+              in which 'decrement' reduces dt (DEC_*), and the MHD_INCOMP input incomp_regress.in (next to this
+              file) run by INCOMP_OLD and INCOMP_NEW; FFTW_ESTIMATE
     track     turb1 on 64^3 with 'track' from dt0 = TDEC_DT0 dt_cfl(0) over TDEC_NSTEP steps on P = TDEC_P
               (decomposition; dt is raised at step 100), and turb1 with 'track' up to t_end on 64^3 and 128^3
               with the dt0, ranks and output of turb1_N64 and turb1_N128_a (runs/stage4/turb)
@@ -29,7 +29,7 @@ EXE_OLD = 'bin/calliope_isoth_s4b'     # src of Stage 5b (HEAD 0f3c805)
 EXE_NEW = 'bin/calliope_isoth_s6'
 INCOMP_OLD = 'bin/calliope_incomp_base'
 INCOMP_NEW = 'bin/calliope_incomp_s6'
-INCOMP_INPUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'MHD_INCOMP_regression', 'calliope.in')
+INCOMP_INPUT = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'incomp_regress.in')
 INCOMP_NP = 4
 DEC_DT0 = 2.0       # 'decrement' regression: dt0 = DEC_DT0 dt_cfl(0), so that reset_dt reduces dt at the first step
 DEC_NSTEP = 100

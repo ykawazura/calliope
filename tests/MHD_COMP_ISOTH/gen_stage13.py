@@ -23,13 +23,14 @@ Batches
               stops with an error if calliope.in differs from that of the control in anything else or if the
               files of ic/ differ
 """
+import hashlib
 import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gen_stage4 as s4
 import gen_stage6 as s6
 import gen_stage8 as s8
-from gen_stage10 import check_control
+from analyze_stage1 import read_nml
 
 EXE_OLD = 'bin/calliope_isoth_s6'     # src of Stage 6 (0c374aa), the same as that of 35c6ed0
 EXE_NEW = 'bin/calliope_isoth_s13d'
@@ -43,6 +44,26 @@ def set_exe(c, exe=EXE_NEW):
     with open(os.path.join(c, 'exe'), 'w') as f:
         f.write(exe + '\n')
     return c
+
+
+def md5s(d):
+    out = {}
+    for name in sorted(os.listdir(d)):
+        with open(os.path.join(d, name), 'rb') as f:
+            out[name] = hashlib.md5(f.read()).hexdigest()
+    return out
+
+
+def check_control(case, control, allowed):
+    """Stops unless calliope.in differs from the control in allowed only and ic/ is the same; returns the changes."""
+    a, b = read_nml(os.path.join(case, 'calliope.in')), read_nml(os.path.join(control, 'calliope.in'))
+    diff = {k: (a.get(k), b.get(k)) for k in sorted(set(a) | set(b)) if a.get(k) != b.get(k)}
+    if set(diff) != set(allowed):
+        raise SystemExit('%s: differs from the control in %s' % (case, sorted(diff)))
+    ma, mb = md5s(os.path.join(case, 'ic')), md5s(os.path.join(control, 'ic'))
+    if ma != mb:
+        raise SystemExit('%s: ic/ differs from the control' % case)
+    return diff, ma
 
 
 def batch_regress(root):

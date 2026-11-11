@@ -44,8 +44,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import gen_stage4 as s4
 import gen_stage6 as s6
 from gen_stage6 import new_case
-from gen_stage10 import md5s
-from gen_stage13 import set_exe
+from gen_stage13 import md5s, set_exe
 from analyze_stage1 import read_nml, num
 
 EXE = 'bin/calliope_isoth_s13d'

@@ -211,7 +211,7 @@ def fig(N=1024):
     import matplotlib
     matplotlib.use('Agg')
     import matplotlib.pyplot as plt
-    from stage2_table import COLOR, GRAY
+    from stage3_table import COLOR, GRAY
     fig, ax = plt.subplots(2, 3, figsize=(10.5, 5.6))
     for r, prob in enumerate(('I1', 'RDpc')):
         fv = np.load(os.path.join(FVWIN, FV_CONV[prob]))

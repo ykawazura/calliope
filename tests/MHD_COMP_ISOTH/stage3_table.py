@@ -11,11 +11,49 @@ import numpy as np
 import mhd_exact as mx
 import fv_mhd1d as fv
 import stage3 as s3
-from stage2_table import e, stats, status, gmax, order, table, COLOR, MARK, GRAY
 
 FIG = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'fig')
 FAMS = ('perp', 'coplanar', 'td', 'rd', 'compound')
 NAMES = ['rho', 'u_x', 'u_y', 'u_z', 'B_y', 'B_z']
+# categorical slots 1-3 of the dataviz reference palette (validated all-pairs, light mode); C is the main scheme
+COLOR = dict(C='#2a78d6', B='#eb6834', A='#1baf7a')
+MARK = dict(C='o', B='s', A='^')
+GRAY = '#52514e'
+
+
+def e(v, fmt='%.1e'):
+    return '-' if v is None or (isinstance(v, float) and not math.isfinite(v)) else fmt % v
+
+
+def stats(d):
+    return d['attempts'][-1]['stats']
+
+
+def status(d):
+    a = d['attempts']
+    if len(a) == 1 and a[0]['status'] == 'ok':
+        return 'ok'
+    return ', '.join('dt/%d %s' % (x['dt_factor'],
+                                   x['status'] if x['status'] == 'ok' else '%s (t = %.3g)' % (x['status'], x['t_stop']))
+                     for x in a)
+
+
+def gmax(xs):
+    xs = [x for x in xs if x is not None]
+    return max(xs) if xs else None
+
+
+def order(Ns, ys):
+    ok = [(n, y) for n, y in zip(Ns, ys) if y is not None and y > 0]
+    if len(ok) < 2:
+        return None
+    p = np.polyfit(np.log([n for n, _ in ok]), np.log([y for _, y in ok]), 1)
+    return -p[0]
+
+
+def table(head, rows):
+    s = '| ' + ' | '.join(head) + ' |\n|' + '|'.join(['---'] * len(head)) + '|\n'
+    return s + ''.join('| ' + ' | '.join(r) + ' |\n' for r in rows)
 
 
 def load(out):

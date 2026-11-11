@@ -39,7 +39,7 @@ Reported, not used: ln(m_N/m_C) (direction by DELTA), H and V (by 10%) as in Sta
 steps, the medians of dt and lambda_svv over each run (cfl.dat) and their ratios N/C; max R_svv (rounding scale),
 min and max D_svv (budget.dat); the shell spectrum E_s(n) of s at T_OUT and the fractions
     f_hi = sum_{n >= k_c} E_s/sum_{n >= 1} E_s,  f_mid = sum_{k_c/2 <= n < k_c} E_s/sum_{n >= 1} E_s
-(n the integer shell of analyze_stage12.shells, k_c = 2/3 of the Nyquist number, n = 0 (the mean of s) left out),
+(n the integer shell of |k| (shells), k_c = 2/3 of the Nyquist number, n = 0 (the mean of s) left out),
 their ratios N/C at each record and the flag 'more high wavenumbers of s' if a ratio exceeds HI_RATIO at any record.
 """
 import hashlib
@@ -58,7 +58,6 @@ import analyze_stage7 as a7  # noqa: E402
 import analyze_stage8 as a8  # noqa: E402
 import judge_stage1 as j1  # noqa: E402
 from analyze_stage1 import analyze, load_runs, read_nml, run_dirs  # noqa: E402
-from analyze_stage12 import shells, spectrum  # noqa: E402
 from gen_stage13 import EXE_NEW  # noqa: E402
 
 TAU0 = a8.TAU0
@@ -455,8 +454,21 @@ def row(S, i):
                 **{q: float(S[q][i]) for q in ('dt', 'dt_adv', 'dt_visc', 'cmax', 'eps', 'lam', 'dt_lam')})
 
 
+def shells(g):
+    """Integer shells of |k| in units of 2 pi/L (a cubic box) and the weights of the r2c half spectrum."""
+    n = np.rint(np.sqrt(g.ikx.reshape(-1, 1, 1)**2 + g.iky.reshape(1, 1, -1)**2 + g.ikz.reshape(1, -1, 1)**2))
+    w = np.where((g.iky == 0) | (2*g.iky == g.nly), 1.0, 2.0).reshape(1, 1, -1)
+    return n.astype(int), np.broadcast_to(w, n.shape)
+
+
+def spectrum(op, f, sh):
+    """sum over the shell of |f_k|^2 (the sum over the shells is <f^2>)."""
+    n, w = sh
+    return np.bincount(n.ravel(), weights=(w*np.abs(op.fft(f))**2).ravel(), minlength=int(n.max()) + 1)
+
+
 def cube_fractions(g, op, f, sh):
-    """The fractions of sum_{n >= 1} w|f_k|^2 (n, w of analyze_stage12.shells) outside the cube max_d |k_d| <=
+    """The fractions of sum_{n >= 1} w|f_k|^2 (n, w of shells) outside the cube max_d |k_d| <=
     (nl_d - 1)//3 that the 2/3 filter keeps (H) and on the Nyquist planes |k_d| = nl_d/2 (nyq)."""
     n, w = sh
     P = w*np.abs(op.fft(f))**2
