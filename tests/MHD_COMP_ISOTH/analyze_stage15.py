@@ -53,6 +53,7 @@ CAP_K64, D_HI64 = 21.0, 16    # the same for the self-convergence (64, 128)
 COST_CAP = {64: 16.0, 128: 96.0, 256: 450.0}   # core-h per run
 PROJ_ROWS = 200     # rows of cfl.dat for the mean dt of the projection
 QJ = ('E_B', 'E_m')                 # components of the judgement
+CAND = ('L', 'H', 'HF', 'R0')       # schemes of the candidates of B* (HF: Stage 16)
 QS = ('E_B', 'E_m', 'P_s', 'E_sru')  # components stored
 ES256 = os.path.join('stage6q', 'turb', 'turb1_N256')
 S8 = os.path.join('stage8', 'coef', 'e0.5_C2')
@@ -557,9 +558,10 @@ def pair(run, ref, q, W, cap, d_hi, kc):
     return dict(k=k, kappa=k/kc, cens=cens, D=dev(T, d_hi), sigma=sigma(ks), kappas=ks)
 
 
-def judge_set(runs, refs, kref, kc, cap, d_hi, extra_delta, need=None):
+def judge_set(runs, refs, kref, kc, cap, d_hi, extra_delta, need=None, pairfn=pair):
     """The pairs (QJ x WIN x refs) of every run against the refs; B* among the standard dissipations; delta;
-    verdict of ES against B*. runs: {label: spec}; refs: {name: spec}; kref: {(q, W): k_ref or None}."""
+    verdict of ES against B*. runs: {label: spec}; refs: {name: spec}; kref: {(q, W): k_ref or None}; pairfn has
+    the arguments and the result of pair (analyze_stage16.py: the time-matched pairs)."""
     keys = [(q, W, rn) for q in QJ for W in WIN for rn in refs if W in refs[rn]['win']]
     P = {}
     for lab, run in runs.items():
@@ -567,10 +569,10 @@ def judge_set(runs, refs, kref, kc, cap, d_hi, extra_delta, need=None):
             P[lab] = {}
             for q, W, rn in keys:
                 kr = kref.get((q, W))
-                P[lab]['%s %s %s' % (q, W, rn)] = pair(run, refs[rn], q, W, min(cap, kr) if kr else cap,
-                                                        int(math.floor(min(d_hi, kr))) if kr else d_hi, kc)
+                P[lab]['%s %s %s' % (q, W, rn)] = pairfn(run, refs[rn], q, W, min(cap, kr) if kr else cap,
+                                                          int(math.floor(min(d_hi, kr))) if kr else d_hi, kc)
     cand = {lab: float(np.mean([x['kappa'] for x in v.values()])) for lab, v in P.items()
-            if lab.split('_')[0] in ('L', 'H', 'R0')}
+            if lab.split('_')[0] in CAND}
     out = dict(pairs=P, cand=cand, npairs=len(keys))
     if 'ES' not in P or not cand:
         out['verdict'] = 'no ES or no candidate'
@@ -672,18 +674,19 @@ def judge(base):
     return out
 
 
-def selfconv_set(pairs, kc, cap, d_hi, judge=True):
+def selfconv_set(pairs, kc, cap, d_hi, judge=True, pairfn=pair):
     """(N, 2N) self-convergence of each label: T = E_N/E_2N with the 2N run as the reference (QJ x WIN); with
-    judge, B* among the standard dissipations and the verdict as judge_set with delta = max(2/k_c, 2 sigma)."""
+    judge, B* among the standard dissipations and the verdict as judge_set with delta = max(2/k_c, 2 sigma);
+    pairfn as in judge_set."""
     P = {}
     for lab, (lo, hi) in pairs.items():
         if all(W in lo['win'] and W in hi['win'] for W in WIN):
-            P[lab] = {'%s %s' % (q, W): pair(lo, hi, q, W, cap, d_hi, kc) for q in QJ for W in WIN}
+            P[lab] = {'%s %s' % (q, W): pairfn(lo, hi, q, W, cap, d_hi, kc) for q in QJ for W in WIN}
     out = dict(pairs=P)
     if not judge:
         return out
     cand = {lab: float(np.mean([x['kappa'] for x in v.values()])) for lab, v in P.items()
-            if lab.split('_')[0] in ('L', 'H', 'R0')}
+            if lab.split('_')[0] in CAND}
     out['cand'] = cand
     if 'ES' not in P or not cand:
         out['verdict'] = 'no ES or no candidate'

@@ -16,6 +16,7 @@ OUT3D tau0, conservation.dat, budget.dat and cfl.dat at every step)
     R0        svv_eps0 = 0, nu = eta = 0, filter_lnrho = T
     L_r<r>    svv_eps0 = 0, filter_lnrho = T, nu = eta = (27/4) gamma_c, lmd = 0 (Laplacian of m and B)
     H_r<r>    svv_eps0 = 0, filter_lnrho = T, nu_h = eta_h = lmd_h = (27/4)^4 gamma_c, exponents 4 (k^8)
+    HF_r<r>   H_r<r> with filter_lnrho = F as ES (Stage 16, gen_stage16.py)
 The decay rate of advance.F90 is nu k^2/k2_max + nu_h (k^2/k2_max)^4 with k2_max = 3 (N/2)^2 (src/grid.F90), so
 that at k_c = N/3 (k_c^2/k2_max = 4/27) both families decay at gamma_c = r eps_ref^(1/3) k_c^(2/3). eps_ref is the
 peak of -dE/dt of ES on 64^3 over (2 pi)^3, per M_s (pre.json, analyze_stage15.py pre).
@@ -87,7 +88,7 @@ def coefs(scheme, r, N, eps_ref):
         c = KMAX2_KC2**4*gc
         phys = dict(nu_h=c, eta_h=c, lmd_h=c, nu_h_exp=4, eta_h_exp=4, lmd_h_exp=4)
     info.update(gamma_c=gc, eps_ref=eps_ref, k_c=kc, coef=c)
-    return 0.0, phys, dict(filter_lnrho=True), info
+    return 0.0, phys, (None if scheme == 'HF' else dict(filter_lnrho=True)), info
 
 
 def check_coefs(c, svv_eps0, phys, nm):
@@ -129,15 +130,16 @@ def eps_peak_ref(case):
 
 
 def run_case(root, prob, N, scheme, r, eps_ref, info, nproc=None, C_shock=2.0, name=None, **kw):
-    """One case <prob>_N<N>_<label> ('track' up to T_STOP tau0 unless kw says otherwise); returns its path."""
+    """One case <prob>_N<N>_<label> ('track' up to T_STOP tau0 unless kw says otherwise); returns its path. The
+    stage of case.json is 15 unless info has another."""
     name = name or '%s_N%d_%s' % (prob, N, label(scheme, r))
     new_case(os.path.join(root, name))
     svv_eps0, phys, nm, ci = coefs(scheme, r, N, eps_ref)
     args = dict(cons=0.0, out3d=OUT3D, track=True, t_stop=T_STOP)
     args.update(kw)
     c = s4.turb_case(root, name, prob, N, nstep_of(runs_of(root), prob, N), nproc or NP[N],
-                     dict(info, stage=15, **ci, C_shock=C_shock), C_shock=C_shock, svv_eps0=svv_eps0,
-                     phys=phys, num=nm, **args)
+                     dict(info, stage=info.get('stage', 15), **ci, C_shock=C_shock), C_shock=C_shock,
+                     svv_eps0=svv_eps0, phys=phys, num=nm, **args)
     check_coefs(c, svv_eps0, phys, nm)
     return set_exe(c, EXE)
 
