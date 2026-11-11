@@ -1,0 +1,15 @@
+{
+ "case": {
+  "fam": "td",
+  "prob": "TDS",
+  "N": 256,
+  "w": 0,
+  "pre": true,
+  "C_eta": 0.0,
+  "name": "TDS_w0pre_N256"
+ },
+ "dir": "x",
+ "nstep": 6340,
+ "dt": 0.0001577287066246057,
+ "t_end": 1.0
+}

@@ -1,0 +1,15 @@
+{
+ "case": {
+  "fam": "rd",
+  "prob": "RDh",
+  "N": 512,
+  "w": 4,
+  "cop": false,
+  "C_eta": 2.0,
+  "name": "RDh_w4_N512_eta2"
+ },
+ "dir": "x",
+ "nstep": 2940,
+ "dt": 0.0003401360544217687,
+ "t_end": 1.0
+}

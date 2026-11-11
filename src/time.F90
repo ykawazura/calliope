@@ -83,7 +83,7 @@ contains
     increase_dt = huge(1.d0)
     ! track_safety: the one-iteration lambda_svv of MHD_COMP_ISOTH was at most 1.193 times below the converged
     ! value (turb1 on 128^3), and 0.8*1.193 < 1. track_raise: on dt_cfl(t) of that run 0.7 takes 12,251 steps
-    ! to 3 tau0 and 0.5 13,388 (tests/MHD_COMP_ISOTH/REPORT_stage6.md)
+    ! to 3 tau0 and 0.5 13,388 (tests/MHD_COMP_ISOTH/stages/REPORT_stage6.md)
     ! track_digits: dt_cfl carries a round-off that depends on the MPI decomposition (lambda_svv of
     ! MHD_COMP_ISOTH by 1e-10, relative); 3 digits keep dt the same on any decomposition unless that moves
     ! track_safety*dt_cfl across a rounding point (chance ~1e-7 per change of dt), and lose < 1% of it

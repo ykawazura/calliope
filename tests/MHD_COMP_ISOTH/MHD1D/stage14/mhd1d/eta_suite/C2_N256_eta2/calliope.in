@@ -1,0 +1,97 @@
+! Stage 3 case C2_N256_eta2 along x (gen_stage3.py)
+&mpi_settings
+  dim_decomp = 2
+/
+&box_parameters
+  lx = 0.15915494309189535d0
+  ly = 0.15915494309189535d0
+  lz = 0.15915494309189535d0
+  nlx = 256
+  nly = 2
+  nlz = 2
+  pruned = F
+/
+&time_parameters
+  dt = 4.424778761061947d-05
+  nstep = 2260
+  cfl = 0.5d0
+  reset_method = 'stop'
+  increase_dt = 10000000000.0d0
+/
+&scheme_parameters
+  time_step_scheme = 'eSSPIFRK3'
+/
+&operation_parameters
+  nonlinear = T
+/
+&physical_parameters
+  nu = 0.0d0
+  nu_h = 0.0d0
+  nu_h_exp = 4
+  eta = 0.0d0
+  eta_h = 0.0d0
+  eta_h_exp = 4
+  lmd = 0.0d0
+  lmd_h = 0.0d0
+  lmd_h_exp = 4
+  beta0 = 2.0d0
+  rho_min = 0.01d0
+  shear = F
+  q = 0.0d0
+/
+&numerics_parameters
+  formulation = 'C'
+  visc_form = 'flux'
+  filter_lnrho = F
+  filter_mom = T
+  filter_mag = T
+  cfl_visc = 1.0d0
+  mass_correction = F
+  s_abort = 100.0d0
+  debug_nan_step = -1
+/
+&shock_parameters
+  C_shock = 2.0d0
+  shock_nmax = 1
+  shock_nsmooth = 1
+  shock_dl = 0.0d0
+  shock_selftest = F
+  C_eta = 2.0d0
+/
+&svv_parameters
+  svv_eps0 = 0.5d0
+  svv_mN = 0.5d0
+  svv_above_kc = T
+  svv_form = 'entropy'
+  cfl_svv = 2.0d0
+  svv_pi_init = 50
+  svv_pi_check = 100
+/
+&isoth_diagnostics
+  write_intvl_1D = 0.005001106194690266d0
+  write_intvl_cons = 0.0d0
+  budget = T
+/
+&force
+  driven = F
+/
+&terminate
+  max_wall_time = 0.45d0
+  terminate_file_name = 'terminate'
+/
+&diagnostics_parameters
+  write_intvl = 10000000000.0d0
+  write_intvl_2D = 0.0d0
+  write_intvl_3D = 0.0d0
+/
+&restart_parameters
+  save_restart_intvl = 10000000000.0d0
+  restart_dir = './restart/'
+/
+&initial_condition
+  init_type = 'profile1d'
+/
+&profile1d_params
+  dir = 'x'
+  table = 'profile1d.dat'
+/

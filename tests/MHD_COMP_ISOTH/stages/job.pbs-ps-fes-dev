@@ -1,0 +1,204 @@
+#!/bin/bash
+#------- qsub option -----------
+#PBS -P NIFS24KISC013
+#PBS -q A_dev
+#PBS -l select=1:ncpus=8:mem=16gb:mpiprocs=8:ompthreads=1
+#PBS -l walltime=00:30:00
+#PBS -j oe
+#
+# Runs every case listed in $CASES (space separated run directories
+# relative to $PBS_O_WORKDIR).  Each directory must contain calliope.in
+# and a file "nproc" holding the number of MPI ranks.  The binary is
+# $EXE (default: ./calliope in $PBS_O_WORKDIR).
+#
+#   qsub -v CASES="runs/a runs/b",EXE=bin/calliope_isoth tests/MHD_COMP_ISOTH/stages/job.pbs-ps-fes-dev
+#
+# A file "exe" in a run directory overrides $EXE for that case (path relative to
+# $PBS_O_WORKDIR).  CASEFILE=<file> reads the list from a file instead.  PAR=<ncores> runs the cases
+# concurrently: each case starts, in the order listed (gen_stage1.py lists them by decreasing cost),
+# as soon as its np ranks fit in PAR cores, with Intel MPI pinning off (on for a case that fills whole
+# hosts, which share no core with another case).  For PAR > 8 request the cores
+# on the command line, e.g. qsub -l select=1:ncpus=64:mem=64gb:mpiprocs=64:ompthreads=1 ...
+# With several hosts each case runs on hosts of its own: one host with np free slots of $PBS_NODEFILE,
+# or, when np exceeds the slots of a host, whole free hosts.
+#
+# A run stops BUDGET minutes (default 27) after the start of the job: the input calliope_run.in is
+# calliope.in with max_wall_time set to the time left, the run saves restart/ when it is reached, and
+# exit_status reads "incomplete" (also after a stop by the file "terminate", see &terminate).  Such a
+# case continues from restart/ while at least 3 minutes are left, and when the same cases are submitted
+# again: its earlier output (including out1d, out2d, out3d, *.out.nc, *.modes.out) goes to chunk_<k>/
+# (analyze_stage1.py concatenates chunk_1, chunk_2, ... and the case directory), and calliope_run.in
+# has init_type = 'restart' and nstep = the steps left.  The steps left are computed from dt of
+# calliope.in, so the chain is valid only for a fixed dt: a run whose dt was changed by reset_dt
+# gets exit_status "dt_changed" (or "dt_stop" when reset_method = 'stop' stopped it) and is not continued.
+# A case with a file "t_end" (one number) runs up to that time with the dt that reset_dt leaves (e.g.
+# reset_method = 'decrement'): a continuation takes dt of the last step from the last row of cfl.dat (written
+# at every step in full precision; its t + dt must equal t of restart/time.dat) and nstep =
+# int((t_end - t)/dt + 0.5), a run that ends without error before t_end - dt/2 (its dt was reduced) is
+# "incomplete", and a change of dt does not give "dt_changed".  When calliope.in also sets t_end
+# (&time_parameters, e.g. with reset_method = 'track', which raises dt as well), the run stops at t_end
+# itself and a continuation keeps nstep of calliope.in (an upper bound) in place of the steps left.
+# A case with any other exit_status is skipped; remove exit_status (and chunk_*) to run it from the start.
+# A case with a directory ic/ (initial condition in the restart format, e.g. from gen_ic.py) starts
+# from it: ic/* is copied to restart/ when the case runs from the start.
+#
+# More than 256 ranks: request whole nodes, e.g. 1024 ranks with
+#   qsub -l select=4:ncpus=256:mpiprocs=256:ompthreads=1 ...
+#
+# A case with a file "fftw_estimate" runs with FFTW_ESTIMATE in place of the FFTW_MEASURE of p3dfft
+# (bin/fftw_shim.so preloaded, built from tests/MHD_COMP_ISOTH/stages/fftw_shim.c), so that two runs use
+# the same FFT plans; the shim logs the planner flags of each plan to calliope.out.std.
+
+module load intel/2025.1
+module load fftw/3.3.10/oneapi2025.1
+module load hdf5/1.14.6/oneapi2025.1-parallel
+module load netcdf-fortran/4.6.2/oneapi2025.1-parallel
+export I_MPI_OFI_PROVIDER=psm3
+export OMP_NUM_THREADS=1
+
+cd ${PBS_O_WORKDIR}
+EXE=${EXE:-./calliope}
+EXE=$(readlink -f ${EXE})
+T_END=$(( $(date +%s) + ${BUDGET:-27} * 60 ))
+
+CASES=${CASES:-$(cat ${CASEFILE})}
+
+SHIM=${PBS_O_WORKDIR}/bin/fftw_shim.so
+for c in ${CASES}; do
+  if [ -f ${c}/fftw_estimate ] && [ ! -f ${SHIM} ]; then
+    mkdir -p $(dirname ${SHIM})
+    gcc -O2 -shared -fPIC -o ${SHIM} tests/MHD_COMP_ISOTH/stages/fftw_shim.c -ldl
+  fi
+done
+
+# value of "name = value" in calliope.in (Fortran d exponent as e)
+nml() { sed -n "s/^ *$1 *= *\([^ ]*\).*/\1/p" $2 | head -1 | sed 's/[dD]/e/'; }
+
+# exit_status of the run in the current directory ($1: exit code of mpirun, $2: t_end or empty)
+status_of() {
+  if grep -q 'This run is stopped' calliope.out.std; then echo dt_stop
+  elif [ -z "$2" ] && grep -q -e 'dt is decreased' -e 'dt is increased' calliope.out.std; then echo dt_changed
+  elif grep -q -e 'Wall time has exceeded' -e 'Termination file has been detected' calliope.out.std; then
+    echo incomplete
+  elif [ $1 -eq 0 ] && [ -n "$2" ] && awk -v t=$(sed -n 2p restart/time.dat | awk '{print $1}') \
+         -v d=$(tail -1 cfl.dat | awk '{print $2}') -v e=$2 'BEGIN{exit !(t < e - 0.5*d)}'; then
+    echo incomplete
+  else echo "exit $1"; fi
+}
+
+run_once() {
+  c=$1
+  hosts_arg=$2
+  np=$(cat ${c}/nproc 2>/dev/null || echo 1)
+  exe=${EXE}
+  [ -f ${c}/exe ] && exe=$(readlink -f $(cat ${c}/exe))
+  pre=
+  [ -f ${c}/fftw_estimate ] && pre="env LD_PRELOAD=${SHIM} FFTW_SHIM_ESTIMATE=1"
+  st=$(cat ${c}/exit_status 2>/dev/null)
+  tend=$(cat ${c}/t_end 2>/dev/null)
+  left=$(( T_END - $(date +%s) ))
+  if [ ${left} -lt 180 ]; then
+    echo "=== ${c}  not started (${left} s left)"
+    return
+  fi
+  sub="s/^\( *max_wall_time *=\).*/\1 $(awk -v s=${left} 'BEGIN{printf "%.4f", (s - 60)/3600}')d0/"
+  if [ "${st}" = "incomplete" ]; then
+    k=1; while [ -d ${c}/chunk_${k} ]; do k=$(( k + 1 )); done
+    mkdir ${c}/chunk_${k}
+    ( cd ${c} && for f in conservation.dat budget.dat cfl.dat calliope.out.std calliope_run.in exit_status \
+                          out1d out2d out3d *.out.nc *.modes.out; do [ -e "${f}" ] && mv "${f}" chunk_${k}/; done )
+    tt=$(sed -n 2p ${c}/restart/time.dat | awk '{print $1}')
+    if [ -n "${tend}" ]; then
+      # t and dt of the last step, which ended at tt
+      read t1 d1 rest < <(tail -1 ${c}/chunk_${k}/cfl.dat)
+      if ! awk -v t=${tt} -v r=${t1} -v d=${d1} 'BEGIN{e = t - (r + d); exit !((e < 0 ? -e : e) <= 1e-12*t)}'; then
+        echo "exit t_end: t + dt of the last row of cfl.dat is not t of restart/time.dat" > ${c}/exit_status
+        return
+      fi
+      if [ -n "$(nml t_end ${c}/calliope.in)" ]; then
+        nleft=$(nml nstep ${c}/calliope.in)
+      else
+        nleft=$(awk -v t=${tt} -v d=${d1} -v e=${tend} 'BEGIN{printf "%d", (e - t)/d + 0.5}')
+      fi
+      sub="${sub};s/^\( *dt *=\).*/\1 ${d1}/"
+    else
+      nleft=$(awk -v t=${tt} -v d=$(nml dt ${c}/calliope.in) -v n=$(nml nstep ${c}/calliope.in) \
+              'BEGIN{printf "%d", n - int(t/d + 0.5)}')
+    fi
+    sub="${sub};s/^\( *init_type *=\).*/\1 'restart'/;s/^\( *nstep *=\).*/\1 ${nleft}/"
+  elif [ -d ${c}/chunk_1 ]; then
+    echo "exit chunk_1 exists" > ${c}/exit_status
+    return
+  elif [ -d ${c}/ic ]; then
+    mkdir -p ${c}/restart && cp ${c}/ic/* ${c}/restart/
+  fi
+  sed -e "${sub}" ${c}/calliope.in > ${c}/calliope_run.in
+  t0="$(date '+%F %T')"
+  ( cd ${c} && mkdir -p out1d out2d out3d restart && \
+    /usr/bin/time -f "wall %e s" mpirun ${hosts_arg} -np ${np} ${pre} ${exe} calliope_run > calliope.out.std 2>&1 ; \
+    status_of $? "${tend}" > exit_status )
+  echo "=== ${c}  (np = ${np}${hosts_arg:+ ${hosts_arg}}, $(basename ${exe}), $(cat ${c}/exit_status), chunk $(( $(ls -d ${c}/chunk_* 2>/dev/null | wc -l) + 1 )))  ${t0}
+$(tail -3 ${c}/calliope.out.std)"
+}
+
+run_case() {
+  st=$(cat $1/exit_status 2>/dev/null)
+  while [ -z "${st}" ] || [ "${st}" = "incomplete" ]; do
+    [ $(( T_END - $(date +%s) )) -lt 180 ] && return
+    run_once $1 "$2"
+    st=$(cat $1/exit_status 2>/dev/null)
+  done
+}
+
+if [ -z "${PAR}" ]; then
+  for c in ${CASES}; do run_case ${c}; done
+else
+  # concurrent mpirun instances would otherwise pin their ranks to the same cores
+  export I_MPI_PIN=off
+  # and would all start on the first host of $PBS_NODEFILE (which lists a host once per slot)
+  hosts=$(awk '!s[$1]++' ${PBS_NODEFILE})
+  declare -A npof hostsof slots free
+  for h in ${hosts}; do slots[$h]=$(grep -cxF ${h} ${PBS_NODEFILE}); done
+  # "host:ranks ..." for $1 ranks in the free slots, empty if they do not fit
+  place() {
+    local h n=0 out=
+    for h in ${hosts}; do
+      if [ $1 -le ${slots[$h]} ]; then
+        [ ${free[$h]} -ge $1 ] && { echo "${h}:$1"; return; }
+      elif [ ${free[$h]} -eq ${slots[$h]} ]; then
+        out="${out} ${h}:${slots[$h]}"; n=$(( n + slots[$h] ))
+        [ ${n} -ge $1 ] && { echo ${out}; return; }
+      fi
+    done
+  }
+  for c in ${CASES}; do
+    np=$(cat ${c}/nproc 2>/dev/null || echo 1)
+    while :; do
+      used=0
+      for h in ${hosts}; do free[$h]=${slots[$h]}; done
+      for p in $(jobs -rp); do
+        used=$(( used + npof[$p] ))
+        for hn in ${hostsof[$p]}; do free[${hn%:*}]=$(( free[${hn%:*}] - ${hn#*:} )); done
+      done
+      hl=$(place ${np})
+      [ ${used} -eq 0 ] && break
+      [ -n "${hl}" ] && [ $(( used + np )) -le ${PAR} ] && break
+      # not wait -n, which misses a case that ended before it was called but after jobs -rp listed it
+      sleep 2
+    done
+    ha=
+    pin=off
+    if [ -n "${hl}" ]; then
+      first=${hl%% *}
+      ha="-hosts $(echo ${hl} | sed 's/:[0-9]*//g; s/ /,/g') -ppn ${first#*:}"
+      # a case that fills its hosts shares no core: pin it (unpinned, 256 ranks on 256 cores ran 1-50 times slower)
+      pin=on
+      for hn in ${hl}; do [ ${hn#*:} -eq ${slots[${hn%:*}]} ] || pin=off; done
+    fi
+    I_MPI_PIN=${pin} run_case ${c} "${ha}" &
+    npof[$!]=${np}
+    hostsof[$!]=${hl}
+  done
+  wait
+fi
+echo "=== all done $(date '+%F %T')"

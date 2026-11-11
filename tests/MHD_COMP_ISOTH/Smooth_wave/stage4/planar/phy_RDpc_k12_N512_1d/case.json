@@ -1,0 +1,32 @@
+{
+ "role": "phy",
+ "prob": "RDpc",
+ "nstep_s3": 6240,
+ "batch": "planar",
+ "dim": "1d",
+ "case": {
+  "fam": "rd",
+  "prob": "RDp",
+  "N": 512,
+  "w": 0,
+  "cop": true,
+  "C_eta": 0.0,
+  "name": "RDpc_N512"
+ },
+ "kvec": [
+  1,
+  2
+ ],
+ "kn": 2.23606797749979,
+ "t_end": 0.4472135954999579,
+ "nstep": 8560,
+ "nrun": 8560,
+ "dt": 5.2244578913546485e-05,
+ "nline": 20,
+ "nl": [
+  512,
+  2,
+  2
+ ],
+ "nproc": 1
+}

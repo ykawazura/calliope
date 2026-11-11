@@ -1,34 +1,115 @@
 # tests/MHD_COMP_ISOTH
 
-等温圧縮性 MHD のモデル `src/model/MHD_COMP_ISOTH` の検証に使うスクリプト、入力、報告を置く。
-2026-11-11 に、論文で使う Stage のものだけを残すよう整理した。整理の前の状態は cf9bb60 にある。
-計算の出力は git の管理外で、ps1 の `~/work/calliope_isoth/runs/` と手元の `runs/` に置く。
+等温圧縮性 MHD のモデル `src/model/MHD_COMP_ISOTH` の検証の入力、スクリプト、報告を置く。
+論文の試験ごとのフォルダ（`Euler1D`、`MHD1D`、`Smooth_wave`、`OT2D`、`Turb3D`）に、その試験の全ケースの入力と説明（`README.md`）を置く。
+Stage ごとの生成と解析のスクリプト、報告（`REPORT_stage*.md`）、共通の部品は `stages/` に置く。
+計算の出力は git の管理外で、ps1 の `~/work/calliope_isoth/runs/` と手元の `runs/` にある。
 各スクリプトの使い方は、その docstring に書いてある。
 
-## 論文での位置
+## 論文の試験とフォルダ
 
-論文に載せる試験と Stage の対応を次の表に示す。
+論文に載せる試験と Stage、フォルダの対応を次の表に示す。
 分類は、検討の記録（worktree の `chat.tex`、git の管理外）の「論文に乗せるテストはどれ？」への答えに従い、その後に行った Stage 16 を加えた。
 
-| 論文での位置 | 試験 | Stage |
-|---|---|---|
-| 本文 | 1D 等温 Euler の衝撃波と単純波 | 1 |
-| 本文 | 1D 等温 MHD の Riemann 問題 | 3、14、16（conv） |
-| 本文 | 多次元の滑らかな解 | 4 |
-| 本文 | 2D Orszag–Tang 渦 | 4、14 |
-| 本文 | 3D 減衰乱流（頑健さ、収支、スペクトル、密度 PDF、ESf の停止） | 6、7、15、16（K） |
-| 付録 | MPI の分割によらないこと | 6、15 |
-| 付録 | 係数の感度 | 8、15（ES25） |
-| 限界 | M_s ≥ 2 | 4、5 |
-| 限界 | B_t が反転する複合問題 C2 | 3 |
-| 限界 | 質量の項を外した ES-SVV（svv_mass = F） | 13 |
+| 論文での位置 | 試験 | Stage | フォルダ |
+|---|---|---|---|
+| 本文 | 1D 等温 Euler の衝撃波と単純波 | 1 | `Euler1D` |
+| 本文 | 1D 等温 MHD の Riemann 問題 | 3、14、16（conv） | `MHD1D` |
+| 本文 | 多次元の滑らかな解（円偏光 Alfvén 波、斜めの平面問題） | 4 | `Smooth_wave` |
+| 本文 | 2D Orszag–Tang 渦 | 4、14 | `OT2D` |
+| 本文 | 3D 減衰乱流（頑健さ、収支、スペクトル、密度 PDF、ESf の停止） | 6、7、15、16（K） | `Turb3D` |
+| 付録 | MPI の分割によらないこと | 6、15 | `Turb3D` |
+| 付録 | 係数の感度 | 8、15（ES25） | `Turb3D` |
+| 限界 | M_s ≥ 2 | 4、5 | `Turb3D` |
+| 限界 | B_t が反転する複合問題 C2 | 3 | `MHD1D` |
+| 限界 | 質量の項を外した ES-SVV（svv_mass = F） | 13 | `Turb3D` |
 
 `chat.tex` の分類は、1D 等温 Euler に Stage 14 も挙げている。
-しかし Stage 14 で走らせ直したのは Stage 3 の 1D MHD と Stage 4 の OT だけで、Stage 1 の Euler の試験は最終版（s13d）で走らせ直していない。
+しかし Stage 14 で走らせ直したのは Stage 3 の 1D MHD と Stage 4 の OT だけで、Stage 1 の Euler の試験は最終版で走らせ直していない。
 Stage 7 のうち論文に載せるのは密度 PDF の裾で、密度の穴の機構は載せない。
 Stage 6 と Stage 13 の batch `regress`（Fortran の変更の前後のビット一致を見る回帰試験）も、論文には載せない。
 
-## Stage ごとのファイル
+フォルダごとのケースの数と、そのケースを走らせた実行ファイルを次に示す。
+最終版は Stage 13 の 4 つ目のビルド `bin/calliope_isoth_s13d`（md5 026c510bac1f2e8811cdaf734281d15e）で、ソースは 07716cc である。
+それ以降、Fortran のソースは変えていない（`src/time.F90` のコメント 1 行を除く）。
+
+| フォルダ | ケース | 実行ファイル（`bin/calliope_isoth_*`） |
+|---|---|---|
+| `Euler1D` | 102 | `es`（Stage 1） |
+| `MHD1D` | 215 | `s13d`（Stage 14、16 で走らせ直した） |
+| `Smooth_wave` | 167 | `s4`（Stage 4） |
+| `OT2D` | 15 | `s13d`（Stage 14 で走らせ直した） |
+| `Turb3D` | 90 | `s4`、`s4b`、`s6`（Stage 4–8）、`s13d`（Stage 13、15、16） |
+
+最終版で走らせ直していないケース（Euler1D、Smooth_wave、Turb3D の Stage 4–8）の扱いは、各フォルダの README に書いた。
+
+## ケースのファイル
+
+各ケースは、ps1 の `~/work/calliope_isoth/runs/` の下のパスのまま、試験のフォルダの下に置いた（例: `runs/stage14/ot/ot_N256_eta0` は `OT2D/stage14/ot/ot_N256_eta0/`）。
+ps1 の元のディレクトリをパスでたどれるようにするためである。
+ケースのディレクトリには次のファイルがある。
+
+| ファイル | 中身 | あるケース |
+|---|---|---|
+| `calliope.in` | calliope の入力 | すべて |
+| `nproc` | MPI のランク数 | すべて |
+| `case.json` | 問題の設定（問題名、N、dt、ステップ数など）。`regen_inputs.py` が読む | Euler1D 以外 |
+| `generated.md5` | ps1 の元の `profile1d.dat` または `ic/*.dat` の md5（`md5sum` の形式） | Euler1D 以外 |
+| `exe` | 実行ファイルのパス（作業ディレクトリからの相対）。ジョブスクリプトの `EXE` より優先する | MHD1D、OT2D、Turb3D の Stage 13–16 |
+| `fftw_estimate` | FFTW の計画を ESTIMATE に固定する印（`stages/fftw_shim.c`） | Euler1D の restart の試験、MHD1D の conv、Smooth_wave の `alfven`、`cpdiag` と `planar` の一部、Turb3D の Stage 15 の分割の試験 |
+| `t_end` | 終了時刻。ジョブスクリプトがこの時刻まで restart で続ける | Turb3D の 'decrement' と 'track' のケース |
+
+写したのは ps1 の元にある入力のファイルだけで、589 ケースの入力 2151 本の md5 が ps1 の元と一致した。
+生成した初期値（`profile1d.dat` と `ic/`）と実行の出力は写していない。
+Stage 1 の restart の試験で投入の前に置いた `terminate` は、calliope が読んで消したので元に残っておらず、ここにもない（`Euler1D/README.md`）。
+
+## 走らせ方
+
+ps1 で 1 つのケースの組を走らせる手順を示す。
+試験に固有の点（`EXE=`、ランク数、ジョブの数）は、各フォルダの README と REPORT の再現手順の章にある。
+
+1. 送る。ps1 は外部のネットワークにつながらず、git も使えないので、手元から `tar` と `ssh` で送る。
+   - `tests/MHD_COMP_ISOTH/stages/` を、作業ディレクトリの同じパスに置く。ps1 の `~/work/calliope_isoth/tests` は古い配置（`stages/` のない平らな配置）のままである。
+   - ケースを、作業ディレクトリの `runs/` の下の同じパスに置く。ps1 の `~/work/calliope_isoth/runs/` には元の実行と出力が残っているので、走らせ直すときは別の作業ディレクトリ（`bin/` と `tests/` を持つ calliope のコピー）を使い、元を上書きしない。
+2. 初期値を書く。`python3 tests/MHD_COMP_ISOTH/stages/regen_inputs.py <case> ...` で、`case.json` から `profile1d.dat` または `ic/` を書き、`generated.md5` と照らす（Euler1D は組み込みの初期値なので不要）。
+3. 実行ファイルを用意する。最終版は次のとおりビルドした（REPORT_stage13 の 12 章）。
+   ```sh
+   module load intel/2025.1 fftw/3.3.10/oneapi2025.1 hdf5/1.14.6/oneapi2025.1-parallel \
+     netcdf-fortran/4.6.2/oneapi2025.1-parallel
+   make clean MODEL=MHD_COMP_ISOTH && make MODEL=MHD_COMP_ISOTH && cp calliope bin/calliope_isoth_s13d
+   ```
+4. 投入する。
+   ```sh
+   qsub -l select=1:ncpus=<cores>:mem=<mem>:mpiprocs=<cores>:ompthreads=1 \
+     -v CASEFILE=<list>,PAR=<cores>[,EXE=bin/calliope_isoth_<ver>][,BUDGET=<min>] \
+     tests/MHD_COMP_ISOTH/stages/job.pbs-ps-fes-dev
+   ```
+   `CASEFILE` はケースのパス（作業ディレクトリからの相対）を 1 行に 1 つ並べたファイルで、`CASES="runs/a runs/b"` でも渡せる。
+   `PAR` は複数のケースを同時に走らせるときのコア数、`BUDGET` はジョブの開始から実行を止めるまでの分数（既定 27）である。
+   予算で止まったケースは restart を保存して `exit_status` が `incomplete` になり、同じ一覧で投げ直すと続きから走る。
+   ジョブスクリプトの使い方の詳細は、その冒頭のコメントにある。
+5. 解析する。各フォルダの README の「解析」の節による。
+
+## 生成する初期値の書き直し
+
+`stages/regen_inputs.py` は、`case.json` の内容から生成の関数（`gen_stage3.write_profile`、`gen_stage4` の場の関数と `gen_ic.write_restart`）を選んで初期値を書き、`generated.md5` と照らす。
+既にあるファイルは書き直さず、照らすだけにする。
+
+md5 がビット単位で一致するのは、ps1 の実行と同じ numpy（2.0.2、x86_64）を使ったときである。
+ps1 では、`profile1d.dat` の 266 ケースと、`ic/` の md5 の組 57 から 1 ケースずつ（256³ を含む）の、合わせて 323 ケースがすべて一致した（書いた内容はメモリで照らし、ps1 には書いていない）。
+手元（numpy 1.26.4、macOS の arm64）では、`profile1d.dat` の 53 ケースと `ic/` の全 57 組が一致しなかった。
+差を調べた `profile1d.dat` の 3 ケースでは絶対差が 7.5e-16 以下、`ic/` の 5 ケースでは場の最大値に対して 5.2e-16 以下で、FFT と初等関数の丸めの違いと読める。
+
+`profile1d.dat` と `ic/*.dat` は、リポジトリの根の `.gitignore` の `*.dat*` で git から外れる。
+試験のフォルダの中で書いても、誤って commit されることはない。
+256³ の `ic/` は 1 ケース約 0.95 GB である。
+
+589 本の `calliope.in` が使う namelist の変数は、いまの `src` がすべて宣言している（静的な照合）。
+いまの版で走らせたときに元と同じ結果になることは、最終版で走らせたケースのほかは確かめていない。
+
+## stages/
+
+### Stage ごとのファイル
 
 | Stage | 内容 | 生成 | 解析 | 報告 |
 |---|---|---|---|---|
@@ -44,8 +125,11 @@ Stage 6 と Stage 13 の batch `regress`（Fortran の変更の前後のビッ�
 | 15 | 3D 減衰乱流での ES-SVV と標準の散逸の比較 | `gen_stage15.py` | `analyze_stage15.py` | `REPORT_stage15.md` |
 | 16 | conv の再実行と、時刻をそろえた K の判定 | `gen_stage16.py` | `analyze_stage16.py`、`check_report_stage16.py` | `REPORT_stage16.md` |
 
-## 共通の部品
+Stage 3 の表と図のスクリプト（`stage3_table.py`、`stage3_aux.py`）は、図を `stages/fig/` に書く。このディレクトリは git の管理外である。
 
+### 共通の部品
+
+- `regen_inputs.py`: 試験のフォルダのケースの初期値を書き直し、`generated.md5` と照らす（上の節）。
 - `isoth_case.py`: 試験のケースの `calliope.in` を作る。
 - `gen_ic.py`: restart の形式で初期条件を書き、出力を読む。
 - `riemann_exact.py`: 1D 等温 Euler の Riemann 問題の厳密解。
@@ -56,13 +140,29 @@ Stage 6 と Stage 13 の batch `regress`（Fortran の変更の前後のビッ�
 - `svv3d.py`: 3D の状態での ES-SVV。Stage 5 の静的な解析のために作り、Stage 7 と Stage 13 も使う。
 - `check_seams.py`: 実行の継ぎ目（再開）をまたぐエネルギー収支を調べる（Stage 4–6）。
 - `job.pbs-ps-fes-dev`: ps1 のジョブスクリプト。
-- `fftw_shim.c`: p3dfft が FFTW に渡す計画の flag を stderr に書き出し、`FFTW_SHIM_ESTIMATE=1` のときは FFTW_ESTIMATE に置き換える LD_PRELOAD の shim。FFTW_MEASURE では同じ入力の 2 回の実行が 1e-13 程度ずれるので、ビット一致の試験に使う。
+- `fftw_shim.c`: p3dfft が FFTW に渡す計画の flag を stderr に書き出し、`FFTW_SHIM_ESTIMATE=1` のときは FFTW_ESTIMATE に置き換える LD_PRELOAD の shim。FFTW_MEASURE では同じ入力の 2 回の実行が 1e-13 程度ずれるので、ビット一致の試験に使う。ケースに `fftw_estimate` があると、ジョブスクリプトがこれをビルドして使う。
 - `stage3_nstep.json`: Stage 3 の試作の実行が t_end に届いたときの step 数と dt。`gen_stage3.py nstep` が書き、Stage 3 の Fortran のケースはこの dt で走る。
 - `incomp_regress.in`: MHD_INCOMP の回帰試験の入力。`gen_stage6.py` と `gen_stage13.py` の batch `regress` が使う。
 
-## 整理で消したファイル
+## 整理の記録
 
-次の 19 本を消した。どれも cf9bb60 から取り出せる。
+### 試験ごとのフォルダへの移動（2026-11-11）
+
+`tests/MHD_COMP_ISOTH/` の直下にあったスクリプト、REPORT、共通の部品を、中身を変えずに `stages/` へ移した。
+変えたのは、移したことで壊れるパスだけである。
+
+- `fv_mhd1d.py` の `REF_DIR` と `stage3.py` の `OUT`（ファイルの位置からリポジトリの根をたどる相対パス）に `'..'` を 1 つ足した。
+- `job.pbs-ps-fes-dev` が `fftw_shim.c` をビルドするパスと、使い方のコメントのパス。
+- 使い方の docstring の `python3 tests/MHD_COMP_ISOTH/<file>`（`analyze_stage5.py`、`check_report_stage16.py`、`check_seams.py`、`gen_stage14.py`、`gen_stage16.py`）。
+- `src/time.F90` のコメントにある `REPORT_stage6.md` のパス（コメントだけで、コードは変わらない）。
+
+REPORT の本文は記録なので変えていない。
+REPORT の再現手順などにあるパス `tests/MHD_COMP_ISOTH/<file>` は、いまは `tests/MHD_COMP_ISOTH/stages/<file>` にある。
+
+### 論文で使う Stage への絞り込み（2026-11-11、ca9a205）
+
+論文で使う Stage のものだけを残し、次の 19 本を消した。
+どれも cf9bb60 から取り出せる（移動の前のパスで指定する）。
 
 ```
 git show cf9bb60:tests/MHD_COMP_ISOTH/<file> > <file>
@@ -89,4 +189,3 @@ git show cf9bb60:tests/MHD_COMP_ISOTH/<file> > <file>
 残した REPORT と一部の docstring は、消したファイルや `tests/MHD_INCOMP_regression` に言及している。
 これらは書いた時点の記録なので変えていない。
 言及されたファイルは、上の `git show` で取り出せる。
-ps1 の `~/work/calliope_isoth/tests` は、整理の前の配置のままである。

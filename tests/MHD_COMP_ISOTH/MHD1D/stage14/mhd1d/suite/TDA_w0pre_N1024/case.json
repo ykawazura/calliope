@@ -1,0 +1,15 @@
+{
+ "case": {
+  "fam": "td",
+  "prob": "TDA",
+  "N": 1024,
+  "w": 0,
+  "pre": true,
+  "C_eta": 0.0,
+  "name": "TDA_w0pre_N1024"
+ },
+ "dir": "x",
+ "nstep": 36000,
+ "dt": 2.777777777777778e-05,
+ "t_end": 1.0
+}

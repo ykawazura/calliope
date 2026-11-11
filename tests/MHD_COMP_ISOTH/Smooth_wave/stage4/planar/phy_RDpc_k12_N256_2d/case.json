@@ -1,0 +1,33 @@
+{
+ "role": "phy",
+ "prob": "RDpc",
+ "nstep_s3": 3040,
+ "batch": "planar",
+ "dim": "2d",
+ "case": {
+  "fam": "rd",
+  "prob": "RDp",
+  "N": 256,
+  "w": 0,
+  "cop": true,
+  "C_eta": 0.0,
+  "name": "RDpc_N256"
+ },
+ "kvec": [
+  1,
+  2
+ ],
+ "kn": 2.23606797749979,
+ "t_end": 0.4472135954999579,
+ "nstep": 7300,
+ "nrun": 7300,
+ "dt": 6.126213636985724e-05,
+ "nline": 20,
+ "planes": 4,
+ "nl": [
+  256,
+  2,
+  256
+ ],
+ "nproc": 16
+}

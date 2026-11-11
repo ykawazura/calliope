@@ -1,0 +1,31 @@
+{
+ "role": "ctl",
+ "prob": "C2_eta2",
+ "nstep_s3": 2260,
+ "batch": "planar",
+ "dim": "2d",
+ "case": {
+  "fam": "compound",
+  "prob": "C2",
+  "N": 256,
+  "C_eta": 2.0,
+  "name": "C2_N256_eta2"
+ },
+ "kvec": [
+  1,
+  0
+ ],
+ "kn": 1.0,
+ "t_end": 0.1,
+ "nstep": 4520,
+ "nrun": 4520,
+ "dt": 2.2123893805309735e-05,
+ "nline": 20,
+ "planes": 4,
+ "nl": [
+  256,
+  2,
+  256
+ ],
+ "nproc": 16
+}

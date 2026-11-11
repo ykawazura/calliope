@@ -1,0 +1,15 @@
+{
+ "case": {
+  "fam": "rd",
+  "prob": "RDp",
+  "N": 256,
+  "w": 0,
+  "cop": true,
+  "C_eta": 2.0,
+  "name": "RDpc_N256_eta2"
+ },
+ "dir": "x",
+ "nstep": 3100,
+ "dt": 0.0003225806451612903,
+ "t_end": 1.0
+}

@@ -1,0 +1,31 @@
+{
+ "role": "phy",
+ "prob": "F1_eta2",
+ "nstep_s3": 860,
+ "batch": "planar",
+ "dim": "2d",
+ "case": {
+  "fam": "coplanar",
+  "prob": "F1",
+  "N": 256,
+  "C_eta": 2.0,
+  "name": "F1_N256_eta2"
+ },
+ "kvec": [
+  1,
+  2
+ ],
+ "kn": 2.23606797749979,
+ "t_end": 0.07155417527999326,
+ "nstep": 2080,
+ "nrun": 2080,
+ "dt": 3.440104580768907e-05,
+ "nline": 20,
+ "planes": 4,
+ "nl": [
+  256,
+  2,
+  256
+ ],
+ "nproc": 16
+}

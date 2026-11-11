@@ -1,0 +1,29 @@
+{
+ "role": "production",
+ "stage": 6,
+ "dt_from": "stage4/turb/turb1_N128_a",
+ "Ms": 1.0,
+ "dB": 1.0,
+ "seed": 20261103,
+ "B0": 1.0,
+ "sigma_c": -0.06285375194557466,
+ "H_m": -0.024941072048338234,
+ "batch": "turb",
+ "problem": "turb1",
+ "N": 256,
+ "tau0": 3.141592653589793,
+ "t_end": 9.42477796076938,
+ "nstep": 16131,
+ "nrun": 161310,
+ "dt": 0.0005842649532434058,
+ "planes": 0.39269908169872414,
+ "adaptive": false,
+ "track": true,
+ "to_t_end": true,
+ "nl": [
+  256,
+  256,
+  256
+ ],
+ "nproc": 256
+}

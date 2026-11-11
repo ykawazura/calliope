@@ -1,0 +1,13 @@
+{
+ "case": {
+  "fam": "coplanar",
+  "prob": "I1",
+  "N": 1024,
+  "C_eta": 2.0,
+  "name": "I1_N1024_eta2"
+ },
+ "dir": "x",
+ "nstep": 2560,
+ "dt": 9.375e-05,
+ "t_end": 0.24
+}

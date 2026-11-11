@@ -1,0 +1,13 @@
+{
+ "case": {
+  "fam": "coplanar",
+  "prob": "F2",
+  "N": 256,
+  "C_eta": 0.0,
+  "name": "F2_N256"
+ },
+ "dir": "x",
+ "nstep": 3360,
+ "dt": 3.125e-05,
+ "t_end": 0.105
+}

@@ -1,0 +1,13 @@
+{
+ "case": {
+  "fam": "perp",
+  "prob": "P1b",
+  "N": 512,
+  "C_eta": 2.0,
+  "name": "P1b_N512_eta2"
+ },
+ "dir": "x",
+ "nstep": 2500,
+ "dt": 3.6e-05,
+ "t_end": 0.09
+}

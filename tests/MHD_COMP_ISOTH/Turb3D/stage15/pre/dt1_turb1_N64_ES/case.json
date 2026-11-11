@@ -1,0 +1,30 @@
+{
+ "scheme": "ES",
+ "r": null,
+ "role": "dt",
+ "stage": 15,
+ "dt_div": 1,
+ "eps_ref_from": "stage6q/track/turb1_N64_t",
+ "Ms": 1.0,
+ "dB": 1.0,
+ "seed": 20261103,
+ "B0": 1.0,
+ "sigma_c": -0.06285375194557466,
+ "H_m": -0.024941072048338234,
+ "batch": "turb",
+ "problem": "turb1",
+ "N": 64,
+ "tau0": 3.141592653589793,
+ "t_end": 9.42477796076938,
+ "nstep": 7134,
+ "nrun": 476,
+ "dt": 0.0013211070872959601,
+ "planes": 0.0,
+ "adaptive": false,
+ "nl": [
+  64,
+  64,
+  64
+ ],
+ "nproc": 16
+}

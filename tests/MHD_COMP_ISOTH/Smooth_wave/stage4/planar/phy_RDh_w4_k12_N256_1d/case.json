@@ -1,0 +1,32 @@
+{
+ "role": "phy",
+ "prob": "RDh_w4",
+ "nstep_s3": 1480,
+ "batch": "planar",
+ "dim": "1d",
+ "case": {
+  "fam": "rd",
+  "prob": "RDh",
+  "N": 256,
+  "w": 4,
+  "cop": false,
+  "C_eta": 0.0,
+  "name": "RDh_w4_N256"
+ },
+ "kvec": [
+  1,
+  2
+ ],
+ "kn": 2.23606797749979,
+ "t_end": 0.4472135954999579,
+ "nstep": 8880,
+ "nrun": 8880,
+ "dt": 5.0361891385130396e-05,
+ "nline": 20,
+ "nl": [
+  256,
+  2,
+  2
+ ],
+ "nproc": 1
+}
