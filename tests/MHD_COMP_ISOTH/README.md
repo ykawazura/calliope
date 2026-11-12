@@ -91,7 +91,7 @@ git の管理下のファイルは、手元から `tar` で送って置いた（
 
 - `runs/` の元のパスは、移した先を指す相対の symlink である。REPORT と解析のスクリプトの `runs/...` のパスは、そのまま使える。
 - batch の要約（`summary.json` など）と、論文に使わないケースは、`runs/` に残した。図が読む要約は、試験のフォルダの symlink からもたどれる（「図」の節）。
-- 手元の Stage 16 の解析で書いた `runs/stage16/conv_table.json` と `judge_tm.json` は、ps1 になかったので、2026-11-13 に手元から写した。
+- 手元の Stage 16 の解析で書いた `runs/stage16/conv_table.json`、`judge_tm.json`、`judge1_hf.json` は、ps1 になかったので、2026-11-13 に手元から写した。`check_report_stage16.py` は 4 本の要約を読み、ps1 でも手元と同じ結果を出す。
 - `du runs/...` は symlink の先を数えない。ケースの量は `du -L` か、試験のフォルダの側で数える。
 - ケースのディレクトリで投入すると、元の出力を上書きする（「走らせ方」の節）。
 
