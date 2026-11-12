@@ -422,6 +422,51 @@ contains
 
 !-----------------------------------------------!
 !> @author  YK
+!! @date    18 May 2022
+!! @brief   Enforce div free for (wx, wy, wz)
+!-----------------------------------------------!
+  subroutine div_free(wx, wy, wz)
+    use grid, only: kx, ky, kz
+    use grid, only: ikx_st, iky_st, ikz_st, ikx_en, iky_en, ikz_en
+    use params, only: zi
+    implicit none
+    complex(r8), dimension (ikx_st:ikx_en, &
+                            ikz_st:ikz_en, &
+                            iky_st:iky_en), intent(inout) :: wx, wy, wz
+    complex(r8), allocatable, dimension(:,:,:)   :: nbl2inv_div_w ! nabla^-2 (div w)
+    real(r8) :: k2
+    integer :: i, j, k
+
+    allocate(nbl2inv_div_w(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0,0.d0))
+
+    !$omp parallel do private(i, k, k2) schedule(static)
+    do j = iky_st, iky_en
+      do k = ikz_st, ikz_en
+        do i = ikx_st, ikx_en
+          k2 = kx(i)**2 + ky(j)**2 + kz(k)**2
+          if(k2 == 0.d0) then
+            nbl2inv_div_w(i,k,j) = 0.d0
+          else
+            nbl2inv_div_w(i,k,j) = -zi*(   kx(i)*wx(i,k,j) &
+                                         + ky(j)*wy(i,k,j) &
+                                         + kz(k)*wz(i,k,j) )/k2
+          endif
+
+          wx(i,k,j) = wx(i,k,j) - zi*kx(i)*nbl2inv_div_w(i,k,j)
+          wy(i,k,j) = wy(i,k,j) - zi*ky(j)*nbl2inv_div_w(i,k,j)
+          wz(i,k,j) = wz(i,k,j) - zi*kz(k)*nbl2inv_div_w(i,k,j)
+        enddo
+      enddo
+    enddo
+    !$omp end parallel do
+
+    deallocate(nbl2inv_div_w)
+
+  end subroutine div_free
+
+
+!-----------------------------------------------!
+!> @author  YK
 !! @date    3 Oct 2020
 !! @brief   Check if divergence free is satisfied
 !-----------------------------------------------!
