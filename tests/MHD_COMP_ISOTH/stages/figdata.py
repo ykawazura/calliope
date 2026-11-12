@@ -4,7 +4,8 @@
     python3 tests/MHD_COMP_ISOTH/<Test>/plot_<test>.py [plot] [name ...]   figures -> <Test>/fig/<name>.pdf
     python3 tests/MHD_COMP_ISOTH/<Test>/plot_<test>.py fetch               missing inputs from ps1 into runs/
     python3 tests/MHD_COMP_ISOTH/<Test>/plot_<test>.py list                figures and their inputs
-    options: --runs DIR (default runs), --host HOST (ps1), --remote DIR (~/work/calliope_isoth)
+    options: --runs DIR (default: runs/ of the worktree, from any directory), --host HOST (ps1),
+             --remote DIR (~/work/calliope_isoth)
 
 fetch writes nothing on ps1 and never overwrites a local file (an existing target is skipped). It
     copies small files (summaries, out1d lines) with tar over ssh to the same path under the local runs/;
@@ -107,6 +108,7 @@ def remote(argv):
 # --------------------------------------------------------------------------------------------- local side
 FILE = globals().get('__file__', '<stdin>')       # '<stdin>' under python3 - on the remote host
 HERE = None if FILE == '<stdin>' else os.path.dirname(os.path.abspath(FILE))
+ROOT = None if HERE is None else os.path.normpath(os.path.join(HERE, '..', '..', '..'))   # the worktree
 
 
 class Copy:
@@ -196,7 +198,7 @@ def main(test_dir, figs, fetches, argv=None):
     ap = argparse.ArgumentParser(description='figures of %s' % os.path.basename(test_dir))
     ap.add_argument('cmd', nargs='?', default='plot', choices=cmds)
     ap.add_argument('names', nargs='*', help='figures to draw (default: all)')
-    ap.add_argument('--runs', default='runs')
+    ap.add_argument('--runs', default=os.path.relpath(os.path.join(ROOT, 'runs')))   # 'runs' from the root
     ap.add_argument('--host', default='ps1')
     ap.add_argument('--remote', default='~/work/calliope_isoth')
     opt = ap.parse_args(argv)

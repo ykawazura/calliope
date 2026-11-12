@@ -149,7 +149,7 @@ python3 tests/MHD_COMP_ISOTH/Euler1D/plot_euler1d.py fetch             # ps1 に
 python3 tests/MHD_COMP_ISOTH/Euler1D/plot_euler1d.py [plot] [名前 ...]  # 図を書く（名前を省くとすべて）
 ```
 
-`--runs` で入力の根（既定 `runs`）を、`--host` と `--remote` で fetch の相手（既定 `ps1` の `~/work/calliope_isoth`）を変えられる。
+`--runs` で入力の根（既定は、走らせた場所によらずリポジトリの根の `runs/`）を、`--host` と `--remote` で fetch の相手（既定 `ps1` の `~/work/calliope_isoth`）を変えられる。
 入力のない図は、足りないファイルを表示して飛ばし、最後に飛ばした図を並べる。
 
 - fetch は ps1 に何も書かず、手元にあるファイルを上書きしない（あれば飛ばす）。
