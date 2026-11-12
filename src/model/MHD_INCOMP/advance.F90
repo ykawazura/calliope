@@ -1275,7 +1275,7 @@ contains
       sz = 1.d0
     endif
 
-    !$omp parallel do private(i, k) schedule(static)
+    !$omp parallel do private(i, k, k2t, k2t_inv) schedule(static)
     do j = iky_st, iky_en
       do k = ikz_st, ikz_en
         do i = ikx_st, ikx_en

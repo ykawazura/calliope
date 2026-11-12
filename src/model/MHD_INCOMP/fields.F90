@@ -952,7 +952,7 @@ contains
 
     allocate(nbl2inv_div_w(ikx_st:ikx_en, ikz_st:ikz_en, iky_st:iky_en), source=(0.d0,0.d0))
 
-    !$omp parallel do private(i, k) schedule(static)
+    !$omp parallel do private(i, k, k2) schedule(static)
     do j = iky_st, iky_en
       do k = ikz_st, ikz_en
         do i = ikx_st, ikx_en
