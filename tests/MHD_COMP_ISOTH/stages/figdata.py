@@ -10,9 +10,8 @@ fetch writes nothing on ps1 and never overwrites a local file (an existing targe
     copies small files (summaries, out1d lines) with tar over ssh to the same path under the local runs/;
     extracts arrays from large outputs by running this file on ps1,
         ssh ps1 'cd ~/work/calliope_isoth && python3 -B - <md5> <op> <arg> ...' < figdata.py > runs/figdata/...npz,
-    which imports the analysis modules of the worktree there (tests/MHD_COMP_ISOTH/stages, or tests/MHD_COMP_ISOTH
-    in the old layout), stops unless their md5 equal those of the local stages/ (MODS), and writes an npz to
-    stdout. The ops:
+    which imports the analysis modules of the worktree there (tests/MHD_COMP_ISOTH/stages), stops unless their md5
+    equal those of the local stages/ (MODS), and writes an npz to stdout. The ops:
         plane <case> <y0|z0> <t> <nlx,nly,nlz> <q,...>   quantities q of gen_ic.PLANE_Q (float32) of the plane
                                                           record nearest to t (analyze_stage4.plane_records)
         table <case> <file>                               a table file of the run (cfl.dat, ...) per output
@@ -32,7 +31,7 @@ import numpy as np
 
 MODS = ('analyze_stage1.py', 'analyze_stage4.py', 'gen_ic.py', 'gen_stage4.py', 'riemann_exact.py',
         'cp_stability.py')
-REMOTE_MOD_DIRS = ('tests/MHD_COMP_ISOTH/stages', 'tests/MHD_COMP_ISOTH')
+REMOTE_MOD_DIR = 'tests/MHD_COMP_ISOTH/stages'
 
 
 def md5(path):
@@ -91,9 +90,9 @@ def remote(argv):
     """python3 - <name:md5,...> <op> <arg> ... in the worktree on the remote host: the npz to stdout."""
     out = os.fdopen(os.dup(1), 'wb')
     os.dup2(2, 1)                                # anything printed goes to stderr, not into the npz
-    mod = next((d for d in REMOTE_MOD_DIRS if os.path.exists(os.path.join(d, 'analyze_stage4.py'))), None)
-    if mod is None:
-        raise SystemExit('analysis modules not found under %s' % os.getcwd())
+    mod = REMOTE_MOD_DIR
+    if not os.path.exists(os.path.join(mod, 'analyze_stage4.py')):
+        raise SystemExit('analysis modules not found in %s' % os.path.join(os.getcwd(), mod))
     want = dict(s.split(':') for s in argv[0].split(','))
     bad = [n for n, h in want.items() if md5(os.path.join(mod, n)) != h]
     if bad:

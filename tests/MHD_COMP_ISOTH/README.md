@@ -3,7 +3,9 @@
 等温圧縮性 MHD のモデル `src/model/MHD_COMP_ISOTH` の検証の入力、スクリプト、報告を置く。
 論文の試験ごとのフォルダ（`Euler1D`、`MHD1D`、`Smooth_wave`、`OT2D`、`Turb3D`）に、その試験の全ケースの入力、説明（`README.md`）、図のスクリプト（`plot_<試験>.py`）を置く。
 Stage ごとの生成と解析のスクリプト、報告（`REPORT_stage*.md`）、共通の部品は `stages/` に置く。
-計算の出力は git の管理外で、ps1 の `~/work/calliope_isoth/runs/` と手元の `runs/` にある。
+計算の出力は git の管理外である。
+ps1 の `~/work/calliope_isoth/tests/MHD_COMP_ISOTH` は、このフォルダと同じ配置で、論文の 589 ケースの実行（入力と出力）を持つ（「ps1 の配置」の節）。
+手元の `runs/` には、解析の要約と図の入力を置く。
 各スクリプトの使い方は、その docstring に書いてある。
 
 ## 論文の試験とフォルダ
@@ -47,6 +49,7 @@ Stage 6 と Stage 13 の batch `regress`（Fortran の変更の前後のビッ�
 
 各ケースは、ps1 の `~/work/calliope_isoth/runs/` の下のパスのまま、試験のフォルダの下に置いた（例: `runs/stage14/ot/ot_N256_eta0` は `OT2D/stage14/ot/ot_N256_eta0/`）。
 ps1 の元のディレクトリをパスでたどれるようにするためである。
+ps1 では、元のディレクトリそのものをこの位置に移し、`runs/` の元のパスには移した先を指す symlink を置いた（「ps1 の配置」の節）。
 ケースのディレクトリには次のファイルがある。
 
 | ファイル | 中身 | あるケース |
@@ -63,14 +66,38 @@ ps1 の元のディレクトリをパスでたどれるようにするためで�
 生成した初期値（`profile1d.dat` と `ic/`）と実行の出力は写していない。
 Stage 1 の restart の試験で投入の前に置いた `terminate` は、calliope が読んで消したので元に残っておらず、ここにもない（`Euler1D/README.md`）。
 
+## ps1 の配置
+
+ps1 の `~/work/calliope_isoth/tests/MHD_COMP_ISOTH` は、2026-11-12 から手元と同じ配置である。
+git の管理下のファイルは、手元から `tar` で送って置いた（ps1 では git を使えない）。手元で変えたら、同じように送り直す。
+589 ケースのディレクトリは元の実行そのもので、入力、生成した初期値（`profile1d.dat`、`ic/`）、出力を持つ。
+元は `runs/<stage>/<batch>/[<sub>/]<case>` にあり、同じファイルシステムの中で mv で移した（複写していない）。
+ケースに足したのは git の `generated.md5` だけで、git のほかの入力は ps1 の元のものと md5 が一致した。
+
+- `runs/` の元のパスは、移した先を指す相対の symlink である。REPORT、解析のスクリプト、`fetch` の `runs/...` のパスは、そのまま使える。
+- batch の要約（`summary.json` など）と、論文に使わないケースは、`runs/` に残した。
+- `du runs/...` は symlink の先を数えない。ケースの量は `du -L` か、`tests/` の側で数える。
+- ケースのディレクトリで投入すると、元の出力を上書きする（「走らせ方」の節）。
+
+移す前の平らな `tests/MHD_COMP_ISOTH` と `tests/MHD_INCOMP_regression` は、`~/work/calliope_isoth/attic/tests_flat_20261112/` に残した（ps1 では何も消していない）。
+平らな配置の `fig/`（Stage 2–5 の解析が書いた PNG）だけは、`stages/fig/` に移した。
+同じ attic に、移したケースの一覧（`moves.txt`）、移した記録（`restructure.log`）、元に戻すスクリプト（`rollback.sh`。`DRY=0` を付けたときだけ動かす）がある。
+移した後、ケースの中の 61506 項目の inode、大きさ、mtime は移す前と一致した。
+変わったのは、`generated.md5` を足した 487 ケースの最上位のディレクトリの mtime だけである。
+
+`runs/` にある過去のスクリプト（`runs/stage14/ana_*.sh`、`runs/stage4/*.py` など）は、平らな配置のパス `tests/MHD_COMP_ISOTH/<file>` を参照するので、そのままでは走らない。
+これらは記録なので書き換えていない。
+attic の平らな配置のファイルのうち `analyze_stage16.py` と `REPORT_stage5.md` は、git のどの版とも違う。どちらも git の版より古い版である。
+
 ## 走らせ方
 
 ps1 で 1 つのケースの組を走らせる手順を示す。
 試験に固有の点（`EXE=`、ランク数、ジョブの数）は、各フォルダの README と REPORT の再現手順の章にある。
 
 1. 送る。ps1 は外部のネットワークにつながらず、git も使えないので、手元から `tar` と `ssh` で送る。
-   - `tests/MHD_COMP_ISOTH/stages/` を、作業ディレクトリの同じパスに置く。ps1 の `~/work/calliope_isoth/tests` は古い配置（`stages/` のない平らな配置）のままである。
-   - ケースを、作業ディレクトリの `runs/` の下の同じパスに置く。ps1 の `~/work/calliope_isoth/runs/` には元の実行と出力が残っているので、走らせ直すときは別の作業ディレクトリ（`bin/` と `tests/` を持つ calliope のコピー）を使い、元を上書きしない。
+   - 作業ディレクトリには、ps1 の `~/work/calliope_isoth` でなく、別の作業ディレクトリ（`bin/` と `tests/` を持つ calliope のコピー）を使う。`~/work/calliope_isoth` のケースのディレクトリには元の実行の出力があり、そこで投入すると上書きするからである。
+   - `tests/MHD_COMP_ISOTH/` を、作業ディレクトリの同じパスに置く。
+   - ケースを、作業ディレクトリの `runs/` の下の同じパスに置く。解析のスクリプトが読むパスの既定値が `runs/<stage>` だからである。
 2. 初期値を書く。`python3 tests/MHD_COMP_ISOTH/stages/regen_inputs.py <case> ...` で、`case.json` から `profile1d.dat` または `ic/` を書き、`generated.md5` と照らす（Euler1D は組み込みの初期値なので不要）。
 3. 実行ファイルを用意する。最終版は次のとおりビルドした（REPORT_stage13 の 12 章）。
    ```sh
@@ -128,7 +155,7 @@ python3 tests/MHD_COMP_ISOTH/Euler1D/plot_euler1d.py [plot] [名前 ...]  # 図�
 - fetch は ps1 に何も書かず、手元にあるファイルを上書きしない（あれば飛ばす）。
 - 小さいファイル（要約の JSON、out1d の行）は、ssh と tar で、ps1 と同じパスで手元の `runs/` に写す。
 - 大きい出力（2D と 3D の面、`cfl.dat`、平面問題の分布）からは、要る配列だけを取り出す。`stages/figdata.py` を ssh の標準入力で ps1 に送って走らせ、npz を標準出力で `runs/figdata/<試験>/` に受け取る。
-- 取り出しは、ps1 の作業ディレクトリにある解析のモジュール（`analyze_stage1.py`、`analyze_stage4.py`、`gen_ic.py`、`gen_stage4.py`、`riemann_exact.py`、`cp_stability.py`）を import する。ps1 の `tests/` は古い配置なので、`tests/MHD_COMP_ISOTH/stages`、`tests/MHD_COMP_ISOTH` の順に探す。md5 が手元の `stages/` のものと違えば止まる。
+- 取り出しは、ps1 の作業ディレクトリにある解析のモジュール（`analyze_stage1.py`、`analyze_stage4.py`、`gen_ic.py`、`gen_stage4.py`、`riemann_exact.py`、`cp_stability.py`）を import する。モジュールは ps1 の `tests/MHD_COMP_ISOTH/stages/` から読み、md5 が手元の `stages/` のものと違えば止まる。
 - fetch が持ち帰る量は、Euler1D が 2.7 MB、Smooth_wave が 0.8 MB、OT2D が 20 MB、Turb3D が 14 MB である。解析の要約（Stage 3 の FV の参照、Stage 7–8、13–16 の JSON など）は、各 Stage の解析で手元の `runs/` に置いたものを読み、fetch の対象にしていない。MHD1D の図は、これだけで描ける。
 
 図は手元でしか描けない。newtx が要り、ps1 にはないからである。
