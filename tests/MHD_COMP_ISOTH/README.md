@@ -1,7 +1,7 @@
 # tests/MHD_COMP_ISOTH
 
 等温圧縮性 MHD のモデル `src/model/MHD_COMP_ISOTH` の検証の入力、スクリプト、報告を置く。
-論文の試験ごとのフォルダ（`Euler1D`、`MHD1D`、`Smooth_wave`、`OT2D`、`Turb3D`）に、その試験の全ケースの入力、説明（`README.md`）、図のスクリプト（`plot_<試験>.py`）を置く。
+論文の試験ごとのフォルダ（`Euler1D`、`MHD1D`、`Smooth_wave`、`OT2D`、`Turb3D`）に、その試験の全ケースの入力、説明（`README.md`）、図のスクリプト（`plot_<試験>.py`）、図が読む要約への symlink を置く。
 Stage ごとの生成と解析のスクリプト、報告（`REPORT_stage*.md`）、共通の部品は `stages/` に置く。
 計算の出力は git の管理外である。
 ps1 の `~/work/calliope_isoth/tests/MHD_COMP_ISOTH` は、このフォルダと同じ配置で、論文の 589 ケースの実行（入力と出力）を持つ（「ps1 の配置」の節）。
@@ -75,7 +75,8 @@ git の管理下のファイルは、手元から `tar` で送って置いた（
 ケースに足したのは git の `generated.md5` だけで、git のほかの入力は ps1 の元のものと md5 が一致した。
 
 - `runs/` の元のパスは、移した先を指す相対の symlink である。REPORT、解析のスクリプト、`fetch` の `runs/...` のパスは、そのまま使える。
-- batch の要約（`summary.json` など）と、論文に使わないケースは、`runs/` に残した。
+- batch の要約（`summary.json` など）と、論文に使わないケースは、`runs/` に残した。図が読む要約は、試験のフォルダの symlink からもたどれる（「図」の節）。
+- 手元の Stage 16 の解析で書いた `runs/stage16/conv_table.json` と `judge_tm.json` は、ps1 になかったので、2026-11-13 に手元から写した。
 - `du runs/...` は symlink の先を数えない。ケースの量は `du -L` か、`tests/` の側で数える。
 - ケースのディレクトリで投入すると、元の出力を上書きする（「走らせ方」の節）。
 
@@ -157,6 +158,13 @@ python3 tests/MHD_COMP_ISOTH/Euler1D/plot_euler1d.py [plot] [名前 ...]  # 図�
 - 大きい出力（2D と 3D の面、`cfl.dat`、平面問題の分布）からは、要る配列だけを取り出す。`stages/figdata.py` を ssh の標準入力で ps1 に送って走らせ、npz を標準出力で `runs/figdata/<試験>/` に受け取る。
 - 取り出しは、ps1 の作業ディレクトリにある解析のモジュール（`analyze_stage1.py`、`analyze_stage4.py`、`gen_ic.py`、`gen_stage4.py`、`riemann_exact.py`、`cp_stability.py`）を import する。モジュールは ps1 の `tests/MHD_COMP_ISOTH/stages/` から読み、md5 が手元の `stages/` のものと違えば止まる。
 - fetch が持ち帰る量は、Euler1D が 2.7 MB、Smooth_wave が 0.8 MB、OT2D が 20 MB、Turb3D が 14 MB である。解析の要約（Stage 3 の FV の参照、Stage 7–8、13–16 の JSON など）は、各 Stage の解析で手元の `runs/` に置いたものを読み、fetch の対象にしていない。MHD1D の図は、これだけで描ける。
+
+図が読む要約（Stage の判定表、batch の `summary.json`、FV の参照など。5 つのフォルダで合わせて 24 項目）は、試験のフォルダからもたどれるように symlink を置いた。
+symlink は、試験のフォルダの下で、要約の `runs/` の下のパスと同じパスに置き、根の `runs/` の同じパスを相対で指す（例: `Euler1D/stage1_es/judge.json` は `../../../../runs/stage1_es/judge.json` を指す）。
+図のスクリプトは、symlink でなく `--runs` の下を読む。
+symlink は git で管理する。手元と ps1 は `runs/` と `tests/` の相対の位置が同じなので、同じ symlink がどちらでも解決する。
+`runs/` は git の外にあるので、`runs/` のない場所（新しい clone など）では、どの symlink も切れている。
+fetch が取り出す npz（`runs/figdata/<試験>/`）と、ケースの出力（Euler1D の out1d の行など）には、symlink を置いていない。npz は手元にしかなく、ケースの出力は ps1 では試験のフォルダのケースの中に実物があるからである。
 
 図は手元でしか描けない。newtx が要り、ps1 にはないからである。
 各スクリプトは、描いた量の主な数値（収束の次数、最大値、判定の値）を標準出力に書く。REPORT の表と照らすためである。

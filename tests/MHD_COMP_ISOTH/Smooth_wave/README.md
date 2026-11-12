@@ -81,6 +81,7 @@ REPORT_stage4 では、これを CP 波の線形不安定で説明した（5.3 �
 入力は、上の解析が書いた `stage4/{alfven,cpdiag,planar}/summary.json` と `stage4/alfven/cp_rates.json`、平面問題の k = (1,2)、N = 256 の最後の分布（`runs/figdata/Smooth_wave/`）である。
 `fetch` は、要約を ps1 から写し、分布を ps1 の出力から取り出す（合わせて 0.8 MB）。
 C2 の FV の参照は、手元の `runs/stage3/fvref` から読む。
+要約と FV の参照は、このフォルダの同じパス（`stage4/alfven/summary.json`、`stage3/fvref` など）に置いた symlink からもたどれる（`../README.md` の「図」の節）。
 図の実行は、上に書いたとおり最終版で走らせ直していない。
 
 成長率 γ は、ω0 = |k0| v_A を単位とする。

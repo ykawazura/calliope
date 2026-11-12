@@ -63,6 +63,7 @@ REPORT_stage1 の 11.2 節にある `smoke/collide_U2_N512_chain` は、restart 
 
 `plot_euler1d.py` が `fig/<名前>.pdf` を書く。コマンドと fetch は `../README.md` の「図」の節による。
 入力は、Stage 1 の判定表 `runs/stage1_es/judge.json`（`judge_stage1.py` が書く）と、`shock` の N = 512、2048 の t_end の out1d の行である。
+判定表は、このフォルダの同じパス（`stage1_es/judge.json`）に置いた symlink からもたどれる（`../README.md` の「図」の節）。
 `fetch` は、手元にないものを ps1 から写す（合わせて 2.7 MB）。
 図の実行は、上に書いたとおり最終版で走らせ直していない。
 

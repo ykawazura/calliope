@@ -78,6 +78,7 @@ Stage 16 の conv は、完走（CV1）し、Stage 3 の実行と全 21 行で�
 `plot_mhd1d.py` が `fig/<名前>.pdf` を書く。コマンドは `../README.md` の「図」の節による。
 入力はすべて手元の `runs/` にあり、fetch は要らない。
 読むのは、Stage 14 の最後の状態（`stage14/mhd1d/suite_last`、`eta_suite_last`）、Stage 16 の表（`stage16/conv_table.json`）、Stage 3 の FV の参照（`stage3/fvref`、N = 65536 など）と収束した FV の解（`stage3/fvwin`）である。
+これらは、このフォルダの同じパス（`stage14/mhd1d/suite_last` など）に置いた symlink からもたどれる（`../README.md` の「図」の節）。
 数値解はどれも最終版（s13d）の実行である。
 REPORT の欄の Stage 3 の節は、設定と議論の節を指す。
 

@@ -145,6 +145,7 @@ ROOT は `runs` である。
 入力の多くは、上の解析が書いて手元の `runs/` に置いた要約である（`stage6q/turb/summary.json`、`stage7/tail_N*.json`、`stage8/{rhomin,summary}.json`、`stage13d/rhomin.json`、`stage15/{spec,judge}.json`、`stage16/judge_tm.json`）。
 `fetch` は、残りの 3 つを ps1 から持ち帰る（合わせて 14 MB）。
 `turb_slice` の面（256³、t = τ0、z = 0 の ρ、ζ、D）と `turb_track` の `cfl.dat` の表（4 本）は ps1 の出力から取り出し、`turb_ms` の `stage5/ana/{res,ms}.json` は写す。
+上に挙げた要約と `stage5/ana/{res,ms}.json` は、このフォルダの同じパスに置いた symlink からもたどれる（`../README.md` の「図」の節）。
 
 | 図 | 論文 | 中身 | REPORT |
 |---|---|---|---|

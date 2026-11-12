@@ -55,6 +55,7 @@ t ≥ 4 ではプラズモイドができ、各点の量が N を上げても収
 
 `plot_ot2d.py` が `fig/<名前>.pdf` を書く。コマンドと fetch は `../README.md` の「図」の節による。
 `ot_eps` と `ot_spec` は、手元の `runs/stage14/ot/summary.json`（上の `analyze_stage4.py ot` が書く）を読む。
+`summary.json` は、このフォルダの同じパス（`stage14/ot/summary.json`）に置いた symlink からもたどれる（`../README.md` の「図」の節）。
 `ot_rho` と `ot_J` は、C_eta = 0 の実行の t = 3、6 の面の ρ、B_x、B_z（float32）を読む。`fetch` が ps1 の出力から `runs/figdata/OT2D/` に取り出す（合わせて 20 MB）。
 どの図も最終版（s13d）の実行である。
 
