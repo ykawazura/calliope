@@ -31,6 +31,7 @@ import sys
 import os
 import math
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths
 from isoth_case import write_case
 
 # Riemann problems: (rho_L, rho_R, u_L, u_R, t_end). The R state is on (L/4, 3L/4);
@@ -263,5 +264,5 @@ def cost(case):
 
 if __name__ == '__main__':
     batch = sys.argv[1]
-    base = sys.argv[2] if len(sys.argv) > 2 else os.path.join('runs', 'stage1')
+    base = sys.argv[2] if len(sys.argv) > 2 else os.path.join(paths.RUNS, 'stage1')
     print(' '.join(sorted(BATCHES[batch](os.path.join(base, batch)), key=cost, reverse=True)))

@@ -47,6 +47,7 @@ import json
 import math
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths
 import analyze_stage3 as a3
 import analyze_stage4 as a4
 import analyze_stage14 as a14
@@ -56,9 +57,9 @@ import gen_stage16 as g16
 from analyze_stage1 import run_dirs
 
 DUP = 1e-3          # tau0: a record of X within DUP of the previous kept one is left out
-S15 = os.path.join('runs', 'stage15')
-S14_LAST = {'': os.path.join('runs', 'stage14', 'mhd1d', 'suite_last'),
-            '_eta2': os.path.join('runs', 'stage14', 'mhd1d', 'eta_suite_last')}
+S15 = os.path.join(paths.RUNS, 'stage15')
+S14_LAST = {'': os.path.join(paths.RUNS, 'stage14', 'mhd1d', 'suite_last'),
+            '_eta2': os.path.join(paths.RUNS, 'stage14', 'mhd1d', 'eta_suite_last')}
 N_SUITE = (256, 512, 1024, 2048)
 N_CONV = (4096, 8192)
 
@@ -713,5 +714,5 @@ if __name__ == '__main__':
         sys.exit(0)
     if cmd not in ('conv', 'table', 'rejudge'):
         sys.exit(__doc__)
-    dict(conv=conv, table=table, rejudge=rejudge)[cmd](sys.argv[2] if len(sys.argv) > 2 else os.path.join('runs',
-                                                                                                         'stage16'))
+    dict(conv=conv, table=table, rejudge=rejudge)[cmd](sys.argv[2] if len(sys.argv) > 2 else
+                                                       os.path.join(paths.RUNS, 'stage16'))

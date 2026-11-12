@@ -17,3 +17,5 @@ html/
 restart?*
 *.pyc
 
+/runs/
+tests/MHD_COMP_ISOTH/runs/

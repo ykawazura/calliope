@@ -16,6 +16,7 @@ Batches
 import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths
 import gen_stage4 as s4
 from gen_stage6 import new_case
 from analyze_stage1 import read_nml
@@ -51,5 +52,5 @@ BATCHES = {'coef': batch_coef}
 
 if __name__ == '__main__':
     batch = sys.argv[1]
-    base = sys.argv[2] if len(sys.argv) > 2 else os.path.join('runs', 'stage8')
+    base = sys.argv[2] if len(sys.argv) > 2 else os.path.join(paths.RUNS, 'stage8')
     print(' '.join(sorted(BATCHES[batch](os.path.join(base, batch)), key=s4.cost, reverse=True)))

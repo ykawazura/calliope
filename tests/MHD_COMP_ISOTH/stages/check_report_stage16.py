@@ -7,8 +7,9 @@ number is formatted as in the report and must appear there (the costs: the rows 
 import os
 import sys
 import json
+import paths
 
-ROOT = sys.argv[1] if len(sys.argv) > 1 else os.path.join('runs', 'stage16')
+ROOT = sys.argv[1] if len(sys.argv) > 1 else os.path.join(paths.RUNS, 'stage16')
 REP = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'REPORT_stage16.md')
 KEYS = ('E_B W1', 'E_B W2', 'E_m W1', 'E_m W2')
 fails = []

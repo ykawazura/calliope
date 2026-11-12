@@ -21,6 +21,7 @@ import sys
 import math
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths
 import gen_stage4 as s4
 
 RES_N = 128
@@ -95,5 +96,5 @@ BATCHES = {'res': batch_res, 'calib': batch_calib, 'ms': batch_ms}
 
 if __name__ == '__main__':
     batch = sys.argv[1]
-    base = sys.argv[2] if len(sys.argv) > 2 else os.path.join('runs', 'stage5')
+    base = sys.argv[2] if len(sys.argv) > 2 else os.path.join(paths.RUNS, 'stage5')
     print(' '.join(sorted(BATCHES[batch](os.path.join(base, batch)), key=s4.cost, reverse=True)))

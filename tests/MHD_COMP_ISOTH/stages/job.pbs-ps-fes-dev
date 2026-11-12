@@ -11,7 +11,8 @@
 # and a file "nproc" holding the number of MPI ranks.  The binary is
 # $EXE (default: ./calliope in $PBS_O_WORKDIR).
 #
-#   qsub -v CASES="runs/a runs/b",EXE=bin/calliope_isoth tests/MHD_COMP_ISOTH/stages/job.pbs-ps-fes-dev
+#   qsub -v CASES="tests/MHD_COMP_ISOTH/runs/a tests/MHD_COMP_ISOTH/runs/b",EXE=bin/calliope_isoth \
+#        tests/MHD_COMP_ISOTH/stages/job.pbs-ps-fes-dev
 #
 # A file "exe" in a run directory overrides $EXE for that case (path relative to
 # $PBS_O_WORKDIR).  CASEFILE=<file> reads the list from a file instead.  PAR=<ncores> runs the cases

@@ -27,6 +27,7 @@ import hashlib
 import os
 import sys
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths
 import gen_stage4 as s4
 import gen_stage6 as s6
 import gen_stage8 as s8
@@ -104,5 +105,5 @@ BATCHES = {'regress': batch_regress, 'track': batch_track, 'nomass': batch_nomas
 
 if __name__ == '__main__':
     batch = sys.argv[1]
-    base = sys.argv[2] if len(sys.argv) > 2 else os.path.join('runs', 'stage13d')
+    base = sys.argv[2] if len(sys.argv) > 2 else os.path.join(paths.RUNS, 'stage13d')
     print(' '.join(sorted(BATCHES[batch](os.path.join(base, batch)), key=s4.cost, reverse=True)))

@@ -28,6 +28,7 @@ import sys
 import json
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths  # noqa: E402
 import gen_ic  # noqa: E402
 from analyze_stage1 import load_runs, read_nml  # noqa: E402
 from analyze_stage4 import out3d_records, out3d_at  # noqa: E402
@@ -327,11 +328,11 @@ if __name__ == '__main__':
         jout = args[k + 1]
         args = args[:k] + args[k + 2:]
     if args[0] == 'res':
-        res(args[1] if len(args) > 1 else 'runs', jout)
+        res(args[1] if len(args) > 1 else paths.RUNS, jout)
     elif args[0] == 'plot':
         plot(args[1], args[2] if len(args) > 2 else os.path.splitext(args[1])[0] + '.png')
     elif args[0] == 'ms':
-        ms(args[1] if len(args) > 1 else 'runs', jout)
+        ms(args[1] if len(args) > 1 else paths.RUNS, jout)
     elif args[0] == 'msplot':
         msplot(args[1], args[2] if len(args) > 2 else os.path.splitext(args[1])[0] + '.png')
     elif args[0] == 'fcheck':

@@ -322,7 +322,7 @@ def planar_profiles(runs):
 FIGS = dict(cp_error=cp_error, cp_dt=cp_dt, cp_growth=cp_growth, cp_diag=cp_diag, planar_profiles=planar_profiles)
 FETCH = [fd.Copy('stage4/alfven/summary.json', 'stage4/alfven/cp_rates.json', 'stage4/cpdiag/summary.json',
                  'stage4/planar/summary.json')]
-FETCH += [fd.Extract(planar_file(p, d), 'planar', 'runs/stage4/planar/phy_%s_k12_N256_%s' % (p, d))
+FETCH += [fd.Extract(planar_file(p, d), 'planar', 'stage4/planar/phy_%s_k12_N256_%s' % (p, d))
           for p in PLANAR for d in ('2d', '1d', '1dh')]
 
 if __name__ == '__main__':

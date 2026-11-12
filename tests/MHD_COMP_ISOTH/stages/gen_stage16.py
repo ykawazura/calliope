@@ -24,12 +24,13 @@ import sys
 import os
 import json
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths
 import gen_stage14 as g14
 import gen_stage15 as g15
 from gen_stage3 import cost
 
-ROOT = os.path.join('runs', 'stage16')
-S15 = os.path.join('runs', 'stage15')
+ROOT = os.path.join(paths.RUNS, 'stage16')
+S15 = os.path.join(paths.RUNS, 'stage15')
 OLD_CONV = os.path.join(g14.OLD3, 'conv')
 CONV = tuple('%s_N%d%s' % (p, N, t) for p in ('I1', 'RDpc') for N in (4096, 8192) for t in ('', '_eta2'))
 
@@ -84,7 +85,7 @@ BATCHES = dict(hf64=batch_hf64, hf128=batch_hf128, hf256=batch_hf256)
 
 
 def main_hf(cmd):
-    lst = os.path.join('runs', 'cases_s16_%s.txt' % cmd)
+    lst = os.path.join(paths.RUNS, 'cases_s16_%s.txt' % cmd)
     if os.path.exists(lst):
         raise SystemExit('%s exists: not written again' % lst)
     cases = BATCHES[cmd]()
@@ -96,7 +97,7 @@ def main_hf(cmd):
 
 def main(cmd):
     todo = PLANS[cmd]()
-    lst = os.path.join('runs', 'cases_s16_%s.txt' % cmd)
+    lst = os.path.join(paths.RUNS, 'cases_s16_%s.txt' % cmd)
     manifest = os.path.join(ROOT, 'manifest_%s.json' % cmd)
     for src, dst in todo:
         g14.check_src(src)

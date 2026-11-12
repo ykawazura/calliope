@@ -23,6 +23,7 @@ import math
 import shutil
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths
 import gen_stage4 as s4
 
 EXE_OLD = 'bin/calliope_isoth_s4b'     # src of Stage 5b (HEAD 0f3c805)
@@ -138,5 +139,5 @@ BATCHES = {'regress': batch_regress, 'track': batch_track, 'turb': batch_turb}
 
 if __name__ == '__main__':
     batch = sys.argv[1]
-    base = sys.argv[2] if len(sys.argv) > 2 else os.path.join('runs', 'stage6')
+    base = sys.argv[2] if len(sys.argv) > 2 else os.path.join(paths.RUNS, 'stage6')
     print(' '.join(sorted(BATCHES[batch](os.path.join(base, batch)), key=s4.cost, reverse=True)))

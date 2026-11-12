@@ -24,6 +24,7 @@ import time
 import numpy as np
 
 import mhd_exact as mx
+import paths
 
 
 def cfast(rho, by, bz, bx, c):
@@ -153,8 +154,7 @@ def run(W0, bx, L, t_end, c=1.0, cfl=0.4, bc='periodic', solver='hlld', every=0,
 
 # ------------------------------------------------------------ references
 T_REF = (0.025, 0.05, 0.075, 0.1)
-REF_DIR = os.path.normpath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', '..', '..', 'runs',
-                                        'stage3', 'fvref'))
+REF_DIR = os.path.abspath(os.path.join(paths.RUNS, 'stage3', 'fvref'))
 
 
 def compound_ic(name, N, L=1.0):

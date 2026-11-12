@@ -151,7 +151,7 @@ def ot_J(runs):
 
 
 FIGS = dict(ot_eps=ot_eps, ot_spec=ot_spec, ot_rho=ot_rho, ot_J=ot_J)
-FETCH = [fd.Extract(plane_file(N, t), 'plane', 'runs/stage14/ot/' + CASES[N], 'y0', str(t), '%d,2,%d' % (N, N),
+FETCH = [fd.Extract(plane_file(N, t), 'plane', 'stage14/ot/' + CASES[N], 'y0', str(t), '%d,2,%d' % (N, N),
                     'rho,bx,bz') for t, Ns in PLANES for N in Ns]
 
 if __name__ == '__main__':

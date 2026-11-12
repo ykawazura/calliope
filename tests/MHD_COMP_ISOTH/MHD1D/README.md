@@ -3,7 +3,7 @@
 論文の本文に載せる 1D MHD の Riemann 問題と、その収束の試験の入力を置く。
 問題の組と判定の量は Stage 3（`../stages/REPORT_stage3.md`）で決めた。
 論文の数値は、最終版の実行ファイル `bin/calliope_isoth_s13d` で走らせ直した Stage 14（`../stages/REPORT_stage14.md`）と Stage 16（`../stages/REPORT_stage16.md`）の実行から取る。
-入力は ps1 の `~/work/calliope_isoth/runs/stage14/mhd1d/` と `runs/stage16/conv/` から写し、`runs/` の下のパスのまま置いた。
+入力は ps1 の `runs/stage14/mhd1d/` と `runs/stage16/conv/` から写し、`runs/` の下のパスのまま置いた（`runs/` は `tests/MHD_COMP_ISOTH/runs/`。`../README.md` の「`runs/` の場所」の節）。
 
 C2（B_t が反転する複合問題）は、論文では限界の例として扱う（REPORT_stage3 の 1 章）。
 suite と eta_suite の `C2_N*` がそれにあたる。
@@ -58,7 +58,7 @@ Stage 16 の conv は、完走（CV1）し、Stage 3 の実行と全 21 行で�
 
 手順は `../README.md` の「走らせ方」による。この試験に固有の点は次のとおりである。
 
-- ケースを ps1 の `runs/` の下の同じパスに写し、`python3 tests/MHD_COMP_ISOTH/stages/regen_inputs.py <case> ...` で `profile1d.dat` を書く。
+- ケースを ps1 の作業ディレクトリの `tests/MHD_COMP_ISOTH/runs/` の下の同じパスに写し、`python3 tests/MHD_COMP_ISOTH/stages/regen_inputs.py <case> ...` で `profile1d.dat` を書く。
 - 各ケースの `exe` が `bin/calliope_isoth_s13d` を指すので、`EXE=` は要らない。
 - conv の 8 本には `fftw_estimate` があり、FFT の計画を ESTIMATE に固定する。Stage 3 の実行と同じ条件にするためである。
 - Stage 14 は、207 本の一覧を `PAR=128` で投げ、予算で止まったケースを `PAR=28` の 2 本目で続けた（REPORT_stage14 の 10 章）。
@@ -66,9 +66,11 @@ Stage 16 の conv は、完走（CV1）し、Stage 3 の実行と全 21 行で�
 
 ## 解析
 
-- 表と図: `python3 tests/MHD_COMP_ISOTH/stages/analyze_stage3.py table runs/stage14/mhd1d/suite runs/stage14/mhd1d/suite_rec` で、各ケースの記録と `tables.md`、図を書く。eta_suite も同じである。
-- 最後の状態: `analyze_stage3.py last runs/stage14/mhd1d/suite runs/stage14/mhd1d/suite_last`（eta_suite も同じ）。
-- 分割: `analyze_stage3.py decomp runs/stage14/mhd1d/decomp`。
+コマンドはリポジトリの根で打ち、`R=tests/MHD_COMP_ISOTH/runs` とする。
+
+- 表と図: `python3 tests/MHD_COMP_ISOTH/stages/analyze_stage3.py table $R/stage14/mhd1d/suite $R/stage14/mhd1d/suite_rec` で、各ケースの記録と `tables.md`、図を書く。eta_suite も同じである。
+- 最後の状態: `analyze_stage3.py last $R/stage14/mhd1d/suite $R/stage14/mhd1d/suite_last`（eta_suite も同じ）。
+- 分割: `analyze_stage3.py decomp $R/stage14/mhd1d/decomp`。
 - conv: `MPLBACKEND=Agg python3 tests/MHD_COMP_ISOTH/stages/analyze_stage16.py conv` で完走と旧との一致を調べ、`analyze_stage16.py table` で N = 256–8192 の表を作る。
   後者は、N ≤ 2048 を `runs/stage14/mhd1d/*_last` から、4096 と 8192 を `runs/stage16/conv_last` から読む。
 - 旧との比較（`analyze_stage14.py mhd1d`、`proto`、`records`）は、ps1 にある Stage 3 の実行（`runs/stage3_f`）と試作の実行（`runs/stage3`）を読むので、それらがない環境では使えない。

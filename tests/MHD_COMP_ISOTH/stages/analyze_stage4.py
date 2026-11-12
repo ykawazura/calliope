@@ -25,6 +25,7 @@ import glob
 import math
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths
 import gen_ic
 from analyze_stage1 import load, load_runs, read_lines, run_dirs
 import stage3 as s3
@@ -1757,7 +1758,7 @@ BATCHES = {'readback': readback, 'regress': regress, 'alfven': alfven, 'cpdiag':
 
 if __name__ == '__main__':
     batch = sys.argv[1]
-    base = sys.argv[2] if len(sys.argv) > 2 else os.path.join('runs', 'stage4')
+    base = sys.argv[2] if len(sys.argv) > 2 else os.path.join(paths.RUNS, 'stage4')
     root = os.path.join(base, batch)
     res = BATCHES[batch](root)
     with open(os.path.join(root, 'summary.json'), 'w') as f:

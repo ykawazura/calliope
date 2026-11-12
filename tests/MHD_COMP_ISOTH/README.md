@@ -5,8 +5,23 @@
 Stage ごとの生成と解析のスクリプト、報告（`REPORT_stage*.md`）、共通の部品は `stages/` に置く。
 計算の出力は git の管理外である。
 ps1 の `~/work/calliope_isoth/tests/MHD_COMP_ISOTH` は、このフォルダと同じ配置で、論文の 589 ケースの実行（入力と出力）を持つ（「ps1 の配置」の節）。
-手元の `runs/` には、解析の要約と図の入力を置く。
+解析の要約、図の入力、論文に使わない実行は、このフォルダの `runs/` に置く（「`runs/` の場所」の節）。
 各スクリプトの使い方は、その docstring に書いてある。
+
+## `runs/` の場所
+
+このフォルダの `runs/` のうち、手元のものは解析の要約と図の入力を持ち、ps1 のものは、論文に使わない実行、batch の要約、試験のフォルダのケースを指す symlink を持つ（「ps1 の配置」の節）。
+どちらも git の管理外である（`.gitignore`）。
+
+2026-11-13 より前は、これをリポジトリの根の `runs/` に置いていた。
+根の `runs/` は、試験とは別の production run（`runs/<モデル>/<問題>/...`）のために空けた。
+REPORT、docstring、検討の記録（`chat.tex`）、ケースの一覧、JSON の記録にある `runs/...` は、移す前の根の `runs/` を指し、いまの `tests/MHD_COMP_ISOTH/runs/...` にあたる。
+これらは書いた時点の記録なので、書き換えていない。
+この README と試験のフォルダの README でも、`runs/` はこのフォルダの `runs/` を指す。
+
+スクリプトが引数を省いたときに読み書きする場所は、`stages/paths.py` の `RUNS` が決める。
+`RUNS` は、走らせた場所からこのフォルダの `runs/` への相対パスで、リポジトリの根で走らせると `tests/MHD_COMP_ISOTH/runs` になる。
+生成のスクリプトが表示するケースのパス（`CASES`）もこの形になり、根で投入するジョブにそのまま渡せる。
 
 ## 論文の試験とフォルダ
 
@@ -47,7 +62,7 @@ Stage 6 と Stage 13 の batch `regress`（Fortran の変更の前後のビッ�
 
 ## ケースのファイル
 
-各ケースは、ps1 の `~/work/calliope_isoth/runs/` の下のパスのまま、試験のフォルダの下に置いた（例: `runs/stage14/ot/ot_N256_eta0` は `OT2D/stage14/ot/ot_N256_eta0/`）。
+各ケースは、ps1 の `runs/` の下のパスのまま、試験のフォルダの下に置いた（例: `runs/stage14/ot/ot_N256_eta0` は `OT2D/stage14/ot/ot_N256_eta0/`）。
 ps1 の元のディレクトリをパスでたどれるようにするためである。
 ps1 では、元のディレクトリそのものをこの位置に移し、`runs/` の元のパスには移した先を指す symlink を置いた（「ps1 の配置」の節）。
 ケースのディレクトリには次のファイルがある。
@@ -74,10 +89,10 @@ git の管理下のファイルは、手元から `tar` で送って置いた（
 元は `runs/<stage>/<batch>/[<sub>/]<case>` にあり、同じファイルシステムの中で mv で移した（複写していない）。
 ケースに足したのは git の `generated.md5` だけで、git のほかの入力は ps1 の元のものと md5 が一致した。
 
-- `runs/` の元のパスは、移した先を指す相対の symlink である。REPORT、解析のスクリプト、`fetch` の `runs/...` のパスは、そのまま使える。
+- `runs/` の元のパスは、移した先を指す相対の symlink である。REPORT と解析のスクリプトの `runs/...` のパスは、そのまま使える。
 - batch の要約（`summary.json` など）と、論文に使わないケースは、`runs/` に残した。図が読む要約は、試験のフォルダの symlink からもたどれる（「図」の節）。
 - 手元の Stage 16 の解析で書いた `runs/stage16/conv_table.json` と `judge_tm.json` は、ps1 になかったので、2026-11-13 に手元から写した。
-- `du runs/...` は symlink の先を数えない。ケースの量は `du -L` か、`tests/` の側で数える。
+- `du runs/...` は symlink の先を数えない。ケースの量は `du -L` か、試験のフォルダの側で数える。
 - ケースのディレクトリで投入すると、元の出力を上書きする（「走らせ方」の節）。
 
 移す前の平らな `tests/MHD_COMP_ISOTH` と `tests/MHD_INCOMP_regression` は、`~/work/calliope_isoth/attic/tests_flat_20261112/` に残した（ps1 では何も消していない）。
@@ -86,7 +101,20 @@ git の管理下のファイルは、手元から `tar` で送って置いた（
 移した後、ケースの中の 61506 項目の inode、大きさ、mtime は移す前と一致した。
 変わったのは、`generated.md5` を足した 487 ケースの最上位のディレクトリの mtime だけである。
 
+2026-11-13 に、根の `runs/` を `tests/MHD_COMP_ISOTH/runs/` に移した（同じファイルシステムの中の rename）。
+`runs/` の中の symlink 1084 本のうち、移すと切れる 719 本の指し先を書き換えた。
+
+- ケースを相対パスで指す 589 本は、指し先から `tests/MHD_COMP_ISOTH/` を抜いた。
+- `runs/` の中を絶対パスで指す 130 本（`runs/stage14/{seams,dry,old}` の下）は、指し先の `/calliope_isoth/runs/` を `/calliope_isoth/tests/MHD_COMP_ISOTH/runs/` に置き換えた。
+- `runs/` の中を相対パスで指す 365 本は、書き換えずにそのまま解決する。
+
+書き換えた後、1084 本が指す実体は、移す前と一致した。
+書き換えた一覧（`links.tsv`）と元に戻すスクリプト（`rollback.py`。`DRY=0` を付けたときだけ動かす）は、`~/work/calliope_isoth/attic/runs_move_20261113/` にある。
+2026-11-12 の `rollback.sh` は根の `runs/` を前提にするので、`tests/MHD_COMP_ISOTH/runs` があれば止まる行を足した（元は同じ場所の `rollback.sh.orig`）。
+2026-11-12 の再配置まで戻すときは、先に `rollback.py` で `runs/` を根に戻す。
+
 `runs/` にある過去のスクリプト（`runs/stage14/ana_*.sh`、`runs/stage4/*.py` など）は、平らな配置のパス `tests/MHD_COMP_ISOTH/<file>` を参照するので、そのままでは走らない。
+`runs/` にあるケースの一覧（`cases_*.txt` など）とジョブのスクリプトは、根からのパス `runs/...` を書いているので、投げ直すときは `tests/MHD_COMP_ISOTH/runs/...` に直す。
 これらは記録なので書き換えていない。
 attic の平らな配置のファイルのうち `analyze_stage16.py` と `REPORT_stage5.md` は、git のどの版とも違う。どちらも git の版より古い版である。
 
@@ -98,7 +126,7 @@ ps1 で 1 つのケースの組を走らせる手順を示す。
 1. 送る。ps1 は外部のネットワークにつながらず、git も使えないので、手元から `tar` と `ssh` で送る。
    - 作業ディレクトリには、ps1 の `~/work/calliope_isoth` でなく、別の作業ディレクトリ（`bin/` と `tests/` を持つ calliope のコピー）を使う。`~/work/calliope_isoth` のケースのディレクトリには元の実行の出力があり、そこで投入すると上書きするからである。
    - `tests/MHD_COMP_ISOTH/` を、作業ディレクトリの同じパスに置く。
-   - ケースを、作業ディレクトリの `runs/` の下の同じパスに置く。解析のスクリプトが読むパスの既定値が `runs/<stage>` だからである。
+   - ケースを、作業ディレクトリの `tests/MHD_COMP_ISOTH/runs/` の下の同じパスに置く。生成と解析のスクリプトが読み書きするパスの既定値が、そこだからである（「`runs/` の場所」の節）。
 2. 初期値を書く。`python3 tests/MHD_COMP_ISOTH/stages/regen_inputs.py <case> ...` で、`case.json` から `profile1d.dat` または `ic/` を書き、`generated.md5` と照らす（Euler1D は組み込みの初期値なので不要）。
 3. 実行ファイルを用意する。最終版は次のとおりビルドした（REPORT_stage13 の 12 章）。
    ```sh
@@ -112,7 +140,7 @@ ps1 で 1 つのケースの組を走らせる手順を示す。
      -v CASEFILE=<list>,PAR=<cores>[,EXE=bin/calliope_isoth_<ver>][,BUDGET=<min>] \
      tests/MHD_COMP_ISOTH/stages/job.pbs-ps-fes-dev
    ```
-   `CASEFILE` はケースのパス（作業ディレクトリからの相対）を 1 行に 1 つ並べたファイルで、`CASES="runs/a runs/b"` でも渡せる。
+   `CASEFILE` はケースのパス（作業ディレクトリからの相対）を 1 行に 1 つ並べたファイルで、`CASES="tests/MHD_COMP_ISOTH/runs/a tests/MHD_COMP_ISOTH/runs/b"` でも渡せる。
    `PAR` は複数のケースを同時に走らせるときのコア数、`BUDGET` はジョブの開始から実行を止めるまでの分数（既定 27）である。
    予算で止まったケースは restart を保存して `exit_status` が `incomplete` になり、同じ一覧で投げ直すと続きから走る。
    ジョブスクリプトの使い方の詳細は、その冒頭のコメントにある。
@@ -150,19 +178,20 @@ python3 tests/MHD_COMP_ISOTH/Euler1D/plot_euler1d.py fetch             # ps1 に
 python3 tests/MHD_COMP_ISOTH/Euler1D/plot_euler1d.py [plot] [名前 ...]  # 図を書く（名前を省くとすべて）
 ```
 
-`--runs` で入力の根（既定は、走らせた場所によらずリポジトリの根の `runs/`）を、`--host` と `--remote` で fetch の相手（既定 `ps1` の `~/work/calliope_isoth`）を変えられる。
+`--runs` で入力の根（既定は、走らせた場所によらずこのフォルダの `runs/`）を、`--host` と `--remote` で fetch の相手（既定 `ps1` の `~/work/calliope_isoth`）を変えられる。
 入力のない図は、足りないファイルを表示して飛ばし、最後に飛ばした図を並べる。
 
 - fetch は ps1 に何も書かず、手元にあるファイルを上書きしない（あれば飛ばす）。
 - 小さいファイル（要約の JSON、out1d の行）は、ssh と tar で、ps1 と同じパスで手元の `runs/` に写す。
 - 大きい出力（2D と 3D の面、`cfl.dat`、平面問題の分布）からは、要る配列だけを取り出す。`stages/figdata.py` を ssh の標準入力で ps1 に送って走らせ、npz を標準出力で `runs/figdata/<試験>/` に受け取る。
+- 写すものも取り出すものも、ps1 の `tests/MHD_COMP_ISOTH/runs/` からのパスで指す。
 - 取り出しは、ps1 の作業ディレクトリにある解析のモジュール（`analyze_stage1.py`、`analyze_stage4.py`、`gen_ic.py`、`gen_stage4.py`、`riemann_exact.py`、`cp_stability.py`）を import する。モジュールは ps1 の `tests/MHD_COMP_ISOTH/stages/` から読み、md5 が手元の `stages/` のものと違えば止まる。
 - fetch が持ち帰る量は、Euler1D が 2.7 MB、Smooth_wave が 0.8 MB、OT2D が 20 MB、Turb3D が 14 MB である。解析の要約（Stage 3 の FV の参照、Stage 7–8、13–16 の JSON など）は、各 Stage の解析で手元の `runs/` に置いたものを読み、fetch の対象にしていない。MHD1D の図は、これだけで描ける。
 
 図が読む要約（Stage の判定表、batch の `summary.json`、FV の参照など。5 つのフォルダで合わせて 24 項目）は、試験のフォルダからもたどれるように symlink を置いた。
-symlink は、試験のフォルダの下で、要約の `runs/` の下のパスと同じパスに置き、根の `runs/` の同じパスを相対で指す（例: `Euler1D/stage1_es/judge.json` は `../../../../runs/stage1_es/judge.json` を指す）。
+symlink は、試験のフォルダの下で、要約の `runs/` の下のパスと同じパスに置き、このフォルダの `runs/` の同じパスを相対で指す（例: `Euler1D/stage1_es/judge.json` は `../../runs/stage1_es/judge.json` を指す）。
 図のスクリプトは、symlink でなく `--runs` の下を読む。
-symlink は git で管理する。手元と ps1 は `runs/` と `tests/` の相対の位置が同じなので、同じ symlink がどちらでも解決する。
+symlink は git で管理する。手元と ps1 は試験のフォルダと `runs/` の相対の位置が同じなので、同じ symlink がどちらでも解決する。
 `runs/` は git の外にあるので、`runs/` のない場所（新しい clone など）では、どの symlink も切れている。
 fetch が取り出す npz（`runs/figdata/<試験>/`）と、ケースの出力（Euler1D の out1d の行など）には、symlink を置いていない。npz は手元にしかなく、ケースの出力は ps1 では試験のフォルダのケースの中に実物があるからである。
 
@@ -254,3 +283,17 @@ git show cf9bb60:tests/MHD_COMP_ISOTH/<file> > <file>
 残した REPORT と一部の docstring は、消したファイルや `tests/MHD_INCOMP_regression` に言及している。
 これらは書いた時点の記録なので変えていない。
 言及されたファイルは、上の `git show` で取り出せる。
+
+### 試験の `runs/` の移動（2026-11-13）
+
+リポジトリの根の `runs/` を `tests/MHD_COMP_ISOTH/runs/` に移し、根の `runs/` を production run のために空けた（「`runs/` の場所」の節）。
+スクリプトで変えたのは、`runs/` の場所を決めていた箇所だけである。
+
+- `stages/paths.py` を足し、場所を `RUNS` の 1 箇所で決めるようにした。
+- 生成と解析のスクリプトで、引数を省いたときの既定値と module の定数（`os.path.join('runs', ...)`）を `paths.RUNS` から作るようにした。`stage3.py` の `OUT` と `fv_mhd1d.py` の `REF_DIR` も同じである。
+- `figdata.py` の `--runs` の既定値を `paths.RUNS` にした。fetch は ps1 の `tests/MHD_COMP_ISOTH/runs/` で写し、取り出しもそこで走らせる。そのため、図のスクリプトが取り出しに渡すケースのパスから、先頭の `runs/` を外した。
+- `job.pbs-ps-fes-dev` の使い方のコメントにある `CASES` の例を直した。
+- 試験のフォルダの 24 本の symlink の指し先を、2 段浅くした。
+- `.gitignore` に `/runs/` と `tests/MHD_COMP_ISOTH/runs/` を足した。
+
+変えた後、手元の 30 枚の図は変える前と画素が一致し、`check_report_stage16.py` の出力も一致した。

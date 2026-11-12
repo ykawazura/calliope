@@ -4,7 +4,7 @@
     python3 tests/MHD_COMP_ISOTH/<Test>/plot_<test>.py [plot] [name ...]   figures -> <Test>/fig/<name>.pdf
     python3 tests/MHD_COMP_ISOTH/<Test>/plot_<test>.py fetch               missing inputs from ps1 into runs/
     python3 tests/MHD_COMP_ISOTH/<Test>/plot_<test>.py list                figures and their inputs
-    options: --runs DIR (default: runs/ of the worktree, from any directory), --host HOST (ps1),
+    options: --runs DIR (default: tests/MHD_COMP_ISOTH/runs/, from any directory), --host HOST (ps1),
              --remote DIR (~/work/calliope_isoth)
 
 fetch writes nothing on ps1 and never overwrites a local file (an existing target is skipped). It
@@ -12,7 +12,8 @@ fetch writes nothing on ps1 and never overwrites a local file (an existing targe
     extracts arrays from large outputs by running this file on ps1,
         ssh ps1 'cd ~/work/calliope_isoth && python3 -B - <md5> <op> <arg> ...' < figdata.py > runs/figdata/...npz,
     which imports the analysis modules of the worktree there (tests/MHD_COMP_ISOTH/stages), stops unless their md5
-    equal those of the local stages/ (MODS), and writes an npz to stdout. The ops:
+    equal those of the local stages/ (MODS), and writes an npz to stdout. The ops run in REMOTE_RUNS there, so a
+    <case> is relative to the runs/ of the tests like the copied files. The ops:
         plane <case> <y0|z0> <t> <nlx,nly,nlz> <q,...>   quantities q of gen_ic.PLANE_Q (float32) of the plane
                                                           record nearest to t (analyze_stage4.plane_records)
         table <case> <file>                               a table file of the run (cfl.dat, ...) per output
@@ -33,6 +34,7 @@ import numpy as np
 MODS = ('analyze_stage1.py', 'analyze_stage4.py', 'gen_ic.py', 'gen_stage4.py', 'riemann_exact.py',
         'cp_stability.py')
 REMOTE_MOD_DIR = 'tests/MHD_COMP_ISOTH/stages'
+REMOTE_RUNS = 'tests/MHD_COMP_ISOTH/runs'
 
 
 def md5(path):
@@ -99,6 +101,7 @@ def remote(argv):
     if bad:
         raise SystemExit('md5 of %s in %s differ from the local stages/' % (', '.join(bad), mod))
     sys.path.insert(0, os.path.abspath(mod))
+    os.chdir(REMOTE_RUNS)
     buf = io.BytesIO()
     np.savez(buf, **OPS[argv[1]](*argv[2:]))
     out.write(buf.getvalue())
@@ -108,7 +111,6 @@ def remote(argv):
 # --------------------------------------------------------------------------------------------- local side
 FILE = globals().get('__file__', '<stdin>')       # '<stdin>' under python3 - on the remote host
 HERE = None if FILE == '<stdin>' else os.path.dirname(os.path.abspath(FILE))
-ROOT = None if HERE is None else os.path.normpath(os.path.join(HERE, '..', '..', '..'))   # the worktree
 
 
 class Copy:
@@ -122,7 +124,7 @@ class Copy:
 
 
 class Extract:
-    """An npz from an op run on the remote host: out relative to runs/, case relative to the remote worktree."""
+    """An npz from an op run on the remote host: out relative to the local runs/, case to REMOTE_RUNS."""
 
     def __init__(self, out, op, *args):
         self.out, self.op, self.args = out, op, args
@@ -148,7 +150,7 @@ def fetch_copy(opt, item):
             print('exists, skipped:', os.path.join(opt.runs, p))
     if not todo:
         return
-    cmd = 'cd %s/runs && tar cf - -- %s' % (remote_dir(opt), ' '.join(shlex.quote(p) for p in todo))
+    cmd = 'cd %s/%s && tar cf - -- %s' % (remote_dir(opt), REMOTE_RUNS, ' '.join(shlex.quote(p) for p in todo))
     proc = subprocess.Popen(ssh_cmd(opt, cmd), stdout=subprocess.PIPE)
     want, got = set(todo), set()
     with tarfile.open(fileobj=proc.stdout, mode='r|') as tf:
@@ -191,6 +193,7 @@ def main(test_dir, figs, fetches, argv=None):
     """Command line of a plot_<test>.py: figs {name: f(runs)} drawn in order; fetches [Copy | Extract]. A figure
     whose input is missing (FileNotFoundError) is skipped and listed at the end."""
     import argparse
+    import paths
     cmds = ('plot', 'fetch', 'list')
     argv = sys.argv[1:] if argv is None else list(argv)
     if argv and argv[0] not in cmds and not argv[0].startswith('-'):
@@ -198,7 +201,7 @@ def main(test_dir, figs, fetches, argv=None):
     ap = argparse.ArgumentParser(description='figures of %s' % os.path.basename(test_dir))
     ap.add_argument('cmd', nargs='?', default='plot', choices=cmds)
     ap.add_argument('names', nargs='*', help='figures to draw (default: all)')
-    ap.add_argument('--runs', default=os.path.relpath(os.path.join(ROOT, 'runs')))   # 'runs' from the root
+    ap.add_argument('--runs', default=paths.RUNS)
     ap.add_argument('--host', default='ps1')
     ap.add_argument('--remote', default='~/work/calliope_isoth')
     opt = ap.parse_args(argv)

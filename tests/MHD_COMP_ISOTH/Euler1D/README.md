@@ -2,7 +2,7 @@
 
 論文の本文に載せる 1D 等温 Euler（B = 0）の試験の入力を置く。
 結果と判定は `../stages/REPORT_stage1.md`（Stage 1）にある。
-入力は ps1 の `~/work/calliope_isoth/runs/stage1_es/` から写した。
+入力は ps1 の `runs/stage1_es/` から写した（`runs/` は `tests/MHD_COMP_ISOTH/runs/`。`../README.md` の「`runs/` の場所」の節）。
 各ケースは `runs/` の下のパスのまま置いてある（例: `stage1_es/shock/U2_N1024/`）。
 
 ## 最終版で走らせ直していないこと
@@ -52,9 +52,9 @@ REPORT_stage1 の 11.2 節にある `smoke/collide_U2_N512_chain` は、restart 
 - restart の試験は、`smoke/collide_U2_N512_est` と、それを 1 ステップ目で止めて restart から続ける `smoke/collide_U2_N512_est_chain` を比べる。
   Stage 1 では後者に `terminate` ファイルを置いて投入した。
   calliope はこのファイルを見つけると消して止まるので、ps1 の元には残っておらず、ここにもない。
-  走らせ直すときは、投入の前に `touch runs/stage1_es/smoke/collide_U2_N512_est_chain/terminate` とする。
+  走らせ直すときは、投入の前に `touch tests/MHD_COMP_ISOTH/runs/stage1_es/smoke/collide_U2_N512_est_chain/terminate` とする。
 - ランクは 1、2、4 である。Stage 1 では、restart の試験の 2 本を除く全ケースを 1 つの一覧にまとめ、`PAR=64` で投入した。止まった U4 のケースは、残りの一覧で続けた（REPORT_stage1 の 11.2 節）。
-- 判定は `python3 tests/MHD_COMP_ISOTH/stages/judge_stage1.py runs/stage1_es` で、各ケースに `summary.json` を書き、判定表を出す。
+- 判定は `python3 tests/MHD_COMP_ISOTH/stages/judge_stage1.py tests/MHD_COMP_ISOTH/runs/stage1_es` で、各ケースに `summary.json` を書き、判定表を出す。
 - fast 波の判定、試作との照合（最初の 1000 ステップ）、SVV の冪乗法と dt の統計は、後処理 `post_stage1_es.sh` で求めた。
   これと fast 波の解析 `fast_wave.py` は ca9a205 で消したので、`git show cf9bb60:tests/MHD_COMP_ISOTH/<file> > <file>` で取り出して使う。
   `post_stage1_es.sh` は `T=tests/MHD_COMP_ISOTH` の下の `proto1d.py` と `fast_wave.py` を呼ぶので、取り出した 2 本は `stages/` に置き、`T` を `stages/` に直す。

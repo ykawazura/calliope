@@ -41,6 +41,7 @@ import os
 import sys
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths
 import gen_stage4 as s4
 import gen_stage6 as s6
 from gen_stage6 import new_case
@@ -272,5 +273,5 @@ BATCHES = {'pre': batch_pre, 'a': batch_a, 'a4': batch_a4, 'b': batch_b, 'c': ba
 
 if __name__ == '__main__':
     batch = sys.argv[1]
-    base = sys.argv[2] if len(sys.argv) > 2 else os.path.join('runs', 'stage15')
+    base = sys.argv[2] if len(sys.argv) > 2 else os.path.join(paths.RUNS, 'stage15')
     print(' '.join(sorted(BATCHES[batch](os.path.join(base, batch)), key=s4.cost, reverse=True)))

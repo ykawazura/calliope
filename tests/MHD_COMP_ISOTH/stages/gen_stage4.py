@@ -44,6 +44,7 @@ import json
 import math
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths
 from isoth_case import write_case
 from gen_stage1 import box_1d
 import gen_ic
@@ -893,5 +894,5 @@ def cost(case):
 
 if __name__ == '__main__':
     batch = sys.argv[1]
-    base = sys.argv[2] if len(sys.argv) > 2 else os.path.join('runs', 'stage4')
+    base = sys.argv[2] if len(sys.argv) > 2 else os.path.join(paths.RUNS, 'stage4')
     print(' '.join(sorted(BATCHES[batch](os.path.join(base, ROOT_OF.get(batch, batch))), key=cost, reverse=True)))

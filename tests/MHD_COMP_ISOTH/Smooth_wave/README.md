@@ -6,7 +6,7 @@ CP 波は厳密解と、斜めの平面問題は同じ問題の 1D の実行と�
 平面問題は衝撃波などの不連続を含み、滑らかな波ではないが、CP 波と同じ Stage 4 の試験なのでここに置いた。
 
 結果と判定は `../stages/REPORT_stage4.md`（Stage 4）にある。
-入力は ps1 の `~/work/calliope_isoth/runs/stage4/{alfven,cpdiag,planar}/` から写し、`runs/` の下のパスのまま置いた。
+入力は ps1 の `runs/stage4/{alfven,cpdiag,planar}/` から写し、`runs/` の下のパスのまま置いた（`runs/` は `tests/MHD_COMP_ISOTH/runs/`。`../README.md` の「`runs/` の場所」の節）。
 
 ## 最終版で走らせ直していないこと
 
@@ -66,7 +66,7 @@ REPORT_stage4 では、これを CP 波の線形不安定で説明した（5.3 �
 
 手順は `../README.md` の「走らせ方」による。この試験に固有の点は次のとおりである。
 
-- ケースを ps1 の `runs/` の下の同じパスに写し、`python3 tests/MHD_COMP_ISOTH/stages/regen_inputs.py <case> ...` で `ic/` または `profile1d.dat` を書く。
+- ケースを ps1 の作業ディレクトリの `tests/MHD_COMP_ISOTH/runs/` の下の同じパスに写し、`python3 tests/MHD_COMP_ISOTH/stages/regen_inputs.py <case> ...` で `ic/` または `profile1d.dat` を書く。
 - ケースに `exe` がないので、`qsub -v` の `EXE=` で実行ファイルを渡す。Stage 4 は `EXE=bin/calliope_isoth_s4` で走らせた。
 - `alfven`、`cpdiag` の全ケースと、`planar` の `ctl_*`、`eqv_*` には `fftw_estimate` があり、FFT の計画を ESTIMATE に固定する。
 

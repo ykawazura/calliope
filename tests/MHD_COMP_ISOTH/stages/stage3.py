@@ -39,12 +39,13 @@ import time
 import numpy as np
 HERE = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, HERE)
+import paths
 import mhd_exact as mx
 import fv_mhd1d as fv
 from proto_mhd1d import MHD1D
 from gen_stage1 import SAFETY
 
-OUT = os.path.normpath(os.path.join(HERE, '..', '..', '..', 'runs', 'stage3'))
+OUT = os.path.abspath(os.path.join(paths.RUNS, 'stage3'))
 LX, L = 1.0 / (2.0 * math.pi), 1.0
 NS = (256, 512, 1024, 2048)
 NWRITE = 20

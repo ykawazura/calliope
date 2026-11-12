@@ -27,6 +27,7 @@ import json
 import glob
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths
 import analyze_stage4 as a4
 from analyze_stage1 import load, load_runs, read_nml, num, strv, run_dirs
 
@@ -461,7 +462,7 @@ BATCHES = {'regress': regress, 'track': track, 'turb': turb}
 
 if __name__ == '__main__':
     batch = sys.argv[1]
-    base = sys.argv[2] if len(sys.argv) > 2 else os.path.join('runs', 'stage6')
+    base = sys.argv[2] if len(sys.argv) > 2 else os.path.join(paths.RUNS, 'stage6')
     root = os.path.join(base, batch)
     res = BATCHES[batch](root)
     with open(os.path.join(root, 'summary.json'), 'w') as f:

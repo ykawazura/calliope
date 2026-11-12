@@ -29,6 +29,7 @@ import json
 import math
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths
 from isoth_case import write_case
 from gen_stage1 import box_1d
 import stage3 as s3
@@ -186,5 +187,5 @@ if __name__ == '__main__':
     if batch == 'nstep':
         write_nstep()
         sys.exit()
-    base = sys.argv[2] if len(sys.argv) > 2 else os.path.join('runs', 'stage3_f')
+    base = sys.argv[2] if len(sys.argv) > 2 else os.path.join(paths.RUNS, 'stage3_f')
     print(' '.join(sorted(BATCHES[batch](os.path.join(base, batch)), key=cost, reverse=True)))

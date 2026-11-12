@@ -29,11 +29,12 @@ import shutil
 import fnmatch
 import hashlib
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths
 from gen_stage3 import cost
 
-OLD3 = os.path.join('runs', 'stage3_f')
-OLD4 = os.path.join('runs', 'stage4', 'ot')
-ROOT = os.path.join('runs', 'stage14')
+OLD3 = os.path.join(paths.RUNS, 'stage3_f')
+OLD4 = os.path.join(paths.RUNS, 'stage4', 'ot')
+ROOT = os.path.join(paths.RUNS, 'stage14')
 EXE_OLD_1D = 'bin/calliope_isoth_s3g'
 EXE_OLD_OT = 'bin/calliope_isoth_s4'
 EXE_NEW = 'bin/calliope_isoth_s13d'
@@ -164,7 +165,7 @@ PLANS = {'pairs': plan_pairs, 'mhd1d': plan_mhd1d, 'ot': plan_ot, 'estimate': pl
 def main(cmd):
     lists, todo = PLANS[cmd]()
     links = old_links() if cmd == 'ot' else []
-    files = {name: os.path.join('runs', 'cases_s14_%s.txt' % name) for name in lists}
+    files = {name: os.path.join(paths.RUNS, 'cases_s14_%s.txt' % name) for name in lists}
     manifest = os.path.join(ROOT, 'manifest_%s.json' % cmd)
     for src, dst, exe, est in todo:
         check_src(src)

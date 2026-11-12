@@ -34,6 +34,7 @@ import glob
 import math
 import numpy as np
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import paths
 import gen_ic
 import analyze_stage4 as a4
 from analyze_stage1 import load, load_runs, run_dirs
@@ -942,8 +943,8 @@ if __name__ == '__main__':
     if cmd == 'selftest':
         sys.exit(0 if selftest() else 1)
     if cmd in ('runs', 'watch'):
-        base = sys.argv[3] if len(sys.argv) > 3 else os.path.join('runs', 'stage15')
+        base = sys.argv[3] if len(sys.argv) > 3 else os.path.join(paths.RUNS, 'stage15')
         (batch_runs if cmd == 'runs' else watch)(base, sys.argv[2])
     else:
-        base = sys.argv[2] if len(sys.argv) > 2 else os.path.join('runs', 'stage15')
+        base = sys.argv[2] if len(sys.argv) > 2 else os.path.join(paths.RUNS, 'stage15')
         dict(pre=pre, spec=spec, judge=judge)[cmd](base)

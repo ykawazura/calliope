@@ -404,9 +404,9 @@ def turb_ms(runs):
 FIGS = dict(turb_eps=turb_eps, turb_spec=turb_spec, turb_slice=turb_slice, turb_track=turb_track,
             turb_rho_pdf=turb_rho_pdf, turb_K_spec=turb_K_spec, turb_K=turb_K, turb_kappa=turb_kappa,
             turb_coef=turb_coef, turb_nomass=turb_nomass, turb_ms=turb_ms)
-FETCH = ([fd.Extract(slice_file(), 'plane', 'runs/' + SLICE[0], SLICE[1], '%.12f' % SLICE[2],
+FETCH = ([fd.Extract(slice_file(), 'plane', SLICE[0], SLICE[1], '%.12f' % SLICE[2],
                      '%d,%d,%d' % ((SLICE[3],) * 3), 'rho,zeta,D')]
-         + [fd.Extract(cfl_file(c), 'table', 'runs/' + c, 'cfl.dat') for N in sorted(TRACK) for c, _ in TRACK[N]]
+         + [fd.Extract(cfl_file(c), 'table', c, 'cfl.dat') for N in sorted(TRACK) for c, _ in TRACK[N]]
          + [fd.Copy('stage5/ana/res.json', 'stage5/ana/ms.json')])
 
 if __name__ == '__main__':

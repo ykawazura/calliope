@@ -3,7 +3,7 @@
 論文の本文に載せる 2D の等温 Orszag–Tang 渦（OT）の入力を置く。
 問題の設定と判定の量は Stage 4（`../stages/REPORT_stage4.md` の 7 章）で決めた。
 論文の数値は、最終版の実行ファイル `bin/calliope_isoth_s13d` で走らせ直した Stage 14（`../stages/REPORT_stage14.md` の 6 章）の実行から取る。
-入力は ps1 の `~/work/calliope_isoth/runs/stage14/ot/` から写し、`runs/` の下のパスのまま置いた。
+入力は ps1 の `runs/stage14/ot/` から写し、`runs/` の下のパスのまま置いた（`runs/` は `tests/MHD_COMP_ISOTH/runs/`。`../README.md` の「`runs/` の場所」の節）。
 Stage 14 の入力は、Stage 4 の実行（`runs/stage4/ot`）の `calliope.in`、`nproc`、`case.json`、`ic/` を複製したものである（REPORT_stage14 の 2 章）。
 生成スクリプトで作り直さなかったのは、Stage 4 より後に足した既定値で `calliope.in` の字面が変わりうるからである。
 
@@ -42,14 +42,14 @@ t ≥ 4 ではプラズモイドができ、各点の量が N を上げても収
 
 手順は `../README.md` の「走らせ方」による。この試験に固有の点は次のとおりである。
 
-- ケースを ps1 の `runs/` の下の同じパスに写し、`python3 tests/MHD_COMP_ISOTH/stages/regen_inputs.py <case> ...` で `ic/` を書く。
+- ケースを ps1 の作業ディレクトリの `tests/MHD_COMP_ISOTH/runs/` の下の同じパスに写し、`python3 tests/MHD_COMP_ISOTH/stages/regen_inputs.py <case> ...` で `ic/` を書く。
 - 各ケースの `exe` が `bin/calliope_isoth_s13d` を指すので、`EXE=` は要らない。
 - Stage 14 は 3 つの一覧（N = 128、256 と分割の 8 本、N = 512、N = 1024）を、それぞれ 256 コアのジョブ（`-l select=1:ncpus=256:mem=745gb:mpiprocs=256:ompthreads=1`、`PAR=256`）で投げ、予算で止まったら同じ一覧で投げ直した（REPORT_stage14 の 10 章）。N = 512 は 2 本、N = 1024 は 3 本のジョブで終わった。
 
 ## 解析
 
-- `python3 tests/MHD_COMP_ISOTH/stages/analyze_stage4.py ot runs/stage14` で、判定（停止、保存則、分割、収束）と数値を標準出力と `runs/stage14/ot/summary.json` に書き、図を同じディレクトリに置く。
-- Stage 4 との比較（O1–O4）は `python3 tests/MHD_COMP_ISOTH/stages/analyze_stage14.py ot runs/stage14` で行う。Stage 4 の実行を `analyze_stage4.py ot` で解析した `runs/stage14/old/ot/summary.json` と、その実行の出力を読むので、ps1 の `runs/stage4/ot` がない環境では使えない。
+- `python3 tests/MHD_COMP_ISOTH/stages/analyze_stage4.py ot tests/MHD_COMP_ISOTH/runs/stage14` で、判定（停止、保存則、分割、収束）と数値を標準出力と `runs/stage14/ot/summary.json` に書き、図を同じディレクトリに置く。
+- Stage 4 との比較（O1–O4）は `python3 tests/MHD_COMP_ISOTH/stages/analyze_stage14.py ot tests/MHD_COMP_ISOTH/runs/stage14` で行う。Stage 4 の実行を `analyze_stage4.py ot` で解析した `runs/stage14/old/ot/summary.json` と、その実行の出力を読むので、ps1 の `runs/stage4/ot` がない環境では使えない。
 
 ## 図
 

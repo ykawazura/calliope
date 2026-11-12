@@ -3,7 +3,7 @@
 論文に載せる 3D 等温 MHD の減衰乱流の入力を置く。
 本文では、頑健さ、収支、スペクトル、密度 PDF と、ES-SVV と標準の散逸の比較を示す（Stage 6、7、15、16）。
 付録では MPI の分割によらないこと（Stage 6、15）と係数の感度（Stage 8、15）を、限界の例では M_s ≥ 2（Stage 4、5）と質量の項を外した ES-SVV（svv_mass = F、Stage 13）を示す。
-入力は ps1 の `~/work/calliope_isoth/runs/` の下から写し、`runs/` の下のパスのまま置いた。
+入力は ps1 の `runs/` の下から写し、`runs/` の下のパスのまま置いた（`runs/` は `tests/MHD_COMP_ISOTH/runs/`。`../README.md` の「`runs/` の場所」の節）。
 
 ## 最終版で走らせ直していないこと
 
@@ -112,7 +112,7 @@ L と H は、ES と比べるための参照であり、ES を安定にするた
 
 手順は `../README.md` の「走らせ方」による。この試験に固有の点は次のとおりである。
 
-- ケースを ps1 の `runs/` の下の同じパスに写し、`python3 tests/MHD_COMP_ISOTH/stages/regen_inputs.py <case> ...` で `ic/` を書く。256³ の `ic/` は 1 ケース約 0.95 GB である。
+- ケースを ps1 の作業ディレクトリの `tests/MHD_COMP_ISOTH/runs/` の下の同じパスに写し、`python3 tests/MHD_COMP_ISOTH/stages/regen_inputs.py <case> ...` で `ic/` を書く。256³ の `ic/` は 1 ケース約 0.95 GB である。
 - `exe` のない batch は、`qsub -v` の `EXE=` で実行ファイルを渡す。`stage4` は `bin/calliope_isoth_s4`、`stage5` は `_s4b`、`stage6q` と `stage8` は `_s6` で走らせた。
 - `stage15/pre` の `dec_*` には `fftw_estimate` があり、FFT の計画を ESTIMATE に固定する。分割の試験でビット単位の一致を見るためである。
 - 256³ は 256 ランクで、1 ノードを丸ごと要求する（`-l select=1:ncpus=256:mem=745gb:mpiprocs=256:ompthreads=1`）。`turb1_N256` は 30 分のジョブ 16 本で 3τ0 に達した。同じ一覧で投げ直すと restart から続く。
@@ -122,13 +122,13 @@ L と H は、ES と比べるための参照であり、ES を安定にするた
 
 ps1 の `~/work/calliope_isoth` で走らせ、`runs/` の下の出力を読む。
 Stage 16 の `rejudge` と `judge1` だけは、ps1 から持ち帰った JSON を手元で読む。
-ROOT は `runs` である。
+ROOT は `tests/MHD_COMP_ISOTH/runs` である。
 
 | Stage | コマンド（`tests/MHD_COMP_ISOTH/stages/` の下） | 読む実行 |
 |---|---|---|
 | 4 | `analyze_stage4.py turb` | `stage4/turb` |
-| 5 | `analyze_stage5.py res runs`、`analyze_stage5.py ms runs` | `stage4/turb`、`stage5/res`、`stage5/ms` |
-| 6 | `analyze_stage6.py track runs/stage6q`、`analyze_stage6.py turb runs/stage6q` | `stage6q`、`stage4/turb` |
+| 5 | `analyze_stage5.py res ROOT`、`analyze_stage5.py ms ROOT` | `stage4/turb`、`stage5/res`、`stage5/ms` |
+| 6 | `analyze_stage6.py track ROOT/stage6q`、`analyze_stage6.py turb ROOT/stage6q` | `stage6q`、`stage4/turb` |
 | 7 | `analyze_stage7.py tail ROOT N`、`hole ROOT N`、`judge ROOT` | `stage4/turb`、`stage6q/turb` |
 | 8 | `analyze_stage8.py rhomin ROOT`、`tail`、`hole`、`judge` | `stage8/coef` |
 | 13 | `analyze_stage13.py rhomin ROOT`、`fields`、`judge`、`instab` | `stage13d/nomass`、`stage8/coef/e0.5_C2` |
