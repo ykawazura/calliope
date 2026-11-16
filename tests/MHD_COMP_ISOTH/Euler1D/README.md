@@ -5,12 +5,35 @@
 入力は ps1 の `runs/stage1_es/` から写した（`runs/` は `tests/MHD_COMP_ISOTH/runs/`。`../README.md` の「`runs/` の場所」の節）。
 各ケースは `runs/` の下のパスのまま置いてある（例: `stage1_es/shock/U2_N1024/`）。
 
-## 最終版で走らせ直していないこと
+## 最終版との照合
 
-この試験は Stage 1 の実行ファイル `bin/calliope_isoth_es`（commit 2126274 のソース）で走らせ、最終版（`bin/calliope_isoth_s13d`）では走らせ直していない。
-Stage 14 で走らせ直したのは、1D MHD と 2D OT だけである。
-`calliope.in` に書いていない変数は、走らせる版の既定値をとる。
-現在の src はこれらの `calliope.in` の変数をすべて宣言している（`../README.md`）が、現在の版で Stage 1 と同じ結果になるかは確かめていない。
+この試験は Stage 1 の実行ファイル `bin/calliope_isoth_es`（commit 2126274 のソース）で走らせた。
+最終版 `bin/calliope_isoth_s13d`（07716cc）で同じ結果になることを、2026-11-17 に `check_s13d.py` で確かめた（job 497715）。
+判定の基準は実行の前に `../../../tasks/MHD_COMP_ISOTH/todo.md` に書き、`check_s13d.py` の docstring に写した。
+
+- 対象は 1 本の実行で終わる 99 ケースである。restart でつないだ 3 ケース（`shock/U4_N4096`、`dtconv/U4_N2048_cflsvv1`、
+  `smoke/collide_U2_N512_est_chain`）は、つなぎ目の位置が実時間で決まり、行がそろわないので外した。
+- 各ケースを es と s13d で、同じ `calliope.in`（md5 で原本と一致）、同じ rank 数、FFTW_ESTIMATE（`fftw_shim.so`）で走らせた。
+  `calliope.in` に書いていない変数は s13d の既定値をとり、その既定値で s13d は es と同じ経路を通る。
+- 99 対すべてで、終了状態（exit 0 が 92 対、exit 1 が 4 対、dt で止まった `dt_stop` が 3 対）がそろい、
+  解のファイル（out1d、restart、shock_selftest.dat）がバイト単位で一致した。
+- conservation.dat、cfl.dat、budget.dat の es が書く列（18、16、26 列）は、96 対で全行の文字列が一致した。
+  budget.dat の列 10（eps_ideal。s13d は eps_eta も引く）も、この 96 対では一致した（収支のない `fast/` の 3 対を除く）。
+- 残る 4 rank の 3 対（`decomp/U2_N512_x_np4`、`decomp/U2_N512_z_np4`、`smoke/selftest_np4`）では、budget.dat の大域和の列が
+  丸め誤差の大きさで違った。差は、和の列（dEdt_sum、eps_shock、eps_svv、-D_svv）で列の最大値の 3.66e-16 以下、
+  和の差の列（err_t、eps_ideal、R_zeta、R_svv）で絶対値 2.27e-13 以下である（和の列の最大値は 806）。
+  残差の比の列（14、25、26）は、分子の残差が丸め誤差の大きさなので、相対では 0.167 まで変わる。
+- この差の原因は MPI_Allreduce の足し算の順序である。s13d は収支の和を 1 回の Allreduce で集める配列を 16 個から 19 個に増やした。
+  Allreduce を recursive doubling に固定して（`I_MPI_ADJUST_ALLREDUCE=1`、job 497729）走らせ直すと、3 対はすべての列で一致した。
+  長さの変わらない conservation.dat の和（7 個）は、既定の Allreduce のままでも 99 対で一致した。
+  同じ実行ファイルでも、既定と固定とでは conservation.dat と budget.dat の和の列が違い、解のファイルは一致した。
+  2 rank の和は 1 回の足し算なので、順序によらない。
+- 負の対照（入力の違う `scan/U4_N1024_C1` の es と `scan/U4_N1024_C4` の s13d）では差を検出した。
+- 終了状態の判定は、実行の後で 1 か所直した。Stage 1 のジョブは dt で止まった 3 本にも `exit 0` を書いたが、今のジョブスクリプトは
+  `dt_stop` を書く（3b784b1）。Stage 1 の calliope.out.std にも止まったことの表示があるので、期待する状態を今のスクリプトの規則で
+  読み直した（`check_s13d.expected`）。
+- 出力は ps1 の `runs/euler1d_s13d/`（`compare.json`、`judge.out`、再実行は `adjust/`）にある。
+  費用は 19.33 core-h（48 コア × 23 分 59 秒と 24 コア × 22 秒）。
 
 ## 問題の設定
 
@@ -65,7 +88,7 @@ REPORT_stage1 の 11.2 節にある `smoke/collide_U2_N512_chain` は、restart 
 入力は、Stage 1 の判定表 `runs/stage1_es/judge.json`（`judge_stage1.py` が書く）と、`shock` の N = 512、2048 の t_end の out1d の行である。
 判定表は、このフォルダの同じパス（`stage1_es/judge.json`）に置いた symlink からもたどれる（`../README.md` の「図」の節）。
 `fetch` は、手元にないものを ps1 から写す（合わせて 2.7 MB）。
-図の実行は、上に書いたとおり最終版で走らせ直していない。
+図の実行は es のものである。s13d との照合は「最終版との照合」の節による。
 
 | 図 | 中身 | REPORT_stage1 |
 |---|---|---|
