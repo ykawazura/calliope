@@ -37,10 +37,12 @@ REPORT、docstring、検討の記録（`chat.tex`）、ケースの一覧、JSON
 | 本文 | 3D 減衰乱流（頑健さ、収支、スペクトル、密度 PDF、ESf の停止） | 6、7、15、16（K） | `Turb3D` |
 | 付録 | MPI の分割によらないこと | 6、15 | `Turb3D` |
 | 付録 | 係数の感度 | 8、15（ES25） | `Turb3D` |
+| 付録 | 理想部の 3 つの定式化 A、B、C の比較（1D の試作） | 2 | なし（`runs/stage2`） |
 | 限界 | M_s ≥ 2 | 4、5 | `Turb3D` |
 | 限界 | B_t が反転する複合問題 C2 | 3 | `MHD1D` |
 | 限界 | 質量の項を外した ES-SVV（svv_mass = F） | 13 | `Turb3D` |
 
+Stage 2 の行は、論文の付録に載せると決めた 2026-11-17 に足した（「Stage 2 の復元」の節）。
 `chat.tex` の分類は、1D 等温 Euler に Stage 14 も挙げている。
 しかし Stage 14 で走らせ直したのは Stage 3 の 1D MHD と Stage 4 の OT だけで、Stage 1 の Euler の試験は最終版で走らせ直していない。
 Stage 7 のうち論文に載せるのは密度 PDF の裾で、密度の穴の機構は載せない。
@@ -206,6 +208,7 @@ PDF は、リポジトリの根の `.gitignore` の `*.pdf` で git から外れ
 | Stage | 内容 | 生成 | 解析 | 報告 |
 |---|---|---|---|---|
 | 1 | 1D 等温 Euler（B = 0） | `gen_stage1.py` | `analyze_stage1.py`、`judge_stage1.py` | `REPORT_stage1.md` |
+| 2 | 理想部の定式化（A、B、C）、衝撃波粘性の形、フィルタの位置、SVV の形の比較（1D の試作、B = 0） | `stage2.py`（試作の実行） | `stage2.py check`、`stage2_table.py` | `REPORT_stage2.md` |
 | 3 | 1D 等温 MHD | `stage3.py`（試作の実行）、`gen_stage3.py` | `analyze_stage3.py`、`stage3_table.py`、`stage3_aux.py` | `REPORT_stage3.md` |
 | 4 | 2D と 3D の等温 MHD | `gen_stage4.py` | `analyze_stage4.py`、`cp_stability.py` | `REPORT_stage4.md` |
 | 5 | M_s ≈ 4 の密度の穴、128³ の解像度試験、64³ での M_s の上限 | `gen_stage5.py` | `analyze_stage5.py`、`svv3d.py` | `REPORT_stage5.md` |
@@ -217,7 +220,8 @@ PDF は、リポジトリの根の `.gitignore` の `*.pdf` で git から外れ
 | 15 | 3D 減衰乱流での ES-SVV と標準の散逸の比較 | `gen_stage15.py` | `analyze_stage15.py` | `REPORT_stage15.md` |
 | 16 | conv の再実行と、時刻をそろえた K の判定 | `gen_stage16.py` | `analyze_stage16.py`、`check_report_stage16.py` | `REPORT_stage16.md` |
 
-Stage 3 の表と図のスクリプト（`stage3_table.py`、`stage3_aux.py`）は、図を `stages/fig/` に書く。このディレクトリは git の管理外である。
+Stage 2 と Stage 3 の表と図のスクリプト（`stage2_table.py`、`stage3_table.py`、`stage3_aux.py`）は、図を `stages/fig/` に書く。このディレクトリは git の管理外である。
+`stage2_table.py` は、表の書式と色の定義を `stage3_table.py` から読む。
 
 ### 共通の部品
 
@@ -265,7 +269,7 @@ git show cf9bb60:tests/MHD_COMP_ISOTH/<file> > <file>
 | 群 | ファイル | 内容 |
 |---|---|---|
 | どこからも使われない診断 | `diag_u4.py`、`fast_wave.py`、`void_probe.py`、`post_stage1_es.sh`、`stage0/fast_wave.in`、`stage0/fast_wave_new_default.in`、`stage0/fast_wave_new_ideal.in` | U4 の衝突流（Stage 1）と 3D の実行の密度の最小点の診断、Stage 1 の ps1 での後処理、Stage 0 の速進波の固有モードの入力と解析 |
-| Stage 2 | `stage2.py`、`stage2_table.py`、`REPORT_stage2.md` | 数値定式化の比較 |
+| Stage 2 | `stage2.py`、`stage2_table.py`、`REPORT_stage2.md` | 数値定式化の比較（2026-11-17 に `stages/` に戻した。「Stage 2 の復元」の節） |
 | Stage 9–12 | `analyze_stage9.py`、`analyze_stage10.py`、`analyze_stage11.py`、`analyze_stage12.py`、`gen_stage10.py`、`REPORT_stage9.md`–`REPORT_stage12.md` | 密度の穴の質量収支と、ES-SVV の項の svv_eps0 への依存 |
 
 残したスクリプトが使っていた定義は、消す前に次のように移した。
@@ -276,7 +280,7 @@ git show cf9bb60:tests/MHD_COMP_ISOTH/<file> > <file>
 |---|---|---|
 | `shells`、`spectrum` | `analyze_stage12.py` | `analyze_stage13.py` |
 | `md5s`、`check_control` | `gen_stage10.py` | `gen_stage13.py` |
-| `COLOR`、`MARK`、`GRAY`、`e`、`stats`、`status`、`gmax`、`order`、`table` | `stage2_table.py` | `stage3_table.py` |
+| `COLOR`、`MARK`、`GRAY`、`e`、`stats`、`status`、`gmax`、`order`、`table` | `stage2_table.py` | `stage3_table.py`（戻した `stage2_table.py` も、ここから読む） |
 
 `incomp_regress.in` は `tests/MHD_INCOMP_regression/calliope.in` から内容を変えずに移した。
 
@@ -297,3 +301,15 @@ git show cf9bb60:tests/MHD_COMP_ISOTH/<file> > <file>
 - `.gitignore` に `/runs/` と `tests/MHD_COMP_ISOTH/runs/` を足した。
 
 変えた後、手元の 30 枚の図は変える前と画素が一致し、`check_report_stage16.py` の出力も一致した。
+
+### Stage 2 の復元（2026-11-17）
+
+論文の付録に理想部の定式化の比較（Stage 2）を載せることにしたので、ca9a205 で消した次の 3 本を cf9bb60 から `stages/` に戻した。
+
+- `REPORT_stage2.md`: 内容を変えていない。書いた時点の記録であり、論文の出典の行番号はこの版の行を指す。
+- `stage2.py`: 出力の場所 `OUT` を `paths.RUNS` から作るようにした。ほかは変えていない。
+- `stage2_table.py`: ca9a205 で `stage3_table.py` に移した 9 つの定義を消し、`stage3_table.py` から読むようにした。移した定義の AST は、`stage2_table.py` の元の定義と同じである。
+
+戻した後、`stage2.py table` と `stage2.py check` を手元で走らせた（Python 3.12.2、numpy 1.26.4、matplotlib 3.8.4）。
+`runs/stage2/tables.md`、`stages/fig/stage2_*.png` の 2 枚、check の出力は、戻す前の記録（`check` の出力は `runs/stage2/check.txt`）とバイト単位で一致した。
+174 本の実行（`stage2.py run`）は走らせ直していない。
