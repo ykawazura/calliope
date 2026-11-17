@@ -13,6 +13,7 @@
 
 - 対象は 1 本の実行で終わる 99 ケースである。restart でつないだ 3 ケース（`shock/U4_N4096`、`dtconv/U4_N2048_cflsvv1`、
   `smoke/collide_U2_N512_est_chain`）は、つなぎ目の位置が実時間で決まり、行がそろわないので外した。
+  このうち論文の値に使う `shock/U4_N4096` は、あとでつながずに走らせ直して照合した（この節の最後の項目）。
 - 各ケースを es と s13d で、同じ `calliope.in`（md5 で原本と一致）、同じ rank 数、FFTW_ESTIMATE（`fftw_shim.so`）で走らせた。
   `calliope.in` に書いていない変数は s13d の既定値をとり、その既定値で s13d は es と同じ経路を通る。
 - 99 対すべてで、終了状態（exit 0 が 92 対、exit 1 が 4 対、dt で止まった `dt_stop` が 3 対）がそろい、
@@ -34,6 +35,24 @@
   読み直した（`check_s13d.expected`）。
 - 出力は ps1 の `runs/euler1d_s13d/`（`compare.json`、`judge.out`、再実行は `adjust/`）にある。
   費用は 19.33 core-h（48 コア × 23 分 59 秒と 24 コア × 22 秒）。
+- `shock/U4_N4096` は、es と s13d で 1 本ずつ、restart でつながずに走らせ直した（2026-11-17、`check_s13d.py gen1`、
+  A_S キューの job 497858、4 rank、`I_MPI_ADJUST_ALLREDUCE=1`）。判定の基準は、実行の前に todo.md に書いた。
+  - 99 対と同じ判定（`check_s13d.py judge`）に合格した。FFT の計画は 2 本とも 48 個すべてが ESTIMATE で、
+    解のファイル 87 個がバイト単位で一致し、3 つの表は全行の全列（列 10 を含む）で一致した。
+  - `check_s13d.py values` で `judge_stage1.judge_shock` の値を比べた。L1(ρ)、ρ* の誤差、overshoot、衝撃波の速さと位置の誤差は、
+    es と s13d で完全に一致した。
+  - Stage 1 のつないだ実行（MEASURE）との相対差は、L1 が 8.5e-13、ρ* の誤差が 2.6e-9、overshoot が 1.1e-12、位置が 9.1e-10 である。
+    論文に載せた桁（ρ* の誤差 1.5e-4、overshoot 3.7%、L1 5.946e-2、当てはめの次数 0.921 と 0.926）は変わらない。
+  - 衝撃波の速さの誤差は、Stage 1 の 1.927e-4 から 2.299e-4 に変わった（相対 0.19）。速さは、out1d の各時刻の衝撃波の位置に直線を当てはめて求める。
+    restart した実行は始めに out1d を書く（step 0。`advance.F90` の `write_line` の条件 `first`）ので、Stage 1 のつないだ実行には
+    継ぎ目の時刻（t = 0.129396、0.278909）の out1d が 1 つずつ余分にあり、当てはめの点が 2 つ多い（22 点と 20 点）。
+    この 2 点を除いて当てはめ直すと、Stage 1 の値は今回の値と相対 3.2e-10 で一致した（右の衝撃波では 3.3e-10）。U4 の速さの誤差は論文に載せていない。
+  - budget.dat の時間積分は、int_eps_shock が相対 1.6e-5、int_D_svv が相対 1.7e-5 違った。Stage 1 のつないだ実行の budget.dat には、
+    継ぎ目ごとに 1 行（t = 0.129393 と 0.278906 の行）がない（122323 行と 122325 行）。wall time で止まった chunk が最後の step の行を書かなかったためで、
+    3b784b1 で直した（es はその前の版）。この 2 行の寄与を足すと、差は相対 4e-14 以下になった。
+  - 実時間は 5720 s と 5966 s、費用は 13.26 core-h（8 コア × 1 時間 39 分 28 秒）である。
+    出力は ps1 の `runs/euler1d_s13d/unchained/`（`compare.json`、`values.json`、`judge.out`、`values.out`）にある。
+  - 残りの 2 ケース（`dtconv/U4_N2048_cflsvv1`、`smoke/collide_U2_N512_est_chain`）は論文で使っていないので、走らせ直していない。
 
 ## 問題の設定
 

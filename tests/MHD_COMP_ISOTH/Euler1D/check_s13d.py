@@ -8,10 +8,20 @@ not been compared in Fortran.
     python3 tests/MHD_COMP_ISOTH/Euler1D/check_s13d.py judge [<root>]  the pairs of <root> (runs/euler1d_s13d) and the
                                                                        negative control -> <root>/compare.json
     python3 tests/MHD_COMP_ISOTH/Euler1D/check_s13d.py pair <old> <new>  one pair, printed (a dry run on earlier output)
+    python3 tests/MHD_COMP_ISOTH/Euler1D/check_s13d.py gen1 <batch/case>   a CHAINED case run in one piece:
+                                                                       runs/euler1d_s13d/unchained/<batch>_<case>_{old,new}
+                                                                       and runs/cases_euler1d_s13d_unchained.txt
+    python3 tests/MHD_COMP_ISOTH/Euler1D/check_s13d.py values <root> [<batch/case> ...]
+                                                                       the shock values of the pairs of <root> against the
+                                                                       Stage 1 judge.json -> <root>/values.json
 
 Run in the top directory of the code (ps1: ~/work/calliope_isoth) and submit the list with
     qsub -N e1s13d -l select=1:ncpus=48:mem=96gb:mpiprocs=48:ompthreads=1 \\
          -v CASEFILE=tests/MHD_COMP_ISOTH/runs/cases_euler1d_s13d.txt,PAR=48 tests/MHD_COMP_ISOTH/stages/job.pbs-ps-fes-dev
+and the list of gen1 (shock/U4_N4096: 4392 s x 4 ranks in Stage 1, with MEASURE) on A_S, whose wall time limit is 24 h:
+    qsub -q A_S -N e1u4 -l select=1:ncpus=8:mem=16gb:mpiprocs=8:ompthreads=1 -l walltime=02:30:00 \\
+         -v CASEFILE=tests/MHD_COMP_ISOTH/runs/cases_euler1d_s13d_unchained.txt,PAR=8,BUDGET=147,I_MPI_ADJUST_ALLREDUCE=1 \\
+         tests/MHD_COMP_ISOTH/stages/job.pbs-ps-fes-dev
 
 gen copies calliope.in and nproc of each case of stage1_es/ to the two cases (md5 checked), writes the file exe and
 an empty fftw_estimate in each, <root>/manifest.json and the list, by decreasing wall time of the Stage 1 run. It
@@ -27,6 +37,14 @@ A pair passes when (fixed before the runs, tasks/MHD_COMP_ISOTH/todo.md, 2026-11
   headers and the same text in each row, except column 10 of budget.dat: eps_ideal of s13d also subtracts eps_eta
   (0 for C_eta = 0), which may change its rounding (1 ulp between s3 and s3e, REPORT_stage3). Its largest difference
   is reported, not judged.
+
+Of the CHAINED cases only shock/U4_N4096 gives values of the paper (rho* error, overshoot, a point of the L1 fit). gen1
+makes its pair to run in one piece (on A_dev the chunks of es and s13d would end at different steps), with the
+Allreduce fixed (I_MPI_ADJUST_ALLREDUCE=1: with four ranks the sums of budget.dat depend on the order of the additions,
+job 497729). The pair is judged as above (judge <root>), and values checks (fixed before the run, todo.md, 2026-11-17)
+that judge_stage1.judge_shock gives the same L1(rho), rho* error, overshoot, speed and position errors for both runs. It
+reports their relative differences from the Stage 1 judge.json (the run of the paper, chained, with MEASURE) and the L1
+fits with L1 of N = 4096 replaced.
 """
 import sys
 import os
@@ -35,15 +53,22 @@ import glob
 import json
 import fnmatch
 import hashlib
+import numpy as np
 TEST = os.path.dirname(os.path.abspath(__file__))
 sys.path.insert(0, os.path.join(TEST, '..', 'stages'))
 import paths
 import analyze_stage4 as a4
 import analyze_stage14 as a14
+import judge_stage1 as j1
 
 SRC = os.path.relpath(os.path.join(TEST, 'stage1_es'))
 ROOT = os.path.join(paths.RUNS, 'euler1d_s13d')
 LIST = os.path.join(paths.RUNS, 'cases_euler1d_s13d.txt')
+UNCHAINED = os.path.join(ROOT, 'unchained')
+LIST1 = os.path.join(paths.RUNS, 'cases_euler1d_s13d_unchained.txt')
+JUDGE1 = os.path.join(SRC, 'judge.json')
+# shock values of judge_stage1.judge_shock that must be the same in the two runs
+VALUES = ('L1', 'star', 'over', 'speed', 'pos')
 EXE = (('old', 'bin/calliope_isoth_es'), ('new', 'bin/calliope_isoth_s13d'))
 NCASES = 102
 CHAINED = ('dtconv/U4_N2048_cflsvv1', 'shock/U4_N4096', 'smoke/collide_U2_N512_est_chain')
@@ -71,31 +96,36 @@ def wall(case):
     return float(w[-1])
 
 
-def sources():
-    """{batch/case: directory} of stage1_es less CHAINED (checked: exactly the cases with chunk_*)."""
+def wall_chained(case):
+    """Wall time in s of a run continued from restart/: that of chunk_1, chunk_2, ... and the case directory."""
+    return sum(wall(d) for d in glob.glob(os.path.join(case, 'chunk_*')) + [case])
+
+
+def sources(chained=False):
+    """{batch/case: directory} of stage1_es less CHAINED (checked: exactly the cases with chunk_*), or of CHAINED."""
     cases = {os.path.relpath(os.path.dirname(f), SRC): os.path.dirname(f)
              for f in glob.glob(os.path.join(SRC, '*', '*', 'calliope.in'))}
-    chained = sorted(k for k, d in cases.items() if glob.glob(os.path.join(d, 'chunk_*')))
-    if len(cases) != NCASES or tuple(chained) != CHAINED:
-        raise SystemExit('%s: %d cases (expected %d), chained %s (expected %s)' % (SRC, len(cases), NCASES, chained,
+    found = sorted(k for k, d in cases.items() if glob.glob(os.path.join(d, 'chunk_*')))
+    if len(cases) != NCASES or tuple(found) != CHAINED:
+        raise SystemExit('%s: %d cases (expected %d), chained %s (expected %s)' % (SRC, len(cases), NCASES, found,
                                                                                   list(CHAINED)))
     for k, d in cases.items():
         unknown = [n for n in os.listdir(d) if not any(fnmatch.fnmatch(n, p) for p in KNOWN)]
         missing = [n for n in INPUTS + ('exit_status', 'calliope.out.std') if not os.path.exists(os.path.join(d, n))]
         if unknown or missing:
             raise SystemExit('%s: unknown files %s, missing %s' % (d, unknown, missing))
-    return {k: d for k, d in cases.items() if k not in CHAINED}
+    return {k: d for k, d in cases.items() if (k in CHAINED) == chained}
 
 
-def gen():
-    src = sources()
+def gen(src=None, root=ROOT, lst=LIST, walltime=wall):
+    src = sources() if src is None else src
     for _, exe in EXE:
         if not os.path.isfile(exe):
             raise SystemExit('%s: no such binary' % exe)
-    todo = {k: {tag: os.path.join(ROOT, k.replace('/', '_') + '_' + tag) for tag, _ in EXE} for k in src}
+    todo = {k: {tag: os.path.join(root, k.replace('/', '_') + '_' + tag) for tag, _ in EXE} for k in src}
     dsts = [d for v in todo.values() for d in v.values()]
-    manifest = os.path.join(ROOT, 'manifest.json')
-    for f in dsts + [LIST, manifest]:
+    manifest = os.path.join(root, 'manifest.json')
+    for f in dsts + [lst, manifest]:
         if os.path.lexists(f):
             raise SystemExit('%s exists: not written again' % f)
     if len(set(dsts)) != len(dsts):
@@ -114,16 +144,23 @@ def gen():
             with open(os.path.join(dst, 'exe'), 'w') as f:
                 f.write(exe + '\n')
             open(os.path.join(dst, 'fftw_estimate'), 'w').close()
-        man[k] = dict(src=d, status=a4.status(d), wall=wall(d), nproc=int(open(os.path.join(d, 'nproc')).read()),
+        man[k] = dict(src=d, status=a4.status(d), wall=walltime(d), nproc=int(open(os.path.join(d, 'nproc')).read()),
                       md5=sums, **todo[k])
     order = sorted(man, key=lambda k: (-man[k]['wall'], k))
-    with open(LIST, 'w') as f:
+    with open(lst, 'w') as f:
         f.write('\n'.join(man[k][tag] for k in order for tag, _ in EXE) + '\n')
     with open(manifest, 'w') as f:
-        json.dump(dict(cases=man, exe=dict(EXE), list=LIST), f, indent=1)
+        json.dump(dict(cases=man, exe=dict(EXE), list=lst), f, indent=1)
     core_s = sum(2 * m['wall'] * m['nproc'] for m in man.values())
     print('%s: %d cases (%d pairs), Stage 1 wall time of the pairs %.2f core-h, longest %s %.0f s x %d ranks' % (
-        LIST, 2 * len(man), len(man), core_s / 3600, order[0], man[order[0]]['wall'], man[order[0]]['nproc']))
+        lst, 2 * len(man), len(man), core_s / 3600, order[0], man[order[0]]['wall'], man[order[0]]['nproc']))
+
+
+def gen1(key):
+    src = sources(chained=True)
+    if key not in src:
+        raise SystemExit('%s: not one of %s' % (key, list(CHAINED)))
+    gen({key: src[key]}, UNCHAINED, LIST1, wall_chained)
 
 
 def header(path):
@@ -244,7 +281,7 @@ def judge(root):
     out = {k: pair(m['old'], m['new'], expected(m['src'])) for k, m in sorted(man.items())}
     for k, r in out.items():
         print(line(k, r))
-    neg = pair(*(os.path.join(root, c) for c in NEG))
+    neg = pair(*(os.path.join(ROOT, c) for c in NEG))
     neg['detected'] = bool(neg['differ'] or any(not t['ok'] for t in neg['tables'].values()))
     print(line('negative control', neg), 'detected' if neg['detected'] else 'NOT DETECTED')
     reps = [r['tables'][REPORTED[0]].get('reported', {}) for r in out.values()]
@@ -261,6 +298,44 @@ def judge(root):
         json.dump(dict(summary=summ, pairs=out, negative=neg), f, indent=1)
 
 
+def fits(N, L1):
+    """Fitted orders of L1 for N >= 512 (judge_stage1.judge_batch_shock) and N >= 1024 (plot_euler1d.euler_l1)."""
+    N, L1 = np.array(N, float), np.array(L1)
+    return {m: -np.polyfit(np.log(N[N >= m]), np.log(L1[N >= m]), 1)[0] for m in (512, 1024)}
+
+
+def values(root, keys):
+    """judge_stage1.judge_shock of the pairs of <root> (it writes summary.json in each run) against the rows of the
+    Stage 1 judge.json; <root>/values.json when no case is listed."""
+    man = json.load(open(os.path.join(root, 'manifest.json')))['cases']
+    ref = json.load(open(JUDGE1))['shock']
+    out = {}
+    for k in keys or sorted(man):
+        batch, case = k.split('/')
+        if batch != 'shock':
+            raise SystemExit('%s: values is for the batch shock' % k)
+        rows, _ = j1.judge_shock([man[k]['old'], man[k]['new']])
+        r0 = [x for x in ref['rows'] if x['case'] == case][0]
+        num = sorted(n for n, v in r0.items() if isinstance(v, float) and isinstance(rows[0].get(n), float))
+        same = {n: rows[0][n] == rows[1][n] for n in num}
+        rel = {n: (rows[1][n] - r0[n]) / abs(r0[n]) if r0[n] else None for n in num}
+        conv = ref['convergence'][case.split('_N')[0]]
+        N = int(case.split('_N')[1])
+        L1 = [rows[1]['L1'] if n == N else v for n, v in zip(conv['N'], conv['L1'])]
+        out[k] = dict(old=rows[0], new=rows[1], stage1=r0, same=same, ok=all(same[n] for n in VALUES), rel=rel,
+                      fit_stage1=fits(conv['N'], conv['L1']), fit_new=fits(conv['N'], L1))
+        print('%s: %s (%s the same in old and new; differ: %s)' % (
+            k, 'ok' if out[k]['ok'] else 'FAIL', '/'.join(VALUES), sorted(n for n in num if not same[n]) or 'none'))
+        for n in num:
+            print('  %-14s new %.10e  Stage 1 %.10e  rel %s' % (n, rows[1][n], r0[n],
+                                                                '%.3e' % rel[n] if rel[n] is not None else '-'))
+        print('  fit N >= 512: %.6f (Stage 1 %.6f), N >= 1024: %.6f (Stage 1 %.6f)' % (
+            out[k]['fit_new'][512], out[k]['fit_stage1'][512], out[k]['fit_new'][1024], out[k]['fit_stage1'][1024]))
+    if not keys:
+        with open(os.path.join(root, 'values.json'), 'w') as f:
+            json.dump(out, f, indent=1, default=float)
+
+
 if __name__ == '__main__':
     cmd = sys.argv[1]
     if cmd == 'gen':
@@ -271,5 +346,9 @@ if __name__ == '__main__':
         r = pair(sys.argv[2], sys.argv[3])
         print(line(os.path.basename(sys.argv[3]), r))
         print(json.dumps(r, indent=1))
+    elif cmd == 'gen1':
+        gen1(sys.argv[2])
+    elif cmd == 'values':
+        values(sys.argv[2], sys.argv[3:])
     else:
         raise SystemExit(__doc__)
